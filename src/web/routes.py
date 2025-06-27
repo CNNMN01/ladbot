@@ -114,7 +114,9 @@ def register_routes(app):
                     'uptime': str(datetime.now() - bot.start_time).split('.')[0],
                     'loaded_cogs': len(bot.cogs),
                     'commands_today': getattr(bot, 'commands_used_today', 0),
-                    'error_count': getattr(bot, 'error_count', 0)
+                    'error_count': getattr(bot, 'error_count', 0),
+                    'bot_status': 'online',
+                    'bot_ready': True
                 }
             else:
                 # Default stats if bot not ready
@@ -126,7 +128,9 @@ def register_routes(app):
                     'uptime': 'Starting...',
                     'loaded_cogs': 0,
                     'commands_today': 0,
-                    'error_count': 0
+                    'error_count': 0,
+                    'bot_status': 'offline',
+                    'bot_ready': False
                 }
         except Exception as e:
             logger.error(f"Error getting bot stats: {e}")
@@ -138,7 +142,9 @@ def register_routes(app):
                 'uptime': 'Error',
                 'loaded_cogs': 0,
                 'commands_today': 0,
-                'error_count': 0
+                'error_count': 0,
+                'bot_status': 'error',
+                'bot_ready': False
             }
 
         return render_template('dashboard.html',
@@ -264,7 +270,8 @@ def register_routes(app):
                     'latency': round(bot.latency * 1000),
                     'uptime': str(datetime.now() - bot.start_time).split('.')[0],
                     'loaded_cogs': len(bot.cogs),
-                    'status': 'online'
+                    'status': 'online',
+                    'bot_ready': True
                 }
             else:
                 stats = {
@@ -274,13 +281,15 @@ def register_routes(app):
                     'latency': 0,
                     'uptime': 'Starting...',
                     'loaded_cogs': 0,
-                    'status': 'starting'
+                    'status': 'starting',
+                    'bot_ready': False
                 }
         except Exception as e:
             logger.error(f"Error in API stats: {e}")
             stats = {
                 'error': str(e),
-                'status': 'error'
+                'status': 'error',
+                'bot_ready': False
             }
 
         return jsonify(stats)
@@ -385,7 +394,8 @@ def register_routes(app):
             # Return dashboard with error message
             fallback_stats = {
                 'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
-                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                'bot_status': 'error', 'bot_ready': False
             }
             return render_template('dashboard.html',
                                  stats=fallback_stats,
@@ -403,7 +413,8 @@ def register_routes(app):
             # Return dashboard with error message
             fallback_stats = {
                 'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
-                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                'bot_status': 'error', 'bot_ready': False
             }
             return render_template('dashboard.html',
                                  stats=fallback_stats,
