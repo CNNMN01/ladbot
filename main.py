@@ -7,6 +7,7 @@ import logging
 import sys
 import os
 from pathlib import Path
+from datetime import datetime
 
 # Add src to Python path
 src_path = str(Path(__file__).parent / "src")
@@ -21,33 +22,37 @@ if project_root not in sys.path:
 
 def setup_logging():
     """Setup logging configuration"""
-    # Import after path is set
     try:
         from config.settings import settings
-    except ImportError:
-        # Fallback import method
-        import importlib.util
-        config_path = Path(__file__).parent / "src" / "config" / "settings.py"
-        spec = importlib.util.spec_from_file_location("settings", config_path)
-        settings_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(settings_module)
-        settings = settings_module.settings
 
-    settings.LOGS_DIR.mkdir(exist_ok=True)
+        settings.LOGS_DIR.mkdir(exist_ok=True)
 
-    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    handlers = [
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(settings.LOGS_DIR / "bot.log")
-    ]
+        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        handlers = [
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(settings.LOGS_DIR / "bot.log")
+        ]
 
-    logging.basicConfig(
-        level=getattr(logging, settings.LOG_LEVEL),
-        format=log_format,
-        handlers=handlers
-    )
+        logging.basicConfig(
+            level=getattr(logging, settings.LOG_LEVEL),
+            format=log_format,
+            handlers=handlers
+        )
 
-    logging.getLogger('discord').setLevel(logging.WARNING)
+        logging.getLogger('discord').setLevel(logging.WARNING)
+    except Exception as e:
+        print(f"❌ Failed to setup logging: {e}")
+        raise
+
+
+def get_port():
+    """Get port from environment (for Render compatibility)"""
+    return int(os.environ.get('PORT', 8080))
+
+
+def get_host():
+    """Get host for web server"""
+    return '0.0.0.0'
 
 
 async def main():
@@ -56,6 +61,7 @@ async def main():
 
     try:
         logger.info("🚀 Starting Ladbot Enhanced...")
+        logger.info(f"📅 Started at: {datetime.now()}")
 
         # Load environment
         try:
@@ -68,46 +74,44 @@ async def main():
         setup_logging()
 
         # Validate configuration
-        try:
-            from config.settings import settings
-        except ImportError:
-            # Fallback import method
-            import importlib.util
-            config_path = Path(__file__).parent / "src" / "config" / "settings.py"
-            spec = importlib.util.spec_from_file_location("settings", config_path)
-            settings_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(settings_module)
-            settings = settings_module.settings
-
-        settings.validate()
+        from config.settings import settings
         logger.info("✅ Configuration validated")
 
-        # Create and start bot
-        try:
-            from bot.ladbot import LadBot
-        except ImportError:
-            # Fallback import method
-            import importlib.util
-            bot_path = Path(__file__).parent / "src" / "bot" / "ladbot.py"
-            spec = importlib.util.spec_from_file_location("ladbot", bot_path)
-            ladbot_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(ladbot_module)
-            LadBot = ladbot_module.LadBot
+        # Log port information for debugging
+        port = get_port()
+        host = get_host()
+        logger.info(f"🌐 Web server will run on {host}:{port}")
 
-        bot = LadBot()
+        # Import and start bot
+        from bot.ladbot import LadBot
 
         logger.info("🤖 Starting Discord bot...")
-        await bot.start(settings.BOT_TOKEN)
+        bot = LadBot()
+
+        # Update bot's web server configuration for Render
+        if hasattr(bot, 'web_port'):
+            bot.web_port = port
+        if hasattr(bot, 'web_host'):
+            bot.web_host = host
+
+        async with bot:
+            await bot.start(settings.BOT_TOKEN)
 
     except KeyboardInterrupt:
-        logger.info("👋 Bot shutdown by user")
+        logger.info("👋 Bot shutdown requested")
     except Exception as e:
-        logger.error(f"💥 Fatal error: {e}", exc_info=True)
-        return 1
-
-    return 0
+        logger.error(f"❌ Fatal error: {e}")
+        logger.exception("Full traceback:")
+        sys.exit(1)
+    finally:
+        logger.info("👋 Bot shutdown complete")
 
 
 if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    sys.exit(exit_code)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
+    except Exception as e:
+        print(f"❌ Critical error: {e}")
+        sys.exit(1)

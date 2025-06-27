@@ -6,6 +6,7 @@ from discord.ext import commands
 import logging
 from pathlib import Path
 import sys
+import os
 from datetime import datetime
 import threading
 
@@ -52,21 +53,12 @@ class SimpleDataManager:
             'ascii': {'default': True, 'type': 'bool', 'descr': 'ASCII art command'},
             'cmd_8ball': {'default': True, 'type': 'bool', 'descr': '8-ball command'},
             'jokes': {'default': True, 'type': 'bool', 'descr': 'Jokes command'},
-            'weather': {'default': True, 'type': 'bool', 'descr': 'Weather command'},
-            'crypto': {'default': True, 'type': 'bool', 'descr': 'Crypto command'},
-            'reddit': {'default': True, 'type': 'bool', 'descr': 'Reddit command'},
-            'bible': {'default': True, 'type': 'bool', 'descr': 'Bible command'},
-            'roll': {'default': True, 'type': 'bool', 'descr': 'Dice roll command'},
             'minesweeper': {'default': True, 'type': 'bool', 'descr': 'Minesweeper game'},
-            'autoresponses': {'default': False, 'type': 'bool', 'descr': 'Auto-responses feature'},
-            'games': {'default': True, 'type': 'bool', 'descr': 'Games commands'},
-            'dino': {'default': True, 'type': 'bool', 'descr': 'Dinosaur facts'},
-            'knockknock': {'default': True, 'type': 'bool', 'descr': 'Knock-knock jokes'},
-            'laugh': {'default': True, 'type': 'bool', 'descr': 'Laugh responses'},
+            'autoresponses': {'default': False, 'type': 'bool', 'descr': 'Auto responses'},
         }
 
 class LadBot(commands.Bot):
-    """Enhanced Ladbot with backward compatibility and web dashboard"""
+    """Enhanced Discord bot with compatibility layers"""
 
     def __init__(self):
         from config.settings import settings
@@ -98,17 +90,20 @@ class LadBot(commands.Bot):
         # Add settings cache for compatibility
         self.settings_cache = {}
 
-        # 🆕 ADD UPTIME TRACKING
+        # Add uptime tracking
         self.start_time = datetime.now()
 
-        # 🆕 ADD COMMAND USAGE TRACKING
+        # Add command usage tracking
         self.commands_used_today = 0
 
-        # 🆕 ADD ERROR TRACKING
+        # Add error tracking
         self.error_count = 0
 
-        # 🆕 WEB SERVER THREAD REFERENCE
+        # Web server configuration for Render
+        self.web_host = '0.0.0.0'
+        self.web_port = int(os.environ.get('PORT', 8080))
         self.web_thread = None
+        self.web_url = f"https://ladbot-dashboard.onrender.com"
 
     def get_setting(self, guild_id, setting_name):
         """Get a setting value (compatibility method)"""
@@ -120,70 +115,95 @@ class LadBot(commands.Bot):
         defaults = {
             'autoresponses': False,
             'minesweeper': True,
+            'ping': True,
+            'help': True,
+            'feedback': True,
+            'say': True,
+            'ascii': True,
             'cmd_8ball': True,
             'jokes': True,
             'weather': True,
             'crypto': True,
             'reddit': True,
             'bible': True,
-            'ping': True,
-            'help': True,
             'roll': True,
-            'say': True,
-            'feedback': True,
-            'ascii': True,
             'games': True,
-            'dino': True,
-            'knockknock': True,
-            'laugh': True,
         }
+
         return defaults.get(setting_name, True)
 
-    async def update_setting(self, guild_id, setting_name, value):
-        """Update a setting (compatibility method)"""
-        # Store in memory cache
+    def update_setting(self, guild_id, setting_name, value):
+        """Update a setting value (compatibility method)"""
         if guild_id not in self.settings_cache:
             self.settings_cache[guild_id] = {}
+
         self.settings_cache[guild_id][setting_name] = value
-        logger.info(f"Updated setting {setting_name} = {value} for guild {guild_id}")
+        logger.info(f"Updated setting {setting_name}={value} for guild {guild_id}")
+
+    def get_stats(self):
+        """Get bot statistics"""
+        # Calculate uptime properly
+        uptime_str = "0s"
+        if hasattr(self, 'start_time'):
+            uptime_delta = datetime.now() - self.start_time
+            days = uptime_delta.days
+            hours, remainder = divmod(uptime_delta.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+
+            if days > 0:
+                uptime_str = f"{days}d {hours}h {minutes}m"
+            elif hours > 0:
+                uptime_str = f"{hours}h {minutes}m"
+            elif minutes > 0:
+                uptime_str = f"{minutes}m {seconds}s"
+            else:
+                uptime_str = f"{seconds}s"
+
+        return {
+            'cogs': len(self.cogs),
+            'commands': len(self.commands),
+            'latency': f"{round(self.latency * 1000)}",
+            'uptime': uptime_str,
+            'guilds': len(self.guilds),
+            'users': len(self.users),
+            'status': 'online' if self.is_ready() else 'offline'
+        }
 
     def start_web_server(self):
-        """Start the web dashboard in a separate thread"""
+        """Start web dashboard in a separate thread"""
         try:
-            from web.app import run_web_server
+            logger.info("🌐 Starting web dashboard...")
 
-            # Get web settings from config
-            host = getattr(self.settings, 'WEB_HOST', '0.0.0.0')
-            port = int(getattr(self.settings, 'WEB_PORT', 8080))
+            # Import Flask components
+            from web.app import create_app
 
-            # Check if port is available
-            import socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                result = s.connect_ex((host if host != '0.0.0.0' else 'localhost', port))
-                if result == 0:
-                    logger.warning(f"⚠️ Port {port} is already in use. Web server may not start.")
+            # Create Flask app with bot instance
+            app = create_app(self)
 
-            # Start web server in background thread
-            self.web_thread = threading.Thread(
-                target=run_web_server,
-                args=(self, host, port),
-                daemon=True,
-                name="WebServer"
-            )
+            # Start web server in separate thread
+            def run_server():
+                try:
+                    app.run(
+                        host=self.web_host,
+                        port=self.web_port,
+                        debug=False,
+                        use_reloader=False,
+                        threaded=True
+                    )
+                except Exception as e:
+                    logger.error(f"❌ Web server error: {e}")
+
+            # Start in background thread
+            self.web_thread = threading.Thread(target=run_server, daemon=True)
             self.web_thread.start()
-            logger.info(f"🌐 Web dashboard started at http://{host}:{port}")
 
-            # Add web dashboard info to bot status
-            if hasattr(self, 'web_url'):
-                self.web_url = f"http://{host}:{port}"
-            else:
-                self.web_url = f"http://{host}:{port}"
+            logger.info(f"🌐 Web dashboard started at: {self.web_url}")
 
-        except ImportError:
-            logger.warning("🌐 Web dashboard dependencies not found. Install with: pip install flask flask-cors")
+        except ImportError as e:
+            logger.warning("🌐 Web dashboard disabled - missing dependencies")
+            logger.info("Install with: pip install flask flask-cors")
         except Exception as e:
             logger.error(f"❌ Failed to start web server: {e}")
-            logger.debug(f"Web server error details: {e.__class__.__name__}: {str(e)}")
 
     async def setup_hook(self):
         """Called when the bot is starting up"""
@@ -227,11 +247,11 @@ class LadBot(commands.Bot):
         logger.info(f"🤖 {self.user.name} (ID: {self.user.id}) is online!")
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
 
-        # Set bot status
+        # Set bot status - Updated with new friendly message
         activity = discord.Game(name="🎪 Your entertainment companion")
         await self.change_presence(activity=activity)
 
-        # 🌐 START WEB DASHBOARD
+        # Start web dashboard
         self.start_web_server()
 
         # Log startup stats
@@ -239,153 +259,41 @@ class LadBot(commands.Bot):
         total_commands = len(self.commands)
         logger.info(f"📈 Serving {total_users} users with {total_commands} commands")
 
-        # 🆕 ADD STARTUP SUMMARY
+        # Add startup summary
         stats = self.get_stats()
         logger.info("🎯 Bot Status Summary:")
         logger.info(f"   • Cogs: {stats['cogs']} loaded")
         logger.info(f"   • Commands: {stats['commands']} available")
         logger.info(f"   • Latency: {stats['latency']}ms")
-        logger.info(f"   • Web Dashboard: {getattr(self, 'web_url', 'Not available')}")
+        logger.info(f"   • Web Dashboard: {self.web_url}")
         logger.info("🚀 Ladbot is fully operational!")
 
-    async def on_command_completion(self, ctx):
-        """Called when a command completes successfully"""
+    async def on_command(self, ctx):
+        """Called when a command is invoked"""
         self.commands_used_today += 1
-        logger.debug(f"Command {ctx.command.name} used by {ctx.author} in {ctx.guild}")
+        logger.info(f"Command '{ctx.command}' used by {ctx.author} in {ctx.guild}")
 
     async def on_command_error(self, ctx, error):
-        """Basic error handling (enhanced error handler cog provides more)"""
+        """Global error handler"""
         self.error_count += 1
 
-        # Let the ErrorHandler cog handle most errors
-        if hasattr(self, 'get_cog') and self.get_cog('ErrorHandler'):
-            return
-
-        # Fallback error handling if ErrorHandler cog isn't loaded
         if isinstance(error, commands.CommandNotFound):
-            return
-        elif isinstance(error, commands.MissingPermissions):
+            return  # Ignore unknown commands
+        elif isinstance(error, commands.CheckFailure):
             await ctx.send("❌ You don't have permission to use this command.")
-        elif isinstance(error, commands.BotMissingPermissions):
-            await ctx.send("❌ I don't have the required permissions.")
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"❌ Missing required argument: `{error.param.name}`")
         else:
             logger.error(f"Unhandled error in {ctx.command}: {error}")
-            await ctx.send("❌ An unexpected error occurred.")
-
-    async def on_guild_join(self, guild):
-        """Called when bot joins a new guild"""
-        logger.info(f"📥 Joined new guild: {guild.name} (ID: {guild.id}) with {guild.member_count} members")
-
-        # Set default settings for new guild
-        self.settings_cache[guild.id] = {}
-
-        # Try to send a welcome message to the first available channel
-        for channel in guild.text_channels:
-            if channel.permissions_for(guild.me).send_messages:
-                embed = discord.Embed(
-                    title="👋 Hello! I'm Ladbot",
-                    description=f"Thanks for adding me to **{guild.name}**!",
-                    color=0x00ff00
-                )
-                embed.add_field(
-                    name="🚀 Getting Started",
-                    value=f"Use `{self.command_prefix}help` to see all available commands",
-                    inline=False
-                )
-                embed.add_field(
-                    name="⚙️ Settings",
-                    value=f"Admins can use `{self.command_prefix}settings` to customize bot behavior",
-                    inline=False
-                )
-                embed.add_field(
-                    name="🌐 Web Dashboard",
-                    value=f"Visit {getattr(self, 'web_url', 'the web dashboard')} for advanced management",
-                    inline=False
-                )
-                embed.add_field(
-                    name="🎮 Features",
-                    value="Entertainment, utilities, games, information commands and more!",
-                    inline=False
-                )
-                try:
-                    await channel.send(embed=embed)
-                    break
-                except discord.Forbidden:
-                    continue
-
-    async def on_guild_remove(self, guild):
-        """Called when bot leaves a guild"""
-        logger.info(f"📤 Left guild: {guild.name} (ID: {guild.id})")
-
-        # Clean up settings cache
-        if guild.id in self.settings_cache:
-            del self.settings_cache[guild.id]
-
-    async def on_message(self, message):
-        """Process messages and commands"""
-        # Don't respond to bots
-        if message.author.bot:
-            return
-
-        # Process commands
-        await self.process_commands(message)
-
-    def get_uptime(self):
-        """Get bot uptime as a formatted string"""
-        if hasattr(self, 'start_time'):
-            uptime = datetime.now() - self.start_time
-            days = uptime.days
-            hours, remainder = divmod(uptime.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-
-            if days > 0:
-                return f"{days}d {hours}h {minutes}m"
-            elif hours > 0:
-                return f"{hours}h {minutes}m"
-            else:
-                return f"{minutes}m {seconds}s"
-        return "Unknown"
-
-    def get_stats(self):
-        """Get bot statistics"""
-        return {
-            'guilds': len(self.guilds),
-            'users': len(self.users),
-            'commands': len(self.commands),
-            'cogs': len(self.cogs),
-            'uptime': self.get_uptime(),
-            'commands_used': getattr(self, 'commands_used_today', 0),
-            'errors': getattr(self, 'error_count', 0),
-            'latency': round(self.latency * 1000),
-            'web_url': getattr(self, 'web_url', None),
-            'status': 'Online' if self.is_ready() else 'Offline',
-            'start_time': self.start_time.isoformat() if hasattr(self, 'start_time') else None
-        }
+            await ctx.send("❌ An error occurred while processing that command.")
 
     async def close(self):
-        """Clean shutdown of bot and web server"""
-        logger.info("🛑 Shutting down Ladbot...")
+        """Called when bot is shutting down"""
+        logger.info("🔄 Bot is shutting down...")
 
-        # Log final stats
-        if hasattr(self, 'start_time'):
-            uptime = datetime.now() - self.start_time
-            logger.info(f"📊 Final uptime: {self.get_uptime()}")
-            logger.info(f"📈 Commands processed: {getattr(self, 'commands_used_today', 0)}")
-            logger.info(f"❌ Errors encountered: {getattr(self, 'error_count', 0)}")
+        # Stop web server if running
+        if self.web_thread and self.web_thread.is_alive():
+            logger.info("🌐 Stopping web dashboard...")
 
-        # Close Discord connection
         await super().close()
-
-        # Web server thread will automatically close since it's daemonic
-        if hasattr(self, 'web_thread') and self.web_thread and self.web_thread.is_alive():
-            logger.info("🌐 Web server will shut down automatically")
-
-        logger.info("👋 Ladbot shutdown complete")
-
-    def get_web_dashboard_url(self):
-        """Get the web dashboard URL"""
-        return getattr(self, 'web_url', 'Not available')
-
-    def is_web_server_running(self):
-        """Check if web server is running"""
-        return hasattr(self, 'web_thread') and self.web_thread and self.web_thread.is_alive()
+        logger.info("👋 Bot shutdown complete")
