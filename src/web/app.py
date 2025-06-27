@@ -1,5 +1,5 @@
 """
-Flask Web Dashboard for Ladbot - Production Ready
+Flask Web Dashboard for Ladbot - Production Ready with OAuth
 """
 import os
 import sys
@@ -51,18 +51,13 @@ def create_app(bot=None):
     from .routes import register_routes
     register_routes(app)
 
-    # Add error handlers
-    @app.errorhandler(404)
-    def not_found(error):
-        return render_template('error.html',
-                             error_code=404,
-                             error_message="Page not found"), 404
-
-    @app.errorhandler(500)
-    def internal_error(error):
-        return render_template('error.html',
-                             error_code=500,
-                             error_message="Internal server error"), 500
+    # Add template context processors
+    @app.context_processor
+    def inject_config():
+        """Make config available in templates"""
+        return {
+            'config': app.config
+        }
 
     return app
 

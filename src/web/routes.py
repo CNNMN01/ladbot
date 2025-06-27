@@ -1,9 +1,10 @@
 """
-Complete Flask routes for Ladbot web dashboard
+Complete Flask routes for Ladbot web dashboard with Discord OAuth
 """
 from flask import render_template, session, redirect, url_for, request, jsonify, flash
 import logging
 from datetime import datetime
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,82 @@ def register_routes(app):
         """Login page"""
         return render_template('login.html')
 
+    @app.route('/auth/discord')
+    def discord_auth():
+        """Redirect to Discord OAuth"""
+        if not app.config['DISCORD_CLIENT_ID']:
+            flash('Discord OAuth not configured', 'error')
+            return redirect(url_for('login'))
+
+        discord_auth_url = (
+            f"https://discord.com/api/oauth2/authorize?"
+            f"client_id={app.config['DISCORD_CLIENT_ID']}&"
+            f"redirect_uri={app.config['DISCORD_REDIRECT_URI']}&"
+            f"response_type=code&"
+            f"scope=identify"
+        )
+        return redirect(discord_auth_url)
+
+    @app.route('/callback')
+    def discord_callback():
+        """Handle Discord OAuth callback"""
+        code = request.args.get('code')
+        if not code:
+            flash('Authorization failed', 'error')
+            return redirect(url_for('login'))
+
+        try:
+            # Exchange code for access token
+            token_data = {
+                'client_id': app.config['DISCORD_CLIENT_ID'],
+                'client_secret': app.config['DISCORD_CLIENT_SECRET'],
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': app.config['DISCORD_REDIRECT_URI']
+            }
+
+            # Get access token
+            token_response = requests.post(
+                'https://discord.com/api/oauth2/token',
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            token_json = token_response.json()
+
+            if 'access_token' not in token_json:
+                flash('Failed to get access token', 'error')
+                return redirect(url_for('login'))
+
+            # Get user info
+            headers = {'Authorization': f"Bearer {token_json['access_token']}"}
+            user_response = requests.get('https://discord.com/api/users/@me', headers=headers)
+            user_data = user_response.json()
+
+            # Store user in session
+            session['user'] = {
+                'id': user_data['id'],
+                'username': user_data['username'],
+                'discriminator': user_data.get('discriminator', '0'),
+                'avatar': user_data.get('avatar')
+            }
+            session['user_id'] = user_data['id']
+
+            flash('Successfully logged in!', 'success')
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            logger.error(f"OAuth error: {e}")
+            flash('Login failed', 'error')
+            return redirect(url_for('login'))
+
     @app.route('/dashboard')
     def dashboard():
         """Main dashboard page"""
+        # Check if user is logged in
+        if 'user' not in session:
+            flash('Please log in to access the dashboard', 'warning')
+            return redirect(url_for('login'))
+
         # Get bot stats safely
         bot = app.bot
         stats = {}
@@ -75,6 +149,11 @@ def register_routes(app):
     @app.route('/analytics')
     def analytics():
         """Analytics page with real data"""
+        # Check if user is logged in
+        if 'user' not in session:
+            flash('Please log in to access analytics', 'warning')
+            return redirect(url_for('login'))
+
         bot = app.bot
         analytics_data = {}
 
@@ -146,6 +225,11 @@ def register_routes(app):
     @app.route('/settings')
     def settings():
         """Settings page"""
+        # Check if user is logged in
+        if 'user' not in session:
+            flash('Please log in to access settings', 'warning')
+            return redirect(url_for('login'))
+
         bot = app.bot
 
         # Get current bot settings

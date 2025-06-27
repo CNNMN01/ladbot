@@ -4,44 +4,63 @@
 
 {% block content %}
 <div class="container">
-    <div class="row justify-content-center align-items-center" style="min-height: 80vh;">
-        <div class="col-md-6 col-lg-4">
-            <div class="card shadow-lg">
-                <div class="card-body text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body text-center p-5">
                     <div class="mb-4">
-                        <i class="fas fa-robot fa-4x text-primary"></i>
+                        <i class="fas fa-robot fa-4x text-primary mb-3"></i>
+                        <h3>Ladbot Dashboard</h3>
+                        <p class="text-muted">Welcome to the Ladbot management dashboard!</p>
                     </div>
-                    <h2 class="card-title mb-3">Ladbot Dashboard</h2>
-                    <p class="text-muted mb-4">Welcome to the Ladbot management dashboard!</p>
 
-                    {% if discord_login_url %}
-                    <a href="{{ discord_login_url }}" class="btn btn-primary btn-lg mb-3">
-                        <i class="fab fa-discord"></i> Login with Discord
-                    </a>
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else 'warning' if category == 'warning' else 'success' }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    {% if config['DISCORD_CLIENT_ID'] %}
+                        <a href="{{ url_for('discord_auth') }}" class="btn btn-primary btn-lg mb-3">
+                            <i class="fab fa-discord me-2"></i> Login with Discord
+                        </a>
+                        <p class="small text-muted">
+                            <i class="fas fa-info-circle"></i> Admin permissions required for access
+                        </p>
                     {% else %}
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Discord OAuth not configured
-                    </div>
-                    {% endif %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> Discord OAuth not configured
+                        </div>
+                        <p class="text-muted">Please contact the administrator to set up Discord authentication.</p>
 
-                    <div class="mt-4">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle"></i>
-                            Admin permissions required for access
-                        </small>
-                    </div>
+                        <!-- Development demo login -->
+                        {% if config.get('DEVELOPMENT') %}
+                            <hr>
+                            <a href="{{ url_for('demo_login') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-user"></i> Demo Login (Development)
+                            </a>
+                        {% endif %}
+                    {% endif %}
 
                     <hr class="my-4">
 
-                    <div class="text-start">
-                        <h6 class="text-muted mb-3">Dashboard Features:</h6>
-                        <ul class="list-unstyled text-muted">
-                            <li><i class="fas fa-chart-line text-primary me-2"></i> Real-time bot statistics</li>
-                            <li><i class="fas fa-cog text-success me-2"></i> Server settings management</li>
-                            <li><i class="fas fa-users text-info me-2"></i> User analytics</li>
-                            <li><i class="fas fa-shield-alt text-warning me-2"></i> Admin controls</li>
-                        </ul>
+                    <h6>Dashboard Features:</h6>
+                    <ul class="list-unstyled text-start">
+                        <li class="mb-2"><i class="fas fa-chart-line text-primary me-2"></i> Real-time bot statistics</li>
+                        <li class="mb-2"><i class="fas fa-cog text-success me-2"></i> Server settings management</li>
+                        <li class="mb-2"><i class="fas fa-users text-info me-2"></i> User analytics</li>
+                        <li class="mb-2"><i class="fas fa-shield-alt text-warning me-2"></i> Admin controls</li>
+                    </ul>
+
+                    <div class="mt-4">
+                        <small class="text-muted">
+                            <i class="fas fa-lock"></i> Secure authentication powered by Discord OAuth 2.0
+                        </small>
                     </div>
                 </div>
             </div>
