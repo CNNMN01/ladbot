@@ -480,4 +480,34 @@ updateTimestamp();
 // Update timestamp every minute
 setInterval(updateTimestamp, 60000);
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Usage Trends Chart
+{% if analytics.usage_trends %}
+const ctx = document.getElementById('usageTrendsChart').getContext('2d');
+const usageData = {{ analytics.usage_trends | tojson }};
+
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: usageData.map(d => d.hour),
+        datasets: [{
+            label: 'Commands Used',
+            data: usageData.map(d => d.usage),
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+{% endif %}
+</script>
 {% endblock %}

@@ -271,6 +271,18 @@ class LadBot(commands.Bot):
     async def on_command(self, ctx):
         """Called when a command is invoked"""
         self.commands_used_today += 1
+
+        # Track analytics
+        try:
+            from utils.analytics import analytics
+            analytics.track_command(
+                command_name=ctx.command.name,
+                user_id=ctx.author.id,
+                guild_id=ctx.guild.id if ctx.guild else 0
+            )
+        except Exception as e:
+            logger.error(f"Analytics tracking error: {e}")
+
         logger.info(f"Command '{ctx.command}' used by {ctx.author} in {ctx.guild}")
 
     async def on_command_error(self, ctx, error):
@@ -290,6 +302,14 @@ class LadBot(commands.Bot):
     async def close(self):
         """Called when bot is shutting down"""
         logger.info("🔄 Bot is shutting down...")
+
+        # Save analytics before shutdown
+        try:
+            from utils.analytics import analytics
+            analytics.save_analytics()
+            logger.info("📊 Analytics data saved")
+        except Exception as e:
+            logger.error(f"Failed to save analytics: {e}")
 
         # Stop web server if running
         if self.web_thread and self.web_thread.is_alive():
