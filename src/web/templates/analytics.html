@@ -247,12 +247,12 @@
         </div>
     </div>
 
-    <!-- Last Updated -->
+    <!-- Last Updated - FIXED -->
     <div class="row mt-4">
         <div class="col-12 text-center">
             <p class="text-muted small">
                 <i class="fas fa-clock"></i>
-                Last updated: <span id="timestamp">{{ moment().format('MMMM Do YYYY, h:mm:ss a') }}</span>
+                Last updated: <span id="timestamp"></span>
             </p>
         </div>
     </div>
@@ -285,10 +285,12 @@ function refreshData() {
 
 // Update timestamp
 function updateTimestamp() {
-    document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    const now = new Date();
+    document.getElementById('timestamp').textContent = now.toLocaleString();
 }
 
-// Update timestamp every minute
+// Set initial timestamp and update every minute
+updateTimestamp();
 setInterval(updateTimestamp, 60000);
 </script>
 {% endblock %}
