@@ -1,5 +1,5 @@
 """
-Fixed Flask routes for Ladbot web dashboard
+Complete Flask routes for Ladbot web dashboard
 """
 from flask import render_template, session, redirect, url_for, request, jsonify, flash
 import logging
@@ -68,9 +68,9 @@ def register_routes(app):
             }
 
         return render_template('dashboard.html',
-                               stats=stats,
-                               bot_stats=stats,  # Alias for template compatibility
-                               user=session.get('user'))
+                             stats=stats,
+                             bot_stats=stats,  # Alias for template compatibility
+                             user=session.get('user'))
 
     @app.route('/analytics')
     def analytics():
@@ -118,8 +118,31 @@ def register_routes(app):
             }
 
         return render_template('analytics.html',
-                               analytics=analytics_data,
-                               user=session.get('user'))
+                             analytics=analytics_data,
+                             user=session.get('user'))
+
+    @app.route('/settings')
+    def settings():
+        """Settings page"""
+        bot = app.bot
+
+        # Get current bot settings
+        settings_data = {
+            'prefix': getattr(bot.config, 'prefix', 'l.'),
+            'admin_count': len(getattr(bot.config, 'admin_ids', [])),
+            'debug_mode': getattr(bot.config, 'DEBUG', False),
+            'total_commands': len(bot.commands) if bot else 0,
+            'loaded_cogs': len(bot.cogs) if bot else 0
+        }
+
+        return render_template('settings.html',
+                             user=session.get('user'),
+                             settings=settings_data)
+
+    @app.route('/about')
+    def about():
+        """About page"""
+        return render_template('about.html', user=session.get('user'))
 
     @app.route('/api/stats')
     def api_stats():
@@ -208,20 +231,38 @@ def register_routes(app):
         flash('You have been logged out.', 'info')
         return redirect(url_for('login'))
 
-    # Error handlers
+    # Error handlers - Use dashboard template as fallback
     @app.errorhandler(404)
     def not_found(error):
         """Handle 404 errors"""
-        return jsonify({
-            'error': 'Page not found',
-            'status': 404
-        }), 404
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Endpoint not found', 'status': 404}), 404
+        else:
+            # Return dashboard with error message
+            fallback_stats = {
+                'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0
+            }
+            return render_template('dashboard.html',
+                                 stats=fallback_stats,
+                                 bot_stats=fallback_stats,
+                                 user=session.get('user'),
+                                 error_message="Page not found"), 404
 
     @app.errorhandler(500)
     def internal_error(error):
         """Handle 500 errors"""
         logger.error(f"Internal server error: {error}")
-        return jsonify({
-            'error': 'Internal server error',
-            'status': 500
-        }), 500
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Internal server error', 'status': 500}), 500
+        else:
+            # Return dashboard with error message
+            fallback_stats = {
+                'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0
+            }
+            return render_template('dashboard.html',
+                                 stats=fallback_stats,
+                                 bot_stats=fallback_stats,
+                                 user=session.get('user'),
+                                 error_message="Internal server error"), 500
