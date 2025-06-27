@@ -3,9 +3,7 @@ Hybrid ASCII Art - Works with or without the 'art' library
 """
 
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import discord
 from discord.ext import commands

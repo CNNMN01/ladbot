@@ -3,8 +3,6 @@ Simple, reliable help command with proper admin filtering
 """
 
 import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import discord
 from discord.ext import commands
@@ -36,10 +34,10 @@ class Help(commands.Cog):
         try:
             # Try lowercase first
             if hasattr(ctx.bot.config, 'admin_ids'):
-                admin_ids = ctx.bot.config.admin_ids
+                admin_ids = ctx.bot.settings.admin_ids
             # Try uppercase if lowercase doesn't exist
             elif hasattr(ctx.bot.config, 'ADMIN_IDS'):
-                admin_ids = ctx.bot.config.ADMIN_IDS
+                admin_ids = ctx.bot.settings.ADMIN_IDS
             # Fallback to empty list
             else:
                 admin_ids = []

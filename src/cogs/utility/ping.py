@@ -3,8 +3,6 @@ Ping command - Check bot latency
 """
 
 import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 import discord
@@ -52,7 +50,7 @@ class Ping(commands.Cog):
             has_server_admin = ctx.author.guild_permissions.administrator if ctx.guild else False
 
             # Check bot admin list
-            is_bot_admin = ctx.author.id in ctx.bot.config.admin_ids
+            is_bot_admin = ctx.author.id in ctx.bot.settings.admin_ids
 
             embed = discord.Embed(
                 title=f"🔍 Admin Status for {ctx.author.display_name}",
@@ -80,7 +78,7 @@ class Ping(commands.Cog):
             # Show the actual admin IDs for debugging
             embed.add_field(
                 name="Bot Admin IDs",
-                value=str(ctx.bot.config.admin_ids) if ctx.bot.config.admin_ids else "None configured",
+                value=str(ctx.bot.settings.admin_ids) if ctx.bot.settings.admin_ids else "None configured",
                 inline=False
             )
 

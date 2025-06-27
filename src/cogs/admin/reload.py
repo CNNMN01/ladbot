@@ -3,8 +3,6 @@ Cog reloading commands for administrators - SECURED VERSION
 """
 
 import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import discord
 from discord.ext import commands
@@ -329,7 +327,7 @@ class Reload(commands.Cog):
         # Admin info
         embed.add_field(
             name="🛡️ Admin Info",
-            value=f"**Admin Count:** {len(ctx.bot.config.admin_ids)}\n**Requested by:** {ctx.author.mention}",
+            value=f"**Admin Count:** {len(ctx.bot.settings.admin_ids)}\n**Requested by:** {ctx.author.mention}",
             inline=True
         )
 
@@ -350,7 +348,7 @@ class Reload(commands.Cog):
         # Bot details
         embed.add_field(
             name="📋 Bot Details",
-            value=f"**Name:** {ctx.bot.user.name}\n**ID:** {ctx.bot.user.id}\n**Version:** 2.0.0\n**Prefix:** {ctx.bot.config.prefix}",
+            value=f"**Name:** {ctx.bot.user.name}\n**ID:** {ctx.bot.user.id}\n**Version:** 2.0.0\n**Prefix:** {ctx.bot.settings.prefix}",
             inline=False
         )
 
@@ -375,14 +373,14 @@ class Reload(commands.Cog):
         # Configuration info (ADMIN ONLY)
         embed.add_field(
             name="⚙️ Configuration",
-            value=f"**Debug Mode:** {'Yes' if ctx.bot.config.debug else 'No'}\n**Database:** {'PostgreSQL' if 'postgresql' in ctx.bot.config.database_url else 'SQLite'}\n**Admin Count:** {len(ctx.bot.config.admin_ids)}",
+            value=f"**Debug Mode:** {'Yes' if ctx.bot.settings.debug else 'No'}\n**Database:** {'PostgreSQL' if 'postgresql' in ctx.bot.settings.database_url else 'SQLite'}\n**Admin Count:** {len(ctx.bot.settings.admin_ids)}",
             inline=True
         )
 
         # Security info (ADMIN ONLY)
         embed.add_field(
             name="🔒 Security Info",
-            value=f"**Admin IDs:** {len(ctx.bot.config.admin_ids)} configured\n**Intents:** Message Content, Members\n**Permissions:** Bot Admin",
+            value=f"**Admin IDs:** {len(ctx.bot.settings.admin_ids)} configured\n**Intents:** Message Content, Members\n**Permissions:** Bot Admin",
             inline=True
         )
 
