@@ -228,7 +228,7 @@ class LadBot(commands.Bot):
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
 
         # Set bot status
-        activity = discord.Game(name=f"{self.settings.BOT_PREFIX}help | v1.0 | {len(self.guilds)} servers")
+        activity = discord.Game(name="🎪 Your entertainment companion")
         await self.change_presence(activity=activity)
 
         # 🌐 START WEB DASHBOARD
