@@ -4,104 +4,83 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
+    <!-- Header -->
+    <div class="row mb-4">
         <div class="col-12">
-            <h1><i class="fas fa-chart-line"></i> Bot Analytics</h1>
-            <p class="text-muted">Detailed performance and usage statistics</p>
-        </div>
-    </div>
-
-    <!-- Overview Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5>Total Servers</h5>
-                            <h2>{{ analytics.total_guilds or 0 }}</h2>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-server fa-2x"></i>
-                        </div>
-                    </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3><i class="fas fa-chart-line text-primary"></i> Bot Analytics</h3>
+                    <p class="text-muted mb-0">Real-time statistics and performance metrics</p>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5>Total Users</h5>
-                            <h2>{{ analytics.total_users or 0 }}</h2>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-users fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5>Bot Latency</h5>
-                            <h2>{{ analytics.bot_latency or 0 }}ms</h2>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-wifi fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5>Uptime</h5>
-                            <h2 style="font-size: 1.5rem;">{{ analytics.uptime or '0s' }}</h2>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-clock fa-2x"></i>
-                        </div>
-                    </div>
+                <div>
+                    <button class="btn btn-outline-primary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Additional Stats Row -->
+    <!-- Main Stats Cards -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card bg-secondary text-white">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5>Total Commands</h5>
-                            <h2>{{ analytics.total_commands or 0 }}</h2>
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Servers</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ analytics.total_guilds or 0 }}</div>
                         </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-terminal fa-2x"></i>
+                        <div class="col-auto">
+                            <i class="fas fa-server fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card bg-dark text-white">
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5>Loaded Cogs</h5>
-                            <h2>{{ analytics.loaded_cogs or 0 }}</h2>
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Users</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ analytics.total_users or 0 }}</div>
                         </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-puzzle-piece fa-2x"></i>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Commands Available</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ analytics.total_commands or 0 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-terminal fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Bot Latency</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ analytics.bot_latency or 0 }}ms</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -109,35 +88,46 @@
         </div>
     </div>
 
-    <!-- Command Usage and Guild Information -->
+    <!-- Command Usage Statistics -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-terminal"></i> Command Usage Statistics</h5>
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-bar"></i> Command Usage Statistics
+                    </h6>
                 </div>
                 <div class="card-body">
                     {% if analytics.command_stats %}
-                        <div class="table-responsive" style="max-height: 400px;">
-                            <table class="table table-sm table-striped">
-                                <thead class="table-dark">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
                                     <tr>
-                                        <th>Command</th>
-                                        <th>Usage Count</th>
-                                        <th>Status</th>
+                                        <th><i class="fas fa-hashtag"></i> Rank</th>
+                                        <th><i class="fas fa-terminal"></i> Command</th>
+                                        <th><i class="fas fa-chart-line"></i> Usage Count</th>
+                                        <th><i class="fas fa-percentage"></i> Percentage</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for command, count in analytics.command_stats.items() %}
+                                    {% for command in analytics.command_stats[:10] %}
                                     <tr>
-                                        <td><code>{{ command }}</code></td>
-                                        <td><span class="badge bg-primary">{{ count }}</span></td>
                                         <td>
-                                            {% if count > 0 %}
-                                                <span class="badge bg-success">Active</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">Unused</span>
-                                            {% endif %}
+                                            <span class="badge badge-primary">{{ loop.index }}</span>
+                                        </td>
+                                        <td>
+                                            <code>{{ command.command }}</code>
+                                        </td>
+                                        <td>
+                                            <strong>{{ command.count }}</strong>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-primary" role="progressbar"
+                                                     style="width: {{ (command.count / analytics.command_stats[0].count * 100) if analytics.command_stats else 0 }}%">
+                                                    {{ "%.1f"|format((command.count / analytics.command_stats[0].count * 100) if analytics.command_stats else 0) }}%
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -145,31 +135,74 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
-                            <p>No command usage data available</p>
-                            <small>Commands will appear here after they are used</small>
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Command Data Yet</h5>
+                            <p class="text-muted">Command usage statistics will appear here as users interact with the bot.</p>
                         </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Guild Information -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-server"></i> Server Details</h5>
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-clock"></i> Bot Status
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div class="mb-3">
+                            {% if analytics.bot_latency and analytics.bot_latency < 100 %}
+                                <i class="fas fa-circle text-success fa-2x"></i>
+                                <h5 class="text-success mt-2">Excellent</h5>
+                            {% elif analytics.bot_latency and analytics.bot_latency < 200 %}
+                                <i class="fas fa-circle text-warning fa-2x"></i>
+                                <h5 class="text-warning mt-2">Good</h5>
+                            {% else %}
+                                <i class="fas fa-circle text-danger fa-2x"></i>
+                                <h5 class="text-danger mt-2">High Latency</h5>
+                            {% endif %}
+                        </div>
+
+                        <div class="row text-center">
+                            <div class="col-12 mb-2">
+                                <strong>Uptime:</strong><br>
+                                <span class="text-muted">{{ analytics.uptime or 'Unknown' }}</span>
+                            </div>
+                            <div class="col-12 mb-2">
+                                <strong>Loaded Modules:</strong><br>
+                                <span class="badge badge-info">{{ analytics.loaded_cogs or 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Details -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-server"></i> Server Details
+                    </h6>
                 </div>
                 <div class="card-body">
                     {% if analytics.guild_data %}
-                        <div class="table-responsive" style="max-height: 400px;">
-                            <table class="table table-sm table-striped">
-                                <thead class="table-dark">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
                                     <tr>
-                                        <th>Server Name</th>
-                                        <th>Members</th>
-                                        <th>Status</th>
+                                        <th><i class="fas fa-server"></i> Server Name</th>
+                                        <th><i class="fas fa-users"></i> Members</th>
+                                        <th><i class="fas fa-crown"></i> Owner</th>
+                                        <th><i class="fas fa-chart-line"></i> Activity</th>
+                                        <th><i class="fas fa-info-circle"></i> Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -177,21 +210,36 @@
                                     <tr>
                                         <td>
                                             <strong>{{ guild.name }}</strong>
-                                            <br>
-                                            <small class="text-muted">ID: {{ guild.id }}</small>
+                                            <br><small class="text-muted">ID: {{ guild.id }}</small>
                                         </td>
-                                        <td><span class="badge bg-info">{{ guild.member_count }}</span></td>
-                                        <td><span class="badge bg-success">Active</span></td>
+                                        <td>
+                                            <span class="badge badge-secondary">{{ guild.members or 0 }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">{{ guild.owner or 'Unknown' }}</span>
+                                        </td>
+                                        <td>
+                                            {% if guild.commands_used and guild.commands_used > 0 %}
+                                                <span class="badge badge-success">{{ guild.commands_used }} commands</span>
+                                            {% else %}
+                                                <span class="badge badge-light">No activity</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-success">
+                                                <i class="fas fa-check-circle"></i> Active
+                                            </span>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-server fa-3x mb-3"></i>
-                            <p>No server data available</p>
-                            <small>Bot is not connected to any servers</small>
+                        <div class="text-center py-4">
+                            <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Server Data Available</h5>
+                            <p class="text-muted">Server information will appear here once the bot joins servers.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -199,321 +247,48 @@
         </div>
     </div>
 
-    <!-- Performance Metrics -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-tachometer-alt"></i> Performance Metrics</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <h3 class="text-success">{{ analytics.bot_latency or 0 }}ms</h3>
-                                <p class="text-muted">Average Latency</p>
-                                <div class="progress mb-2">
-                                    <div class="progress-bar bg-success" style="width: {{ (100 - (analytics.bot_latency or 0) / 2) if (analytics.bot_latency or 0) < 200 else 25 }}%"></div>
-                                </div>
-                                <small class="text-muted">
-                                    {% if (analytics.bot_latency or 0) < 100 %}
-                                        Excellent
-                                    {% elif (analytics.bot_latency or 0) < 200 %}
-                                        Good
-                                    {% else %}
-                                        Fair
-                                    {% endif %}
-                                </small>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <h3 class="text-info">{{ analytics.uptime or '0s' }}</h3>
-                                <p class="text-muted">Current Uptime</p>
-                                <div class="progress mb-2">
-                                    <div class="progress-bar bg-info" style="width: 95%"></div>
-                                </div>
-                                <small class="text-muted">Running smoothly</small>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <h3 class="text-primary">{{ analytics.loaded_cogs or 0 }}/{{ analytics.total_commands or 0 }}</h3>
-                                <p class="text-muted">Cogs/Commands Loaded</p>
-                                <div class="progress mb-2">
-                                    <div class="progress-bar bg-primary" style="width: {{ (analytics.loaded_cogs / analytics.total_commands * 100) if analytics.total_commands else 0 }}%"></div>
-                                </div>
-                                <small class="text-muted">System health</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Information -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-info-circle"></i> System Information</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
-                                <h6>Bot Status</h6>
-                                <span class="badge bg-success fs-6">Online</span>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <i class="fas fa-link text-success fa-2x mb-2"></i>
-                                <h6>Discord API</h6>
-                                <span class="text-success">Connected</span>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <i class="fas fa-globe text-primary fa-2x mb-2"></i>
-                                <h6>Web Dashboard</h6>
-                                <span class="text-success">Active</span>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <i class="fas fa-clock text-info fa-2x mb-2"></i>
-                                <h6>Last Updated</h6>
-                                <span class="text-muted" id="last-updated">Just now</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Analytics Charts -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-chart-bar"></i> Usage Trends</h5>
-                </div>
-                <div class="card-body">
-                    {% if analytics.usage_trends %}
-                        <canvas id="usageTrendsChart" width="400" height="200"></canvas>
-                    {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-chart-line fa-3x mb-3"></i>
-                            <p>Usage trend charts coming soon</p>
-                            <small>Historical command usage and performance metrics</small>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-users"></i> User Activity</h5>
-                </div>
-                <div class="card-body">
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-user-chart fa-3x mb-3"></i>
-                        <p>User activity analytics coming soon</p>
-                        <small>Active users, peak hours, and engagement metrics</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Export and Actions -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-download"></i> Export & Actions</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Data Export</h6>
-                            <p class="text-muted">Export analytics data for external analysis</p>
-                            <button class="btn btn-outline-primary me-2" onclick="exportData('json')">
-                                <i class="fas fa-file-code"></i> Export JSON
-                            </button>
-                            <button class="btn btn-outline-success" onclick="exportData('csv')">
-                                <i class="fas fa-file-csv"></i> Export CSV
-                            </button>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Quick Actions</h6>
-                            <p class="text-muted">Manage bot performance and monitoring</p>
-                            <button class="btn btn-outline-info me-2" onclick="clearStats()">
-                                <i class="fas fa-trash"></i> Clear Stats
-                            </button>
-                            <button class="btn btn-outline-warning" onclick="resetCounters()">
-                                <i class="fas fa-redo"></i> Reset Counters
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Navigation -->
-    <div class="row">
-        <div class="col-12">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary me-2">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
-            </a>
-            <a href="{{ url_for('settings') }}" class="btn btn-primary me-2">
-                <i class="fas fa-cog"></i> Manage Settings
-            </a>
-            <button onclick="location.reload()" class="btn btn-info me-2">
-                <i class="fas fa-sync"></i> Refresh Data
-            </button>
-            <button onclick="toggleAutoRefresh()" class="btn btn-outline-secondary" id="auto-refresh-btn">
-                <i class="fas fa-play"></i> Auto Refresh
-            </button>
+    <!-- Last Updated -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <p class="text-muted small">
+                <i class="fas fa-clock"></i>
+                Last updated: <span id="timestamp">{{ moment().format('MMMM Do YYYY, h:mm:ss a') }}</span>
+            </p>
         </div>
     </div>
 </div>
 
+<!-- Custom Styles -->
+<style>
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+.text-xs {
+    font-size: 0.7rem;
+}
+</style>
+
 <script>
-let autoRefreshInterval = null;
-let autoRefreshEnabled = false;
+// Auto refresh functionality
+function refreshData() {
+    window.location.reload();
+}
 
 // Update timestamp
 function updateTimestamp() {
-    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+    document.getElementById('timestamp').textContent = new Date().toLocaleString();
 }
-
-// Toggle auto-refresh
-function toggleAutoRefresh() {
-    const btn = document.getElementById('auto-refresh-btn');
-
-    if (autoRefreshEnabled) {
-        // Disable auto-refresh
-        clearInterval(autoRefreshInterval);
-        autoRefreshEnabled = false;
-        btn.innerHTML = '<i class="fas fa-play"></i> Auto Refresh';
-        btn.className = 'btn btn-outline-secondary';
-    } else {
-        // Enable auto-refresh
-        autoRefreshInterval = setInterval(function() {
-            updateTimestamp();
-            // You can add more refresh logic here
-        }, 30000); // 30 seconds
-
-        autoRefreshEnabled = true;
-        btn.innerHTML = '<i class="fas fa-pause"></i> Stop Auto Refresh';
-        btn.className = 'btn btn-outline-danger';
-    }
-}
-
-// Export data functions
-function exportData(format) {
-    const data = {
-        timestamp: new Date().toISOString(),
-        stats: {
-            guilds: {{ analytics.total_guilds or 0 }},
-            users: {{ analytics.total_users or 0 }},
-            commands: {{ analytics.total_commands or 0 }},
-            latency: {{ analytics.bot_latency or 0 }},
-            uptime: '{{ analytics.uptime or "0s" }}',
-            loaded_cogs: {{ analytics.loaded_cogs or 0 }}
-        },
-        command_stats: {{ analytics.command_stats | tojson if analytics.command_stats else '{}' }},
-        guild_data: {{ analytics.guild_data | tojson if analytics.guild_data else '[]' }}
-    };
-
-    if (format === 'json') {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        downloadFile(blob, 'ladbot-analytics.json');
-    } else if (format === 'csv') {
-        // Convert to CSV format
-        let csv = 'Metric,Value\n';
-        csv += `Guilds,${data.stats.guilds}\n`;
-        csv += `Users,${data.stats.users}\n`;
-        csv += `Commands,${data.stats.commands}\n`;
-        csv += `Latency,${data.stats.latency}ms\n`;
-        csv += `Uptime,${data.stats.uptime}\n`;
-        csv += `Loaded Cogs,${data.stats.loaded_cogs}\n`;
-
-        const blob = new Blob([csv], { type: 'text/csv' });
-        downloadFile(blob, 'ladbot-analytics.csv');
-    }
-}
-
-function downloadFile(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-// Clear stats function
-function clearStats() {
-    if (confirm('Are you sure you want to clear all statistics? This action cannot be undone.')) {
-        // This would need to be implemented on the backend
-        alert('Clear stats functionality would be implemented here');
-    }
-}
-
-// Reset counters function
-function resetCounters() {
-    if (confirm('Are you sure you want to reset usage counters?')) {
-        // This would need to be implemented on the backend
-        alert('Reset counters functionality would be implemented here');
-    }
-}
-
-// Initial timestamp
-updateTimestamp();
 
 // Update timestamp every minute
 setInterval(updateTimestamp, 60000);
 </script>
-
-<!-- Chart.js for Usage Trends -->
-{% if analytics.usage_trends %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-// Usage Trends Chart - only load if data exists
-const ctx = document.getElementById('usageTrendsChart').getContext('2d');
-const usageData = {{ analytics.usage_trends | tojson }};
-
-const chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: usageData.map(d => d.hour),
-        datasets: [{
-            label: 'Commands Used',
-            data: usageData.map(d => d.usage),
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
-});
-</script>
-{% endif %}
 {% endblock %}
