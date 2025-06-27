@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Ladbot Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+            {% if user %}
+                <p class="text-muted">Welcome back, {{ user.username }}!</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5>Servers</h5>
+                            <h2>{{ bot_stats.guilds or 0 }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-server fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5>Users</h5>
+                            <h2>{{ bot_stats.users or 0 }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5>Commands</h5>
+                            <h2>{{ bot_stats.commands or 0 }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-terminal fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5>Uptime</h5>
+                            <h2 style="font-size: 1.5rem;">{{ bot_stats.uptime or '0s' }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bot Statistics and Quick Actions -->
+    <div class="row">
+        <!-- Bot Statistics -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Bot Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p><strong>Status:</strong> 
+                                <span class="badge badge-{{ 'success' if bot_stats.status == 'online' else 'danger' }}">
+                                    {{ bot_stats.status|title }}
+                                </span>
+                            </p>
+                            <p><strong>Loaded Cogs:</strong> {{ bot_stats.loaded_cogs or 0 }}</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>Latency:</strong> {{ bot_stats.latency or 0 }}ms</p>
+                            <p><strong>Commands Used Today:</strong> {{ bot_stats.commands_used_today or 0 }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6>Performance</h6>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-success" style="width: {{ (100 - (bot_stats.latency or 0) / 5) if (bot_stats.latency or 0) < 500 else 0 }}%"></div>
+                        </div>
+                        <small class="text-muted">Latency: {{ bot_stats.latency or 0 }}ms</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('settings') }}" class="btn btn-primary btn-block mb-3 d-block">
+                        <i class="fas fa-cog"></i> Manage Settings
+                    </a>
+                    <button onclick="refreshStats()" class="btn btn-info btn-block mb-3 d-block">
+                        <i class="fas fa-sync"></i> Refresh Stats
+                    </button>
+                    <a href="{{ url_for('analytics') }}" class="btn btn-secondary btn-block mb-3 d-block">
+                        <i class="fas fa-chart-line"></i> View Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-history"></i> System Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <i class="fas fa-{{ 'check-circle text-success' if bot_stats.status == 'online' else 'times-circle text-danger' }} fa-3x"></i>
+                                <h5 class="mt-2">Bot Status</h5>
+                                <p class="text-muted">{{ bot_stats.status|title }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <i class="fas fa-wifi text-info fa-3x"></i>
+                                <h5 class="mt-2">Connection</h5>
+                                <p class="text-muted">{{ bot_stats.latency or 0 }}ms latency</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <i class="fas fa-server text-primary fa-3x"></i>
+                                <h5 class="mt-2">Servers</h5>
+                                <p class="text-muted">{{ bot_stats.guilds or 0 }} connected</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshStats() {
+    // Show loading state
+    const refreshBtn = event.target;
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    refreshBtn.disabled = true;
+    
+    // Reload the page
+    setTimeout(function() {
+        location.reload();
+    }, 500);
+}
+
+// Auto-refresh every 30 seconds
+setInterval(function() {
+    // Silently refresh stats via AJAX
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            // Update stats without full page reload
+            console.log('Stats updated:', data);
+        })
+        .catch(error => console.log('Stats refresh failed:', error));
+}, 30000);
+</script>
+{% endblock %}

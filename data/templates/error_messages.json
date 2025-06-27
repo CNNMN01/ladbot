@@ -1,0 +1,5 @@
+{
+  "command_not_found": "❌ Command not found. Use `{prefix}help` to see available commands.",
+  "missing_permissions": "🔒 You don't have permission to use this command.",
+  "api_error": "🌐 Service unavailable. Please try again later."
+}

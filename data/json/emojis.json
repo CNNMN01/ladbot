@@ -1,0 +1,15 @@
+{
+  "success": "✅",
+  "error": "❌",
+  "warning": "⚠️",
+  "info": "ℹ️",
+  "loading": "⏳",
+  "first": "⏮️",
+  "previous": "◀️",
+  "next": "▶️",
+  "last": "⏭️",
+  "stop": "⏹️",
+  "reload": "🔄",
+  "left_pointer": "◀️",
+  "right_pointer": "▶️"
+}

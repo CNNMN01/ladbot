@@ -1,0 +1,13 @@
+{
+  "github": "https://raw.githubusercontent.com/Camto/Lad/master/Images/github.png",
+  "settings": "https://raw.githubusercontent.com/Camto/Lad/master/Images/settings.png",
+  "weather": "https://raw.githubusercontent.com/Camto/Lad/master/Images/weather.png",
+  "reddit": "https://raw.githubusercontent.com/Camto/Lad/master/Images/reddit.png",
+  "bitcoin": "https://raw.githubusercontent.com/Camto/Lad/master/Images/bitcoin.png",
+  "bible": "https://raw.githubusercontent.com/Camto/Lad/master/Images/bible.png",
+  "dinos": [
+    "https://raw.githubusercontent.com/Camto/Lad/master/Images/dinos/dino%201.png",
+    "https://raw.githubusercontent.com/Camto/Lad/master/Images/dinos/dino%202.png",
+    "https://raw.githubusercontent.com/Camto/Lad/master/Images/dinos/dino%203.png"
+  ]
+}

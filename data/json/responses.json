@@ -1,0 +1,33 @@
+{
+  "success": [
+    "✅ Operation completed successfully!",
+    "✅ Done!",
+    "✅ Success!",
+    "✅ All set!",
+    "✅ Perfect!",
+    "✅ Mission accomplished!",
+    "✅ Task completed!"
+  ],
+  "error": [
+    "❌ Something went wrong!",
+    "❌ An error occurred!",
+    "❌ Failed to complete operation!",
+    "❌ Oops! That didn't work!",
+    "❌ Unable to process request!",
+    "❌ Command failed!"
+  ],
+  "loading": [
+    "⏳ Please wait...",
+    "⏳ Loading...",
+    "⏳ Processing...",
+    "⏳ Working on it...",
+    "⏳ Give me a moment...",
+    "⏳ Computing..."
+  ],
+  "thinking": [
+    "🤔 Let me think about that...",
+    "🤔 Hmm, interesting question...",
+    "🤔 Processing your request...",
+    "🤔 Calculating..."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "command_not_found": {
+    "title": "❌ Command Not Found",
+    "description": "That command doesn't exist. Use `l.help` to see available commands.",
+    "color": 16711680
+  },
+  "command_disabled": {
+    "title": "🚫 Command Disabled",
+    "description": "This command has been disabled for this server.",
+    "color": 16755200
+  },
+  "missing_permissions": {
+    "title": "🔒 Missing Permissions",
+    "description": "You don't have permission to use this command.",
+    "color": 16711680
+  },
+  "bot_missing_permissions": {
+    "title": "🤖 Bot Missing Permissions",
+    "description": "I don't have the required permissions to execute this command.",
+    "color": 16711680
+  },
+  "settings_not_admin": {
+    "title": "🔒 Admin Only",
+    "description": "Only administrators can change bot settings.",
+    "color": 16711680
+  },
+  "settings_more_args": {
+    "title": "ℹ️ Settings Help",
+    "description": "Use `l.settings` to view all settings, `l.settings <option>` to view a specific setting, or `l.settings <option> <value>` to change a setting.",
+    "color": 631039
+  }
+}

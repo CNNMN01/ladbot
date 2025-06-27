@@ -1,0 +1,22 @@
+[
+  {"description": "🎱 It is certain", "color": 65280},
+  {"description": "🎱 It is decidedly so", "color": 65280},
+  {"description": "🎱 Without a doubt", "color": 65280},
+  {"description": "🎱 Yes definitely", "color": 65280},
+  {"description": "🎱 You may rely on it", "color": 65280},
+  {"description": "🎱 As I see it, yes", "color": 65280},
+  {"description": "🎱 Most likely", "color": 65280},
+  {"description": "🎱 Outlook good", "color": 65280},
+  {"description": "🎱 Yes", "color": 65280},
+  {"description": "🎱 Signs point to yes", "color": 65280},
+  {"description": "🎱 Reply hazy, try again", "color": 16755200},
+  {"description": "🎱 Ask again later", "color": 16755200},
+  {"description": "🎱 Better not tell you now", "color": 16755200},
+  {"description": "🎱 Cannot predict now", "color": 16755200},
+  {"description": "🎱 Concentrate and ask again", "color": 16755200},
+  {"description": "🎱 Don't count on it", "color": 16711680},
+  {"description": "🎱 My reply is no", "color": 16711680},
+  {"description": "🎱 My sources say no", "color": 16711680},
+  {"description": "🎱 Outlook not so good", "color": 16711680},
+  {"description": "🎱 Very doubtful", "color": 16711680}
+]

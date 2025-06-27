@@ -1,0 +1,3 @@
+"""
+Entertainment commands for Ladbot
+"""

@@ -1,0 +1,37 @@
+{
+  "title": "🎉 Welcome to {server_name}!",
+  "description": "Thanks for adding Ladbot to your server! Here's everything you need to know to get started.",
+  "fields": [
+    {
+      "name": "🎮 Getting Started",
+      "value": "Use `l.help` to see all available commands!\nTry `l.minesweeper beginner` for a fun game!",
+      "inline": false
+    },
+    {
+      "name": "⚙️ Server Configuration",
+      "value": "Admins can use `l.settings` to customize bot settings.\nEnable/disable commands per server with `l.settings <command> on/off`",
+      "inline": false
+    },
+    {
+      "name": "🎯 Popular Commands",
+      "value": "`l.minesweeper` - Interactive minesweeper game\n`l.8ball <question>` - Magic 8-ball predictions\n`l.weather <city>` - Weather information\n`l.jokes` - Random jokes and puns\n`l.crypto <coin>` - Cryptocurrency prices\n`l.reddit <subreddit>` - Browse Reddit posts",
+      "inline": false
+    },
+    {
+      "name": "🔧 Admin Features",
+      "value": "`l.autoresponse` - Set up automatic responses\n`l.settings` - Manage server settings\n`l.reload` - Reload bot components",
+      "inline": false
+    },
+    {
+      "name": "📞 Support & Feedback",
+      "value": "Use `l.feedback <message>` to send feedback to developers!\nNeed help? Try `l.help <command>` for detailed command info.",
+      "inline": false
+    }
+  ],
+  "color": 65280,
+  "footer": {
+    "text": "Enjoy using Ladbot! 🎉 • Visit our GitHub for updates",
+    "icon_url": "https://raw.githubusercontent.com/Camto/Lad/master/Images/github.png"
+  },
+  "thumbnail": "https://raw.githubusercontent.com/Camto/Lad/master/Images/settings.png"
+}

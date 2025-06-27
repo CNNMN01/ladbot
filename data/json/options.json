@@ -1,0 +1,122 @@
+{
+  "ascii": {
+    "default": true,
+    "descr": "Enable ASCII art command",
+    "type": "bool"
+  },
+  "cmd_8ball": {
+    "default": true,
+    "descr": "Enable Magic 8-Ball command",
+    "type": "bool"
+  },
+  "ping": {
+    "default": true,
+    "descr": "Enable ping command",
+    "type": "bool"
+  },
+  "help": {
+    "default": true,
+    "descr": "Enable help command",
+    "type": "bool"
+  },
+  "settings": {
+    "default": true,
+    "descr": "Enable settings command",
+    "type": "bool"
+  },
+  "reload": {
+    "default": true,
+    "descr": "Enable reload command",
+    "type": "bool"
+  },
+  "feedback": {
+    "default": true,
+    "descr": "Enable feedback command",
+    "type": "bool"
+  },
+  "say": {
+    "default": true,
+    "descr": "Enable say command",
+    "type": "bool"
+  },
+  "roll": {
+    "default": true,
+    "descr": "Enable dice rolling command",
+    "type": "bool"
+  },
+  "user_info": {
+    "default": true,
+    "descr": "Enable user info command",
+    "type": "bool"
+  },
+  "server_info": {
+    "default": true,
+    "descr": "Enable server info command",
+    "type": "bool"
+  },
+  "weather": {
+    "default": true,
+    "descr": "Enable weather command",
+    "type": "bool"
+  },
+  "crypto": {
+    "default": true,
+    "descr": "Enable cryptocurrency price command",
+    "type": "bool"
+  },
+  "reddit": {
+    "default": true,
+    "descr": "Enable Reddit browsing command",
+    "type": "bool"
+  },
+  "bible": {
+    "default": true,
+    "descr": "Enable Bible verse command",
+    "type": "bool"
+  },
+  "autoresponses": {
+    "default": false,
+    "descr": "Enable automatic responses to keywords",
+    "type": "bool"
+  },
+  "autoresponse_file": {
+    "default": [],
+    "descr": "Custom autoresponse configuration",
+    "type": "json"
+  },
+  "convert": {
+    "default": true,
+    "descr": "Enable file conversion command",
+    "type": "bool"
+  },
+  "dino": {
+    "default": true,
+    "descr": "Enable dinosaur facts command",
+    "type": "bool"
+  },
+  "knockknock": {
+    "default": true,
+    "descr": "Enable knock-knock jokes command",
+    "type": "bool"
+  },
+  "laugh": {
+    "default": true,
+    "descr": "Enable laugh command",
+    "type": "bool"
+  },
+  "minesweeper": {
+    "default": true,
+    "descr": "Enable interactive minesweeper game",
+    "type": "bool"
+  },
+  "jokes": {
+    "default": true,
+    "descr": "Enable random jokes command",
+    "type": "bool"
+  },
+  "games": {
+    "default": true,
+    "descr": "Enable mini-games commands",
+    "type": "bool"
+  }
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "trigger": "hello",
+    "response": "Hi there! 👋 How can I help you today?",
+    "match_type": "contains"
+  },
+  {
+    "trigger": "thanks bot",
+    "response": "You're welcome! 😊 Happy to help!",
+    "match_type": "contains"
+  },
+  {
+    "trigger": "good morning",
+    "response": "Good morning! ☀️ Hope you have a great day!",
+    "match_type": "contains"
+  },
+  {
+    "trigger": "good night",
+    "response": "Good night! 🌙 Sweet dreams!",
+    "match_type": "contains"
+  },
+  {
+    "trigger": "lol",
+    "response": "😂 Glad I could make you laugh!",
+    "match_type": "exact"
+  }
+]
