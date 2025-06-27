@@ -1,61 +1,90 @@
 """
-Enhanced Ladbot Class - Compatible with existing cogs
+Enhanced Ladbot with Complete Compatibility Layer
 """
+
 import discord
 from discord.ext import commands
 import logging
-from pathlib import Path
-import sys
 import os
-from datetime import datetime
+import asyncio
 import threading
-
-# Add project root to path for imports
-sys.path.append(str(Path(__file__).parent.parent.parent))
+from datetime import datetime
+from pathlib import Path
+import json
 
 logger = logging.getLogger(__name__)
 
-class SimpleCogLoader:
-    """Simple cog loader for compatibility"""
-    def __init__(self, bot):
-        self.bot = bot
-        self.loaded_cogs = set()
-
-    async def reload_all_cogs(self):
-        """Reload all cogs"""
-        reloaded = 0
-        failed = 0
-        for ext_name in list(self.bot.extensions.keys()):
-            try:
-                await self.bot.reload_extension(ext_name)
-                reloaded += 1
-                logger.info(f"✅ Reloaded: {ext_name}")
-            except Exception as e:
-                failed += 1
-                logger.error(f"❌ Failed to reload {ext_name}: {e}")
-
-        logger.info(f"🔄 Reload complete: {reloaded} reloaded, {failed} failed")
-        return reloaded, failed
 
 class SimpleDataManager:
     """Simple data manager for compatibility"""
-    def __init__(self):
-        self.embed_color = 0x00ff00
-        self.options = self._get_default_options()
 
-    def _get_default_options(self):
-        """Return default options for backward compatibility"""
-        return {
-            'ping': {'default': True, 'type': 'bool', 'descr': 'Ping command'},
-            'help': {'default': True, 'type': 'bool', 'descr': 'Help command'},
-            'feedback': {'default': True, 'type': 'bool', 'descr': 'Feedback command'},
-            'say': {'default': True, 'type': 'bool', 'descr': 'Say command'},
-            'ascii': {'default': True, 'type': 'bool', 'descr': 'ASCII art command'},
-            'cmd_8ball': {'default': True, 'type': 'bool', 'descr': '8-ball command'},
-            'jokes': {'default': True, 'type': 'bool', 'descr': 'Jokes command'},
-            'minesweeper': {'default': True, 'type': 'bool', 'descr': 'Minesweeper game'},
-            'autoresponses': {'default': False, 'type': 'bool', 'descr': 'Auto responses'},
-        }
+    def __init__(self):
+        self.data_dir = Path(__file__).parent.parent.parent / "data"
+        self.data_dir.mkdir(exist_ok=True)
+
+    def get_data(self, filename):
+        """Get data from JSON file"""
+        try:
+            file_path = self.data_dir / f"{filename}.json"
+            if file_path.exists():
+                with open(file_path, 'r') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            logger.error(f"Error loading data from {filename}: {e}")
+            return {}
+
+    def save_data(self, filename, data):
+        """Save data to JSON file"""
+        try:
+            file_path = self.data_dir / f"{filename}.json"
+            with open(file_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving data to {filename}: {e}")
+            return False
+
+
+class SimpleCogLoader:
+    """Simple cog loader for compatibility"""
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def reload_cog(self, cog_name):
+        """Reload a specific cog"""
+        try:
+            await self.bot.reload_extension(cog_name)
+            return True
+        except Exception as e:
+            logger.error(f"Error reloading cog {cog_name}: {e}")
+            return False
+
+
+# Default settings for various features
+DEFAULT_SETTINGS = {
+    'ping': {'default': True, 'type': 'bool', 'descr': 'Ping command'},
+    'help': {'default': True, 'type': 'bool', 'descr': 'Help command'},
+    'info': {'default': True, 'type': 'bool', 'descr': 'Bot info command'},
+    'say': {'default': True, 'type': 'bool', 'descr': 'Say command'},
+    'weather': {'default': True, 'type': 'bool', 'descr': 'Weather information'},
+    'crypto': {'default': True, 'type': 'bool', 'descr': 'Crypto prices'},
+    'reddit': {'default': True, 'type': 'bool', 'descr': 'Reddit posts'},
+    'eightball': {'default': True, 'type': 'bool', 'descr': '8-ball responses'},
+    'jokes': {'default': True, 'type': 'bool', 'descr': 'Joke commands'},
+    'ascii_art': {'default': True, 'type': 'bool', 'descr': 'ASCII art generation'},
+    'games': {'default': True, 'type': 'bool', 'descr': 'Various games'},
+    'dinosaurs': {'default': True, 'type': 'bool', 'descr': 'Dinosaur facts'},
+    'bible': {'default': True, 'type': 'bool', 'descr': 'Bible verses'},
+    'converter': {'default': True, 'type': 'bool', 'descr': 'Unit converter'},
+    'roll': {'default': True, 'type': 'bool', 'descr': 'Dice rolling'},
+    'feedback': {'default': True, 'type': 'bool', 'descr': 'User feedback'},
+    'tools': {'default': True, 'type': 'bool', 'descr': 'Utility tools'},
+    'minesweeper': {'default': True, 'type': 'bool', 'descr': 'Minesweeper game'},
+    'autoresponses': {'default': False, 'type': 'bool', 'descr': 'Auto responses'},
+}
+
 
 class LadBot(commands.Bot):
     """Enhanced Discord bot with compatibility layers"""
@@ -77,14 +106,10 @@ class LadBot(commands.Bot):
         )
 
         self.settings = settings
+        self.config = settings  # Backward compatibility - CRITICAL FIX
 
-        # Backward compatibility - add the attributes your cogs expect
-        self.config = settings  # Many cogs use self.bot.config
-
-        # Create a simple data manager for compatibility
+        # Create compatibility components
         self.data_manager = SimpleDataManager()
-
-        # Add cog loader for reload commands
         self.cog_loader = SimpleCogLoader(self)
 
         # Add settings cache for compatibility
@@ -99,11 +124,10 @@ class LadBot(commands.Bot):
         # Add error tracking
         self.error_count = 0
 
-        # Web server configuration for Render
+        # Web server configuration
         self.web_host = '0.0.0.0'
         self.web_port = int(os.environ.get('PORT', 8080))
         self.web_thread = None
-        self.web_url = f"https://ladbot-dashboard.onrender.com"
 
     def get_setting(self, guild_id, setting_name):
         """Get a setting value (compatibility method)"""
@@ -112,208 +136,128 @@ class LadBot(commands.Bot):
             return self.settings_cache[guild_id][setting_name]
 
         # Return default values for common settings
-        defaults = {
-            'autoresponses': False,
-            'minesweeper': True,
-            'ping': True,
-            'help': True,
-            'feedback': True,
-            'say': True,
-            'ascii': True,
-            'cmd_8ball': True,
-            'jokes': True,
-            'weather': True,
-            'crypto': True,
-            'reddit': True,
-            'bible': True,
-            'roll': True,
-            'games': True,
-        }
+        if setting_name in DEFAULT_SETTINGS:
+            return DEFAULT_SETTINGS[setting_name]['default']
 
-        return defaults.get(setting_name, True)
+        # Default to True for unknown settings to avoid breaking functionality
+        return True
 
-    def update_setting(self, guild_id, setting_name, value):
-        """Update a setting value (compatibility method)"""
+    def set_setting(self, guild_id, setting_name, value):
+        """Set a setting value (compatibility method)"""
         if guild_id not in self.settings_cache:
             self.settings_cache[guild_id] = {}
 
         self.settings_cache[guild_id][setting_name] = value
-        logger.info(f"Updated setting {setting_name}={value} for guild {guild_id}")
 
-    def get_stats(self):
-        """Get bot statistics"""
-        # Calculate uptime properly
-        uptime_str = "0s"
-        if hasattr(self, 'start_time'):
-            uptime_delta = datetime.now() - self.start_time
-            days = uptime_delta.days
-            hours, remainder = divmod(uptime_delta.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-
-            if days > 0:
-                uptime_str = f"{days}d {hours}h {minutes}m"
-            elif hours > 0:
-                uptime_str = f"{hours}h {minutes}m"
-            elif minutes > 0:
-                uptime_str = f"{minutes}m {seconds}s"
-            else:
-                uptime_str = f"{seconds}s"
-
-        return {
-            'cogs': len(self.cogs),
-            'commands': len(self.commands),
-            'latency': f"{round(self.latency * 1000)}",
-            'uptime': uptime_str,
-            'guilds': len(self.guilds),
-            'users': len(self.users),
-            'status': 'online' if self.is_ready() else 'offline'
-        }
-
-    def start_web_server(self):
-        """Start web dashboard in a separate thread"""
+        # Save to file for persistence
         try:
-            logger.info("🌐 Starting web dashboard...")
+            settings_file = self.data_manager.data_dir / f"guild_settings_{guild_id}.json"
+            current_settings = {}
+            if settings_file.exists():
+                with open(settings_file, 'r') as f:
+                    current_settings = json.load(f)
 
-            # Import Flask components
-            from web.app import create_app
+            current_settings[setting_name] = value
 
-            # Create Flask app with bot instance
-            app = create_app(self)
+            with open(settings_file, 'w') as f:
+                json.dump(current_settings, f, indent=2)
 
-            # Start web server in separate thread
+        except Exception as e:
+            logger.error(f"Error saving setting {setting_name} for guild {guild_id}: {e}")
+
+    async def setup_hook(self):
+        """Setup hook called when bot is starting"""
+        logger.info("🔧 Setting up bot components...")
+
+        # Load all cogs
+        await self.load_cogs()
+
+        # Start web server in background
+        if self.settings.DISCORD_CLIENT_ID:
+            self.loop.create_task(self.start_web_server())
+
+    async def load_cogs(self):
+        """Load all cogs from the cogs directory"""
+        cogs_dir = Path(__file__).parent.parent / "cogs"
+
+        # Define load order (admin cogs first, then others)
+        load_order = [
+            "cogs.admin.console",
+            "cogs.admin.reload",
+            "cogs.admin.settings",
+            "cogs.admin.autoresponses",
+            "cogs.admin.error_handler",
+            "cogs.admin.moderation",
+        ]
+
+        # Add other cogs
+        for category in ["entertainment", "information", "utility"]:
+            category_path = cogs_dir / category
+            if category_path.exists():
+                for file in category_path.glob("*.py"):
+                    if file.name != "__init__.py":
+                        load_order.append(f"cogs.{category}.{file.stem}")
+
+        # Load cogs in order
+        for cog_name in load_order:
+            try:
+                await self.load_extension(cog_name)
+                logger.info(f"✅ Loaded: {cog_name}")
+            except Exception as e:
+                logger.error(f"❌ Failed to load {cog_name}: {e}")
+
+    async def start_web_server(self):
+        """Start the web server in the background"""
+        try:
+            from web.app import run_web_server
+
+            # Run in thread to avoid blocking
             def run_server():
-                try:
-                    app.run(
-                        host=self.web_host,
-                        port=self.web_port,
-                        debug=False,
-                        use_reloader=False,
-                        threaded=True
-                    )
-                except Exception as e:
-                    logger.error(f"❌ Web server error: {e}")
+                run_web_server(self, self.web_host, self.web_port)
 
-            # Start in background thread
             self.web_thread = threading.Thread(target=run_server, daemon=True)
             self.web_thread.start()
 
-            logger.info(f"🌐 Web dashboard started at: {self.web_url}")
-
-        except ImportError as e:
-            logger.warning("🌐 Web dashboard disabled - missing dependencies")
-            logger.info("Install with: pip install flask flask-cors")
+            logger.info(f"🌐 Web server starting on {self.web_host}:{self.web_port}")
         except Exception as e:
-            logger.error(f"❌ Failed to start web server: {e}")
-
-    async def setup_hook(self):
-        """Called when the bot is starting up"""
-        logger.info("🔧 Setting up bot components...")
-
-        try:
-            await self.load_cogs()
-            logger.info("✅ Bot setup completed")
-        except Exception as e:
-            logger.error(f"❌ Setup failed: {e}")
-            raise
-
-    async def load_cogs(self):
-        """Load all available cogs"""
-        cog_dirs = ["admin", "entertainment", "information", "utility"]
-        loaded_count = 0
-        failed_count = 0
-
-        for cog_dir in cog_dirs:
-            cog_path = Path("src/cogs") / cog_dir
-
-            if cog_path.exists():
-                for file_path in cog_path.glob("*.py"):
-                    if file_path.name.startswith("_"):
-                        continue
-
-                    cog_name = f"cogs.{cog_dir}.{file_path.stem}"
-                    try:
-                        await self.load_extension(cog_name)
-                        self.cog_loader.loaded_cogs.add(cog_name)
-                        logger.info(f"✅ Loaded: {cog_name}")
-                        loaded_count += 1
-                    except Exception as e:
-                        logger.error(f"❌ Failed to load {cog_name}: {e}")
-                        failed_count += 1
-
-        logger.info(f"🎮 Cog loading: {loaded_count} loaded, {failed_count} failed")
+            logger.warning(f"⚠️ Could not start web server: {e}")
 
     async def on_ready(self):
         """Called when bot is ready"""
         logger.info(f"🤖 {self.user.name} (ID: {self.user.id}) is online!")
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
 
-        # Set bot status - Updated with new friendly message
-        activity = discord.Game(name="🎪 Your entertainment companion")
-        await self.change_presence(activity=activity)
-
-        # Start web dashboard
-        self.start_web_server()
-
-        # Log startup stats
-        total_users = len(self.users)
-        total_commands = len(self.commands)
-        logger.info(f"📈 Serving {total_users} users with {total_commands} commands")
-
-        # Add startup summary
-        stats = self.get_stats()
-        logger.info("🎯 Bot Status Summary:")
-        logger.info(f"   • Cogs: {stats['cogs']} loaded")
-        logger.info(f"   • Commands: {stats['commands']} available")
-        logger.info(f"   • Latency: {stats['latency']}ms")
-        logger.info(f"   • Web Dashboard: {self.web_url}")
-        logger.info("🚀 Ladbot is fully operational!")
+        # Set status
+        await self.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
+            )
+        )
 
     async def on_command(self, ctx):
         """Called when a command is invoked"""
         self.commands_used_today += 1
-
-        # Track analytics
-        try:
-            from utils.analytics import analytics
-            analytics.track_command(
-                command_name=ctx.command.name,
-                user_id=ctx.author.id,
-                guild_id=ctx.guild.id if ctx.guild else 0
-            )
-        except Exception as e:
-            logger.error(f"Analytics tracking error: {e}")
-
-        logger.info(f"Command '{ctx.command}' used by {ctx.author} in {ctx.guild}")
+        logger.info(f"Command {ctx.command} used by {ctx.author} in {ctx.guild}")
 
     async def on_command_error(self, ctx, error):
         """Global error handler"""
         self.error_count += 1
 
-        if isinstance(error, commands.CommandNotFound):
-            return  # Ignore unknown commands
-        elif isinstance(error, commands.CheckFailure):
-            await ctx.send("❌ You don't have permission to use this command.")
+        if isinstance(error, commands.CheckFailure):
+            # Don't log permission errors, just send user message
+            await ctx.send(f"❌ {error}")
+        elif isinstance(error, commands.CommandNotFound):
+            # Ignore command not found errors
+            pass
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(f"❌ Missing required argument: `{error.param.name}`")
         else:
+            # Log other errors
             logger.error(f"Unhandled error in {ctx.command}: {error}")
-            await ctx.send("❌ An error occurred while processing that command.")
+            await ctx.send("❌ An unexpected error occurred. Please try again later.")
 
     async def close(self):
-        """Called when bot is shutting down"""
-        logger.info("🔄 Bot is shutting down...")
-
-        # Save analytics before shutdown
-        try:
-            from utils.analytics import analytics
-            analytics.save_analytics()
-            logger.info("📊 Analytics data saved")
-        except Exception as e:
-            logger.error(f"Failed to save analytics: {e}")
-
-        # Stop web server if running
-        if self.web_thread and self.web_thread.is_alive():
-            logger.info("🌐 Stopping web dashboard...")
-
+        """Cleanup when bot is shutting down"""
+        logger.info("🔄 Bot shutting down...")
         await super().close()
-        logger.info("👋 Bot shutdown complete")

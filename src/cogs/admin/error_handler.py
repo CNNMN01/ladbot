@@ -1,152 +1,123 @@
 """
-Enhanced error handling for the bot
+Enhanced Global Error Handler for Ladbot
 """
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import discord
 from discord.ext import commands
 import logging
 import traceback
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class ErrorHandler(commands.Cog):
-    """Enhanced error handling system"""
+    """Enhanced error handling with detailed logging"""
 
     def __init__(self, bot):
         self.bot = bot
+        self.error_channel_id = None  # Set this to log errors to a specific channel
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         """Global error handler for all commands"""
 
-        # Ignore command not found errors (reduces spam)
-        if isinstance(error, commands.CommandNotFound):
+        # Track error
+        if hasattr(self.bot, 'error_count'):
+            self.bot.error_count += 1
+
+        # Ignore these errors
+        if isinstance(error, (commands.CommandNotFound, commands.DisabledCommand)):
             return
 
-        # Handle different types of errors
+        # Handle specific error types
         if isinstance(error, commands.CheckFailure):
-            # Admin permission errors are handled by decorators
+            # Permission errors - user friendly message
+            embed = discord.Embed(
+                title="🚫 Permission Denied",
+                description=str(error),
+                color=0xff4444
+            )
+            await ctx.send(embed=embed, delete_after=10)
             return
 
         elif isinstance(error, commands.MissingRequiredArgument):
             embed = discord.Embed(
-                title="❌ Missing Argument",
-                description=f"Missing required argument: `{error.param.name}`",
-                color=0xff0000
+                title="❓ Missing Argument",
+                description=f"Missing required argument: `{error.param.name}`\n\nUse `{ctx.prefix}help {ctx.command}` for usage info.",
+                color=0xffaa00
             )
-            embed.add_field(
-                name="Usage",
-                value=f"`{ctx.prefix}help {ctx.command.name}` for more info",
-                inline=False
-            )
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, delete_after=15)
+            return
 
         elif isinstance(error, commands.BadArgument):
             embed = discord.Embed(
                 title="❌ Invalid Argument",
-                description=str(error),
-                color=0xff0000
+                description=f"Invalid argument provided.\n\nUse `{ctx.prefix}help {ctx.command}` for usage info.",
+                color=0xffaa00
             )
-            embed.add_field(
-                name="Usage",
-                value=f"`{ctx.prefix}help {ctx.command.name}` for more info",
-                inline=False
-            )
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, delete_after=15)
+            return
 
         elif isinstance(error, commands.CommandOnCooldown):
             embed = discord.Embed(
                 title="⏰ Command on Cooldown",
-                description=f"Please wait **{error.retry_after:.1f}** seconds before using this command again.",
-                color=0xff9900
+                description=f"This command is on cooldown. Try again in {error.retry_after:.1f} seconds.",
+                color=0xffaa00
             )
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, delete_after=10)
+            return
 
         elif isinstance(error, commands.MissingPermissions):
             embed = discord.Embed(
-                title="🔒 Missing Permissions",
-                description="You don't have the required Discord permissions for this command.",
-                color=0xff0000
+                title="🚫 Missing Permissions",
+                description="You don't have the required permissions to use this command.",
+                color=0xff4444
             )
-            missing_perms = ", ".join(error.missing_permissions)
-            embed.add_field(name="Required Permissions", value=missing_perms, inline=False)
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, delete_after=10)
+            return
 
-        elif isinstance(error, commands.BotMissingPermissions):
-            embed = discord.Embed(
-                title="🤖 Bot Missing Permissions",
-                description="I don't have the required permissions to execute this command.",
-                color=0xff0000
-            )
-            missing_perms = ", ".join(error.missing_permissions)
-            embed.add_field(name="Missing Permissions", value=missing_perms, inline=False)
-            await ctx.send(embed=embed)
+        # Handle unexpected errors
+        error_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        elif isinstance(error, discord.Forbidden):
-            embed = discord.Embed(
-                title="🚫 Access Forbidden",
-                description="I don't have permission to perform that action.",
-                color=0xff0000
-            )
-            await ctx.send(embed=embed)
+        # Log the full error
+        logger.error(f"Unhandled error (ID: {error_id}) in command {ctx.command}: {error}")
+        logger.error(f"Error details: {traceback.format_exc()}")
 
-        else:
-            # Log unexpected errors
-            logger.error(f"Unhandled error in {ctx.command}: {error}")
-            logger.error("".join(traceback.format_exception(type(error), error, error.__traceback__)))
-
-            embed = discord.Embed(
-                title="💥 Unexpected Error",
-                description="An unexpected error occurred. The error has been logged.",
-                color=0xff0000
-            )
-            embed.add_field(
-                name="Error Type",
-                value=type(error).__name__,
-                inline=True
-            )
-            if len(str(error)) < 1000:
-                embed.add_field(
-                    name="Error Details",
-                    value=f"```{str(error)}```",
-                    inline=False
-                )
-            await ctx.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_error(self, event, *args, **kwargs):
-        """Handle non-command errors"""
-        logger.error(f"Error in event {event}: {args}, {kwargs}")
-        # Don't crash the bot on errors
-
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def testerror(self, ctx, error_type: str = "generic"):
-        """Test error handling (Admin Only)"""
+        # Send user-friendly error message
         embed = discord.Embed(
-            title="🧪 Testing Error Handler",
-            description=f"Testing error type: `{error_type}`",
-            color=0xff9900
+            title="💥 Unexpected Error",
+            description=f"An unexpected error occurred while executing this command.\n\n**Error ID:** `{error_id}`\n\nThis error has been logged for investigation.",
+            color=0xff4444
         )
-        await ctx.send(embed=embed)
+        embed.set_footer(text="If this keeps happening, please contact an administrator.")
 
-        # Generate different test errors
-        if error_type == "missing_arg":
-            raise commands.MissingRequiredArgument(ctx.command.params['error_type'])
-        elif error_type == "bad_arg":
-            raise commands.BadArgument("This is a test bad argument error")
-        elif error_type == "forbidden":
-            raise discord.Forbidden(discord.HTTPException(), "Test forbidden error")
-        elif error_type == "generic":
-            raise Exception("This is a test generic error")
-        else:
-            await ctx.send(f"❌ Unknown error type: `{error_type}`\nTry: missing_arg, bad_arg, forbidden, generic")
+        try:
+            await ctx.send(embed=embed)
+        except:
+            # Fallback to plain text if embed fails
+            await ctx.send(f"❌ An unexpected error occurred (ID: {error_id}). This has been logged.")
+
+        # Send detailed error to error channel if configured
+        if self.error_channel_id:
+            try:
+                error_channel = self.bot.get_channel(self.error_channel_id)
+                if error_channel:
+                    error_embed = discord.Embed(
+                        title=f"Error Report - {error_id}",
+                        color=0xff0000
+                    )
+                    error_embed.add_field(name="Command", value=str(ctx.command), inline=True)
+                    error_embed.add_field(name="User", value=f"{ctx.author} ({ctx.author.id})", inline=True)
+                    error_embed.add_field(name="Guild", value=f"{ctx.guild} ({ctx.guild.id})" if ctx.guild else "DM", inline=True)
+                    error_embed.add_field(name="Error", value=f"```{str(error)[:1000]}```", inline=False)
+
+                    if len(str(error)) > 1000:
+                        error_embed.add_field(name="Full Traceback", value="Check logs for full details", inline=False)
+
+                    await error_channel.send(embed=error_embed)
+            except Exception as e:
+                logger.error(f"Failed to send error to error channel: {e}")
 
 
 async def setup(bot):
