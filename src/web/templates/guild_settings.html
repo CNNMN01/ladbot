@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}{{ guild.name }} Settings - Ladbot Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex align-items-center">
+                <a href="{{ url_for('advanced_settings') }}" class="btn btn-outline-secondary me-3">
+                    <i class="fas fa-arrow-left"></i> Back to Settings
+                </a>
+                <div>
+                    <h3>
+                        {% if guild.icon %}
+                            <img src="{{ guild.icon }}" class="rounded-circle me-2" width="40" height="40">
+                        {% endif %}
+                        {{ guild.name }} Settings
+                    </h3>
+                    <p class="text-muted mb-0">Configure bot behavior for this server</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs"></i> Server Configuration
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="guildSettingsForm">
+                        <!-- Basic Settings -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">Basic Settings</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Command Prefix</label>
+                                            <input type="text" class="form-control" name="prefix" 
+                                                   value="{{ current_settings.prefix or 'l.' }}" 
+                                                   maxlength="5">
+                                            <div class="form-text">The prefix used for bot commands in this server.</div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Embed Color</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   name="embed_color" 
+                                                   value="{{ current_settings.embed_color or '#4e73df' }}">
+                                            <div class="form-text">Default color for bot embed messages.</div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Command Cooldown (seconds)</label>
+                                            <input type="number" class="form-control" name="command_cooldown" 
+                                                   value="{{ current_settings.command_cooldown or 3 }}" 
+                                                   min="0" max="60">
+                                            <div class="form-text">Delay between command uses to prevent spam.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">Feature Toggles</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" name="autoresponses" 
+                                                   {% if current_settings.autoresponses %}checked{% endif %}>
+                                            <label class="form-check-label">
+                                                <strong>Auto Responses</strong><br>
+                                                <small class="text-muted">Enable automatic responses to keywords</small>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" name="welcome_messages" 
+                                                   {% if current_settings.welcome_messages %}checked{% endif %}>
+                                            <label class="form-check-label">
+                                                <strong>Welcome Messages</strong><br>
+                                                <small class="text-muted">Send welcome messages to new members</small>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" name="moderation_enabled" 
+                                                   {% if current_settings.moderation_enabled %}checked{% endif %}>
+                                            <label class="form-check-label">
+                                                <strong>Moderation Features</strong><br>
+                                                <small class="text-muted">Enable moderation commands and features</small>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" name="spam_protection" 
+                                                   {% if current_settings.spam_protection %}checked{% endif %}>
+                                            <label class="form-check-label">
+                                                <strong>Spam Protection</strong><br>
+                                                <small class="text-muted">Enable spam detection and prevention</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Button -->
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save"></i> Save Settings
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-lg ms-2" onclick="resetForm()">
+                                    <i class="fas fa-undo"></i> Reset to Defaults
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Messages -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="saveToast" class="toast" role="alert">
+        <div class="toast-header">
+            <strong class="me-auto">Settings</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            Settings saved successfully!
+        </div>
+    </div>
+</div>
+
+<script>
+// Form submission handler
+document.getElementById('guildSettingsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    saveSettings();
+});
+
+function saveSettings() {
+    const form = document.getElementById('guildSettingsForm');
+    const formData = new FormData(form);
+    const settings = {};
+    
+    // Convert form data to object
+    for (let [key, value] of formData.entries()) {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (input && input.type === 'checkbox') {
+            settings[key] = input.checked;
+        } else if (input && input.type === 'number') {
+            settings[key] = parseInt(value);
+        } else {
+            settings[key] = value;
+        }
+    }
+    
+    // Handle unchecked checkboxes
+    form.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        if (!settings.hasOwnProperty(input.name)) {
+            settings[input.name] = false;
+        }
+    });
+    
+    // Save to server
+    fetch(`/api/settings/guild/{{ guild.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Settings saved successfully!', 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to save settings'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving settings:', error);
+        showToast('Failed to save settings. Please try again.', 'error');
+    });
+}
+
+function resetForm() {
+    if (confirm('Are you sure you want to reset all settings to defaults?')) {
+        document.getElementById('guildSettingsForm').reset();
+        showToast('Form reset to defaults. Click Save to apply.', 'info');
+    }
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('saveToast');
+    const toastBody = toast.querySelector('.toast-body');
+    
+    toastBody.textContent = message;
+    
+    // Change color based on type
+    toast.className = `toast ${type === 'error' ? 'bg-danger text-white' : type === 'info' ? 'bg-info text-white' : 'bg-success text-white'}`;
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+// Load current settings on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Guild settings page loaded for guild {{ guild.id }}');
+});
+</script>
+{% endblock %}
