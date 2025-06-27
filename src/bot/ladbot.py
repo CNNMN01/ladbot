@@ -22,6 +22,11 @@ class SimpleDataManager:
         self.data_dir = Path(__file__).parent.parent.parent / "data"
         self.data_dir.mkdir(exist_ok=True)
 
+        # Compatibility attributes that cogs expect
+        self.embed_color = 0x00ff00
+        self.logs_dir = Path(__file__).parent.parent.parent / "logs"
+        self.logs_dir.mkdir(exist_ok=True)
+
     def get_data(self, filename):
         """Get data from JSON file"""
         try:
@@ -33,6 +38,10 @@ class SimpleDataManager:
         except Exception as e:
             logger.error(f"Error loading data from {filename}: {e}")
             return {}
+
+    def get_json(self, filename):
+        """Alias for get_data for backward compatibility"""
+        return self.get_data(filename)
 
     def save_data(self, filename, data):
         """Save data to JSON file"""
@@ -74,6 +83,7 @@ DEFAULT_SETTINGS = {
     'crypto': {'default': True, 'type': 'bool', 'descr': 'Crypto prices'},
     'reddit': {'default': True, 'type': 'bool', 'descr': 'Reddit posts'},
     'eightball': {'default': True, 'type': 'bool', 'descr': '8-ball responses'},
+    'cmd_8ball': {'default': True, 'type': 'bool', 'descr': '8-ball responses'},
     'jokes': {'default': True, 'type': 'bool', 'descr': 'Joke commands'},
     'ascii_art': {'default': True, 'type': 'bool', 'descr': 'ASCII art generation'},
     'games': {'default': True, 'type': 'bool', 'descr': 'Various games'},
@@ -165,187 +175,124 @@ class LadBot(commands.Bot):
         if setting_name in DEFAULT_SETTINGS:
             return DEFAULT_SETTINGS[setting_name]['default']
 
-        # Default to True for unknown settings to avoid breaking functionality
+        # Default to True for unknown settings to avoid breaking commands
         return True
 
-    def set_setting(self, guild_id, setting_name, value):
-        """Set a setting value (compatibility method)"""
-        if guild_id not in self.settings_cache:
-            self.settings_cache[guild_id] = {}
-
-        self.settings_cache[guild_id][setting_name] = value
-
-        # Save to file for persistence
-        try:
-            settings_file = self.data_manager.data_dir / f"guild_settings_{guild_id}.json"
-            current_settings = {}
-            if settings_file.exists():
-                with open(settings_file, 'r') as f:
-                    current_settings = json.load(f)
-
-            current_settings[setting_name] = value
-
-            with open(settings_file, 'w') as f:
-                json.dump(current_settings, f, indent=2)
-
-        except Exception as e:
-            logger.error(f"Error saving setting {setting_name} for guild {guild_id}: {e}")
-
     async def setup_hook(self):
-        """Setup hook called when bot is starting"""
+        """Setup bot components and load cogs"""
         logger.info("🔧 Setting up bot components...")
 
         # Load all cogs
         await self.load_cogs()
 
-        # Start web server in background for Render
-        if os.getenv('RENDER') or os.getenv('PORT'):
-            self.loop.create_task(self.start_web_server())
+        # Start web dashboard if not on Render (Render handles this separately)
+        if not os.getenv('RENDER'):
+            try:
+                await self.start_web_dashboard()
+            except Exception as e:
+                logger.warning(f"Web dashboard failed to start: {e}")
+
+        logger.info("✅ Bot setup completed")
 
     async def load_cogs(self):
         """Load all cogs from the cogs directory"""
-        cogs_dir = Path(__file__).parent.parent / "cogs"
+        loaded = 0
+        failed = 0
 
-        # Define load order (admin cogs first, then others)
-        load_order = [
-            "cogs.admin.console",
-            "cogs.admin.reload",
-            "cogs.admin.settings",
-            "cogs.admin.autoresponses",
-            "cogs.admin.error_handler",
-            "cogs.admin.moderation",
-        ]
+        cogs_dir = Path("src/cogs")
+        if not cogs_dir.exists():
+            logger.error("Cogs directory not found!")
+            return
 
-        # Add other cogs
-        for category in ["entertainment", "information", "utility"]:
-            category_path = cogs_dir / category
-            if category_path.exists():
-                for file in category_path.glob("*.py"):
-                    if file.name != "__init__.py":
-                        load_order.append(f"cogs.{category}.{file.stem}")
+        # Discover and load cogs
+        for category_dir in cogs_dir.iterdir():
+            if category_dir.is_dir() and not category_dir.name.startswith("_"):
+                for cog_file in category_dir.glob("*.py"):
+                    if cog_file.name != "__init__.py":
+                        cog_name = f"cogs.{category_dir.name}.{cog_file.stem}"
+                        try:
+                            await self.load_extension(cog_name)
+                            logger.info(f"✅ Loaded: {cog_name}")
+                            loaded += 1
+                        except Exception as e:
+                            logger.error(f"❌ Failed to load {cog_name}: {e}")
+                            failed += 1
 
-        # Load cogs in order
-        loaded_count = 0
-        failed_count = 0
+        logger.info(f"🎮 Cog loading complete: {loaded} loaded, {failed} failed")
 
-        for cog_name in load_order:
-            try:
-                await self.load_extension(cog_name)
-                self.cog_loader.loaded_cogs.add(cog_name)
-                logger.info(f"✅ Loaded: {cog_name}")
-                loaded_count += 1
-            except Exception as e:
-                logger.error(f"❌ Failed to load {cog_name}: {e}")
-                failed_count += 1
-
-        logger.info(f"🎮 Cog loading complete: {loaded_count} loaded, {failed_count} failed")
-
-    async def start_web_server(self):
-        """Start the web server in the background - Render Compatible"""
+    async def start_web_dashboard(self):
+        """Start the web dashboard in a separate thread"""
         try:
-            logger.info(f"🌐 Initializing web dashboard on {self.web_host}:{self.web_port}")
-
-            # Import Flask components
             from web.app import create_app
 
-            def run_server():
-                try:
-                    # Create Flask app with bot instance
-                    app = create_app(self)
+            app = create_app(self)
 
-                    # Configure for production
-                    if os.getenv('RENDER'):
-                        app.config['ENV'] = 'production'
-                        app.config['DEBUG'] = False
+            def run_app():
+                app.run(
+                    host=self.web_host,
+                    port=self.web_port,
+                    debug=False,
+                    threaded=True
+                )
 
-                    logger.info(f"🌐 Starting Flask server on {self.web_host}:{self.web_port}")
-
-                    # Start the Flask app
-                    app.run(
-                        host=self.web_host,
-                        port=self.web_port,
-                        debug=False,
-                        use_reloader=False,
-                        threaded=True
-                    )
-
-                except Exception as e:
-                    logger.error(f"❌ Web server error: {e}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-
-            # Start in background thread
-            self.web_thread = threading.Thread(target=run_server, daemon=True)
+            self.web_thread = threading.Thread(target=run_app, daemon=True)
             self.web_thread.start()
 
-            # Give it a moment to start
-            await asyncio.sleep(2)
+            logger.info(f"🌐 Web dashboard started at http://{self.web_host}:{self.web_port}")
 
-            logger.info(f"🌐 Web dashboard should be available at: {self.web_url}")
-
-        except ImportError as e:
-            logger.warning("🌐 Web dashboard disabled - missing Flask dependencies")
-            logger.info("Install with: pip install flask flask-cors")
         except Exception as e:
-            logger.error(f"❌ Failed to start web server: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"Failed to start web dashboard: {e}")
 
     async def on_ready(self):
-        """Called when bot is ready"""
+        """Called when the bot is ready"""
         logger.info(f"🤖 {self.user.name} (ID: {self.user.id}) is online!")
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
 
-        # Set status
-        try:
-            await self.change_presence(
-                activity=discord.Activity(
-                    type=discord.ActivityType.watching,
-                    name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
-                )
-            )
-        except Exception as e:
-            logger.warning(f"Could not set presence: {e}")
+        # Calculate stats
+        total_users = sum(guild.member_count for guild in self.guilds)
+        total_commands = len([cmd for cmd in self.walk_commands()])
 
-        # Log web server status
-        if self.web_thread and self.web_thread.is_alive():
-            logger.info(f"🌐 Web dashboard running at: {self.web_url}")
-        else:
-            logger.warning("🌐 Web dashboard not running")
+        # Set activity
+        activity = discord.Activity(
+            type=discord.ActivityType.watching,
+            name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
+        )
+        await self.change_presence(activity=activity)
 
-    async def on_command(self, ctx):
-        """Called when a command is invoked"""
-        self.commands_used_today += 1
-        logger.debug(f"Command {ctx.command} used by {ctx.author} in {ctx.guild}")
+        # Log startup summary
+        if not os.getenv('RENDER'):
+            logger.info(f"🌐 Web dashboard started at {self.web_url}")
+
+        logger.info(f"📈 Serving {total_users} users with {total_commands} commands")
+        logger.info("🎯 Bot Status Summary:")
+        logger.info(f"   • Cogs: {len(self.cogs)} loaded")
+        logger.info(f"   • Commands: {total_commands} available")
+        logger.info(f"   • Latency: {round(self.latency * 1000)}ms")
+        logger.info(f"   • Web Dashboard: {self.web_url}")
+        logger.info("🚀 Ladbot is fully operational!")
 
     async def on_command_error(self, ctx, error):
         """Global error handler"""
         self.error_count += 1
 
-        if isinstance(error, commands.CheckFailure):
-            # Don't log permission errors, just send user message
-            await ctx.send(f"❌ {error}")
-        elif isinstance(error, commands.CommandNotFound):
-            # Ignore command not found errors
+        if isinstance(error, commands.CommandNotFound):
+            return
+
+        logger.error(f"Unhandled error in {ctx.command}: {error}")
+
+        # Send user-friendly error message
+        embed = discord.Embed(
+            title="❌ Command Error",
+            description="An unexpected error occurred. This has been logged for investigation.",
+            color=0xff0000
+        )
+        try:
+            await ctx.send(embed=embed, delete_after=10)
+        except:
             pass
-        elif isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(f"❌ Missing required argument: `{error.param.name}`")
-        else:
-            # Log other errors
-            logger.error(f"Unhandled error in {ctx.command}: {error}")
-            try:
-                await ctx.send("❌ An unexpected error occurred. Please try again later.")
-            except:
-                pass  # Don't crash if we can't send the error message
 
     async def close(self):
-        """Cleanup when bot is shutting down"""
+        """Cleanup when bot shuts down"""
         logger.info("🔄 Bot shutting down...")
-
-        # Stop web server thread if running
-        if self.web_thread and self.web_thread.is_alive():
-            logger.info("🌐 Stopping web server...")
-            # Note: daemon threads will stop automatically
-
         await super().close()
         logger.info("👋 Bot shutdown complete")
