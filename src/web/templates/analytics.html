@@ -295,7 +295,7 @@
         </div>
     </div>
 
-    <!-- Additional Analytics Charts (Placeholder for future features) -->
+    <!-- Analytics Charts -->
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="card">
@@ -303,11 +303,15 @@
                     <h5><i class="fas fa-chart-bar"></i> Usage Trends</h5>
                 </div>
                 <div class="card-body">
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-chart-line fa-3x mb-3"></i>
-                        <p>Usage trend charts coming soon</p>
-                        <small>Historical command usage and performance metrics</small>
-                    </div>
+                    {% if analytics.usage_trends %}
+                        <canvas id="usageTrendsChart" width="400" height="200"></canvas>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-chart-line fa-3x mb-3"></i>
+                            <p>Usage trend charts coming soon</p>
+                            <small>Historical command usage and performance metrics</small>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -480,10 +484,12 @@ updateTimestamp();
 // Update timestamp every minute
 setInterval(updateTimestamp, 60000);
 </script>
+
+<!-- Chart.js for Usage Trends -->
+{% if analytics.usage_trends %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Usage Trends Chart
-{% if analytics.usage_trends %}
+// Usage Trends Chart - only load if data exists
 const ctx = document.getElementById('usageTrendsChart').getContext('2d');
 const usageData = {{ analytics.usage_trends | tojson }};
 
@@ -508,6 +514,6 @@ const chart = new Chart(ctx, {
         }
     }
 });
-{% endif %}
 </script>
+{% endif %}
 {% endblock %}
