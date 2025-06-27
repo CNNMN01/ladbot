@@ -1,5 +1,5 @@
 """
-Complete Flask routes for Ladbot web dashboard with Discord OAuth
+Complete Flask routes for Ladbot web dashboard with Advanced Settings
 """
 from flask import render_template, session, redirect, url_for, request, jsonify, flash
 import logging
@@ -230,31 +230,113 @@ def register_routes(app):
 
     @app.route('/settings')
     def settings():
-        """Settings page"""
-        # Check if user is logged in
+        """Basic settings page - redirect to advanced settings"""
+        return redirect(url_for('advanced_settings'))
+
+    @app.route('/settings/advanced')
+    def advanced_settings():
+        """Advanced settings configuration page"""
         if 'user' not in session:
             flash('Please log in to access settings', 'warning')
             return redirect(url_for('login'))
 
         bot = app.bot
 
-        # Get current bot settings
-        settings_data = {
-            'prefix': getattr(bot.config, 'prefix', 'l.'),
-            'admin_count': len(getattr(bot.config, 'admin_ids', [])),
-            'debug_mode': getattr(bot.config, 'DEBUG', False),
-            'total_commands': len(bot.commands) if bot else 0,
-            'loaded_cogs': len(bot.cogs) if bot else 0
-        }
+        # Initialize settings manager
+        if not hasattr(bot, 'settings_manager'):
+            try:
+                from utils.settings_manager import SettingsManager
+                bot.settings_manager = SettingsManager(bot)
+            except ImportError:
+                logger.error("Settings manager not available")
+                flash('Advanced settings not available', 'error')
+                return redirect(url_for('dashboard'))
 
-        return render_template('settings.html',
+        # Get all guilds user has access to
+        user_guilds = []
+        try:
+            for guild in bot.guilds:
+                # Check if user is admin in this guild
+                member = guild.get_member(int(session['user_id']))
+                if member and (member.guild_permissions.administrator or
+                              int(session['user_id']) in bot.config.admin_ids):
+                    user_guilds.append({
+                        'id': guild.id,
+                        'name': guild.name,
+                        'icon': guild.icon.url if guild.icon else None,
+                        'member_count': guild.member_count,
+                        'owner': str(guild.owner) if guild.owner else "Unknown"
+                    })
+        except Exception as e:
+            logger.error(f"Error getting user guilds: {e}")
+
+        # Check if user is bot admin
+        is_bot_admin = int(session['user_id']) in bot.config.admin_ids
+
+        return render_template('advanced_settings.html',
                              user=session.get('user'),
-                             settings=settings_data)
+                             guilds=user_guilds,
+                             is_bot_admin=is_bot_admin)
+
+    @app.route('/settings/guild/<int:guild_id>')
+    def guild_settings(guild_id):
+        """Guild-specific settings page"""
+        if 'user' not in session:
+            flash('Please log in to access settings', 'warning')
+            return redirect(url_for('login'))
+
+        bot = app.bot
+
+        # Initialize settings manager
+        if not hasattr(bot, 'settings_manager'):
+            try:
+                from utils.settings_manager import SettingsManager
+                bot.settings_manager = SettingsManager(bot)
+            except ImportError:
+                logger.error("Settings manager not available")
+                flash('Advanced settings not available', 'error')
+                return redirect(url_for('advanced_settings'))
+
+        # Verify user has permission for this guild
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            flash('Guild not found', 'error')
+            return redirect(url_for('advanced_settings'))
+
+        member = guild.get_member(int(session['user_id']))
+        if not member or not (member.guild_permissions.administrator or
+                             int(session['user_id']) in bot.config.admin_ids):
+            flash('You do not have permission to manage this server', 'error')
+            return redirect(url_for('advanced_settings'))
+
+        # Get current settings
+        current_settings = bot.settings_manager.load_guild_settings(guild_id)
+        settings_categories = bot.settings_manager.get_settings_categories()
+
+        # Get additional data for dropdowns
+        commands = bot.settings_manager.get_all_commands()
+        roles = bot.settings_manager.get_guild_roles(guild_id)
+
+        return render_template('guild_settings.html',
+                             user=session.get('user'),
+                             guild={
+                                 'id': guild.id,
+                                 'name': guild.name,
+                                 'icon': guild.icon.url if guild.icon else None,
+                                 'member_count': guild.member_count,
+                                 'owner': str(guild.owner) if guild.owner else "Unknown"
+                             },
+                             current_settings=current_settings,
+                             settings_categories=settings_categories,
+                             commands=commands,
+                             roles=roles)
 
     @app.route('/about')
     def about():
         """About page"""
         return render_template('about.html', user=session.get('user'))
+
+    # ===== API ROUTES =====
 
     @app.route('/api/stats')
     def api_stats():
@@ -332,6 +414,185 @@ def register_routes(app):
             logger.error(f"Error in API analytics: {e}")
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/api/settings/guild/<int:guild_id>', methods=['GET', 'POST'])
+    def api_guild_settings(guild_id):
+        """Get or save guild settings via API"""
+        if 'user' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        bot = app.bot
+
+        # Initialize settings manager
+        if not hasattr(bot, 'settings_manager'):
+            try:
+                from utils.settings_manager import SettingsManager
+                bot.settings_manager = SettingsManager(bot)
+            except ImportError:
+                return jsonify({'error': 'Settings manager not available'}), 500
+
+        # Verify permission
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            return jsonify({'error': 'Guild not found'}), 404
+
+        member = guild.get_member(int(session['user_id']))
+        if not member or not (member.guild_permissions.administrator or
+                             int(session['user_id']) in bot.config.admin_ids):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+
+        if request.method == 'GET':
+            # Return current guild settings
+            try:
+                settings = bot.settings_manager.load_guild_settings(guild_id)
+                return jsonify(settings)
+            except Exception as e:
+                logger.error(f"Error loading guild {guild_id} settings: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        elif request.method == 'POST':
+            # Save new guild settings
+            try:
+                # Get and validate settings from request
+                new_settings = request.json
+                if not new_settings:
+                    return jsonify({'error': 'No settings data provided'}), 400
+
+                # Apply settings
+                if bot.settings_manager.apply_guild_settings(guild_id, new_settings):
+                    return jsonify({
+                        'success': True,
+                        'message': 'Settings saved successfully',
+                        'timestamp': datetime.now().isoformat()
+                    })
+                else:
+                    return jsonify({'error': 'Failed to save settings'}), 500
+
+            except Exception as e:
+                logger.error(f"Error saving guild {guild_id} settings: {e}")
+                return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/settings/global', methods=['GET', 'POST'])
+    def api_global_settings():
+        """Get or update global bot settings"""
+        if 'user' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        # Check if user is bot admin
+        if int(session['user_id']) not in app.bot.config.admin_ids:
+            return jsonify({'error': 'Bot admin access required'}), 403
+
+        bot = app.bot
+
+        # Initialize settings manager
+        if not hasattr(bot, 'settings_manager'):
+            try:
+                from utils.settings_manager import SettingsManager
+                bot.settings_manager = SettingsManager(bot)
+            except ImportError:
+                return jsonify({'error': 'Settings manager not available'}), 500
+
+        if request.method == 'GET':
+            return jsonify(bot.settings_manager.global_settings)
+
+        elif request.method == 'POST':
+            try:
+                new_settings = request.json
+                if not new_settings:
+                    return jsonify({'error': 'No settings data provided'}), 400
+
+                bot.settings_manager.global_settings.update(new_settings)
+
+                if bot.settings_manager.save_global_settings():
+                    return jsonify({
+                        'success': True,
+                        'message': 'Global settings updated successfully'
+                    })
+                else:
+                    return jsonify({'error': 'Failed to save global settings'}), 500
+
+            except Exception as e:
+                logger.error(f"Error updating global settings: {e}")
+                return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/guild/<int:guild_id>/commands')
+    def api_guild_commands(guild_id):
+        """Get available commands for a guild"""
+        if 'user' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        bot = app.bot
+
+        # Verify permission
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            return jsonify({'error': 'Guild not found'}), 404
+
+        member = guild.get_member(int(session['user_id']))
+        if not member or not (member.guild_permissions.administrator or
+                             int(session['user_id']) in bot.config.admin_ids):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+
+        try:
+            if hasattr(bot, 'settings_manager'):
+                commands = bot.settings_manager.get_all_commands()
+            else:
+                # Fallback method
+                commands = []
+                for command in bot.commands:
+                    commands.append({
+                        'name': command.name,
+                        'description': command.help or 'No description available',
+                        'category': getattr(command.cog, 'qualified_name', 'General') if command.cog else 'General',
+                        'aliases': list(command.aliases) if command.aliases else []
+                    })
+
+            return jsonify(commands)
+
+        except Exception as e:
+            logger.error(f"Error getting commands for guild {guild_id}: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/guild/<int:guild_id>/roles')
+    def api_guild_roles(guild_id):
+        """Get roles for a guild"""
+        if 'user' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        bot = app.bot
+
+        # Verify permission
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            return jsonify({'error': 'Guild not found'}), 404
+
+        member = guild.get_member(int(session['user_id']))
+        if not member or not (member.guild_permissions.administrator or
+                             int(session['user_id']) in bot.config.admin_ids):
+            return jsonify({'error': 'Insufficient permissions'}), 403
+
+        try:
+            if hasattr(bot, 'settings_manager'):
+                roles = bot.settings_manager.get_guild_roles(guild_id)
+            else:
+                # Fallback method
+                roles = []
+                for role in guild.roles:
+                    if role.name != "@everyone":
+                        roles.append({
+                            'id': role.id,
+                            'name': role.name,
+                            'color': str(role.color),
+                            'permissions': role.permissions.value,
+                            'mentionable': role.mentionable
+                        })
+                roles = sorted(roles, key=lambda x: x['name'])
+
+            return jsonify(roles)
+
+        except Exception as e:
+            logger.error(f"Error getting roles for guild {guild_id}: {e}")
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/health')
     def health():
         """Health check endpoint for Render"""
@@ -361,6 +622,8 @@ def register_routes(app):
                 'timestamp': datetime.now().isoformat()
             }), 500
 
+    # ===== AUTHENTICATION ROUTES =====
+
     @app.route('/demo-login')
     def demo_login():
         """Demo login for testing (development only)"""
@@ -384,7 +647,8 @@ def register_routes(app):
         flash('You have been logged out.', 'info')
         return redirect(url_for('login'))
 
-    # Error handlers - Use dashboard template as fallback
+    # ===== ERROR HANDLERS =====
+
     @app.errorhandler(404)
     def not_found(error):
         """Handle 404 errors"""

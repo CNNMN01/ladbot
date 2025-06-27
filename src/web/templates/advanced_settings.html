@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Settings - Ladbot Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3><i class="fas fa-cogs text-primary"></i> Advanced Settings</h3>
+            <p class="text-muted">Configure bot settings for your servers</p>
+        </div>
+    </div>
+
+    <!-- Global Settings Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-globe"></i> Global Bot Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        These settings apply to the entire bot across all servers.
+                        <span class="badge badge-warning">Bot Admin Only</span>
+                    </p>
+                    <button class="btn btn-primary" onclick="openGlobalSettings()">
+                        <i class="fas fa-edit"></i> Manage Global Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Settings -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-server"></i> Server Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Configure bot behavior for individual servers you manage.
+                    </p>
+                    
+                    {% if guilds %}
+                        <div class="row">
+                            {% for guild in guilds %}
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="card border-left-primary h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-3">
+                                            {% if guild.icon %}
+                                                <img src="{{ guild.icon }}" class="rounded-circle me-3" width="50" height="50">
+                                            {% else %}
+                                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                                                    {{ guild.name[0] }}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <h6 class="mb-0">{{ guild.name }}</h6>
+                                                <small class="text-muted">{{ guild.member_count }} members</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="d-grid">
+                                            <a href="{{ url_for('guild_settings', guild_id=guild.id) }}" 
+                                               class="btn btn-outline-primary">
+                                                <i class="fas fa-cog"></i> Configure Settings
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Servers Available</h5>
+                            <p class="text-muted">
+                                You need administrator permissions in a server to configure its bot settings.
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt"></i> Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <button class="btn btn-success btn-block" onclick="backupSettings()">
+                                <i class="fas fa-download"></i> Backup Settings
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button class="btn btn-warning btn-block" onclick="resetToDefaults()">
+                                <i class="fas fa-undo"></i> Reset to Defaults
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button class="btn btn-info btn-block" onclick="importSettings()">
+                                <i class="fas fa-upload"></i> Import Settings
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('analytics') }}" class="btn btn-secondary btn-block">
+                                <i class="fas fa-chart-line"></i> View Analytics
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Global Settings Modal -->
+<div class="modal fade" id="globalSettingsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-globe"></i> Global Bot Settings
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="globalSettingsForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Bot Name</label>
+                                <input type="text" class="form-control" name="bot_name" value="Ladbot">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Default Prefix</label>
+                                <input type="text" class="form-control" name="default_prefix" value="l.">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Default Embed Color</label>
+                                <input type="color" class="form-control" name="default_embed_color" value="#4e73df">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Max Command Cooldown</label>
+                                <input type="number" class="form-control" name="max_command_cooldown" value="5" min="0" max="60">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" name="error_logging" checked>
+                                <label class="form-check-label">Error Logging</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" name="analytics_enabled" checked>
+                                <label class="form-check-label">Analytics</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" name="maintenance_mode">
+                                <label class="form-check-label">Maintenance Mode</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveGlobalSettings()">
+                    <i class="fas fa-save"></i> Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+</style>
+
+<script>
+function openGlobalSettings() {
+    // Load current global settings
+    fetch('/api/settings/global')
+        .then(response => response.json())
+        .then(data => {
+            // Populate form with current values
+            const form = document.getElementById('globalSettingsForm');
+            Object.keys(data).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === 'checkbox') {
+                        input.checked = data[key];
+                    } else {
+                        input.value = data[key];
+                    }
+                }
+            });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('globalSettingsModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error loading global settings:', error);
+            alert('Failed to load global settings');
+        });
+}
+
+function saveGlobalSettings() {
+    const form = document.getElementById('globalSettingsForm');
+    const formData = new FormData(form);
+    const settings = {};
+    
+    // Convert form data to object
+    for (let [key, value] of formData.entries()) {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (input.type === 'checkbox') {
+            settings[key] = input.checked;
+        } else if (input.type === 'number') {
+            settings[key] = parseInt(value);
+        } else {
+            settings[key] = value;
+        }
+    }
+    
+    // Include unchecked checkboxes as false
+    form.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        if (!settings.hasOwnProperty(input.name)) {
+            settings[input.name] = false;
+        }
+    });
+    
+    // Save settings
+    fetch('/api/settings/global', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Global settings saved successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('globalSettingsModal')).hide();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving settings:', error);
+        alert('Failed to save settings');
+    });
+}
+
+function backupSettings() {
+    // Download settings as JSON
+    fetch('/api/settings/global')
+        .then(response => response.json())
+        .then(data => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ladbot-settings-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+}
+
+function resetToDefaults() {
+    if (confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
+        // Implementation would go here
+        alert('Reset functionality would be implemented here');
+    }
+}
+
+function importSettings() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const settings = JSON.parse(e.target.result);
+                // Validate and import settings
+                console.log('Importing settings:', settings);
+                alert('Import functionality would be implemented here');
+            } catch (error) {
+                alert('Invalid settings file');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+</script>
+{% endblock %}
