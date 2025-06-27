@@ -1,85 +1,227 @@
-@app.route('/analytics')
-def analytics():
-    """Analytics page"""
-    if 'user_id' not in session:
+"""
+Fixed Flask routes for Ladbot web dashboard
+"""
+from flask import render_template, session, redirect, url_for, request, jsonify, flash
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+def register_routes(app):
+    """Register all routes with the Flask app"""
+
+    @app.route('/')
+    def index():
+        """Home page - redirect to dashboard or login"""
+        if 'user' in session:
+            return redirect(url_for('dashboard'))
         return redirect(url_for('login'))
 
-    # Check admin permissions
-    user_id = int(session.get('user_id'))
-    is_admin = False
+    @app.route('/login')
+    def login():
+        """Login page"""
+        return render_template('login.html')
 
-    if app.bot and hasattr(app.bot.config, 'admin_ids'):
-        is_admin = user_id in app.bot.config.admin_ids
-    elif app.bot and hasattr(app.bot.config, 'ADMIN_IDS'):
-        is_admin = user_id in app.bot.config.ADMIN_IDS
+    @app.route('/dashboard')
+    def dashboard():
+        """Main dashboard page"""
+        # Get bot stats safely
+        bot = app.bot
+        stats = {}
 
-    if not is_admin:
-        flash('Admin permissions required.', 'error')
-        return redirect(url_for('dashboard'))
-
-    # Import analytics
-    try:
-        from utils.analytics import analytics as bot_analytics
-    except ImportError:
-        bot_analytics = None
-
-    # Get detailed analytics data
-    analytics_data = {}
-    if app.bot:
-        # Get usage trends and user activity if analytics available
-        if bot_analytics:
-            usage_trends = bot_analytics.get_usage_trends(24)
-            top_commands = bot_analytics.get_top_commands(10)
-            user_activity = bot_analytics.get_user_activity_stats()
-        else:
-            usage_trends = []
-            top_commands = []
-            user_activity = {
-                'active_users_24h': 0,
-                'total_commands_24h': 0,
-                'peak_hour': '00:00',
-                'peak_hour_usage': 0,
-                'hourly_breakdown': {}
+        try:
+            if bot and bot.is_ready():
+                stats = {
+                    'guilds': len(bot.guilds),
+                    'users': len(bot.users),
+                    'commands': len(bot.commands),
+                    'latency': round(bot.latency * 1000),
+                    'uptime': str(datetime.now() - bot.start_time).split('.')[0],
+                    'loaded_cogs': len(bot.cogs),
+                    'commands_today': getattr(bot, 'commands_used_today', 0),
+                    'error_count': getattr(bot, 'error_count', 0)
+                }
+            else:
+                # Default stats if bot not ready
+                stats = {
+                    'guilds': 0,
+                    'users': 0,
+                    'commands': 0,
+                    'latency': 0,
+                    'uptime': 'Starting...',
+                    'loaded_cogs': 0,
+                    'commands_today': 0,
+                    'error_count': 0
+                }
+        except Exception as e:
+            logger.error(f"Error getting bot stats: {e}")
+            stats = {
+                'guilds': 0,
+                'users': 0,
+                'commands': 0,
+                'latency': 0,
+                'uptime': 'Error',
+                'loaded_cogs': 0,
+                'commands_today': 0,
+                'error_count': 0
             }
 
-        # Calculate uptime properly
-        uptime_str = "0s"
-        if hasattr(app.bot, 'start_time'):
-            uptime_delta = datetime.now() - app.bot.start_time
-            days = uptime_delta.days
-            hours, remainder = divmod(uptime_delta.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
+        return render_template('dashboard.html',
+                               stats=stats,
+                               bot_stats=stats,  # Alias for template compatibility
+                               user=session.get('user'))
 
-            if days > 0:
-                uptime_str = f"{days}d {hours}h {minutes}m"
-            elif hours > 0:
-                uptime_str = f"{hours}h {minutes}m"
-            elif minutes > 0:
-                uptime_str = f"{minutes}m {seconds}s"
+    @app.route('/analytics')
+    def analytics():
+        """Analytics page"""
+        bot = app.bot
+        analytics_data = {}
+
+        try:
+            if bot and bot.is_ready():
+                analytics_data = {
+                    'total_guilds': len(bot.guilds),
+                    'total_users': len(bot.users),
+                    'total_commands': len(bot.commands),
+                    'bot_latency': round(bot.latency * 1000),
+                    'uptime': str(datetime.now() - bot.start_time).split('.')[0],
+                    'loaded_cogs': len(bot.cogs),
+                    'command_stats': {},
+                    'guild_data': [],
+                    'usage_trends': []
+                }
             else:
-                uptime_str = f"{seconds}s"
+                analytics_data = {
+                    'total_guilds': 0,
+                    'total_users': 0,
+                    'total_commands': 0,
+                    'bot_latency': 0,
+                    'uptime': 'Starting...',
+                    'loaded_cogs': 0,
+                    'command_stats': {},
+                    'guild_data': [],
+                    'usage_trends': []
+                }
+        except Exception as e:
+            logger.error(f"Error getting analytics data: {e}")
+            analytics_data = {
+                'total_guilds': 0,
+                'total_users': 0,
+                'total_commands': 0,
+                'bot_latency': 0,
+                'uptime': 'Error',
+                'loaded_cogs': 0,
+                'command_stats': {},
+                'guild_data': [],
+                'usage_trends': []
+            }
 
-        # Guild analytics
-        guild_data = []
-        for guild in app.bot.guilds:
-            guild_data.append({
-                'name': guild.name,
-                'member_count': guild.member_count,
-                'created_at': guild.created_at.isoformat(),
-                'id': guild.id
-            })
+        return render_template('analytics.html',
+                               analytics=analytics_data,
+                               user=session.get('user'))
 
-        analytics_data = {
-            'usage_trends': usage_trends,
-            'top_commands': top_commands,
-            'user_activity': user_activity,
-            'guild_data': guild_data,
-            'total_users': len(app.bot.users),
-            'total_guilds': len(app.bot.guilds),
-            'bot_latency': round(app.bot.latency * 1000),
-            'uptime': uptime_str,
-            'total_commands': len(app.bot.commands),
-            'loaded_cogs': len(app.bot.cogs)
-        }
+    @app.route('/api/stats')
+    def api_stats():
+        """API endpoint for real-time stats"""
+        bot = app.bot
 
-    return render_template('analytics.html', analytics=analytics_data, user=session.get('user'))
+        try:
+            if bot and bot.is_ready():
+                stats = {
+                    'guilds': len(bot.guilds),
+                    'users': len(bot.users),
+                    'commands': len(bot.commands),
+                    'latency': round(bot.latency * 1000),
+                    'uptime': str(datetime.now() - bot.start_time).split('.')[0],
+                    'loaded_cogs': len(bot.cogs),
+                    'status': 'online'
+                }
+            else:
+                stats = {
+                    'guilds': 0,
+                    'users': 0,
+                    'commands': 0,
+                    'latency': 0,
+                    'uptime': 'Starting...',
+                    'loaded_cogs': 0,
+                    'status': 'starting'
+                }
+        except Exception as e:
+            logger.error(f"Error in API stats: {e}")
+            stats = {
+                'error': str(e),
+                'status': 'error'
+            }
+
+        return jsonify(stats)
+
+    @app.route('/health')
+    def health():
+        """Health check endpoint for Render"""
+        bot = app.bot
+
+        try:
+            if bot and bot.is_ready():
+                return jsonify({
+                    'status': 'healthy',
+                    'bot_status': 'online',
+                    'guilds': len(bot.guilds),
+                    'timestamp': datetime.now().isoformat(),
+                    'version': '2.0.0'
+                })
+            else:
+                return jsonify({
+                    'status': 'starting',
+                    'bot_status': 'connecting',
+                    'timestamp': datetime.now().isoformat(),
+                    'version': '2.0.0'
+                }), 503
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return jsonify({
+                'status': 'error',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }), 500
+
+    @app.route('/demo-login')
+    def demo_login():
+        """Demo login for testing (development only)"""
+        if app.debug or app.config.get('DEVELOPMENT'):
+            session['user'] = {
+                'id': '123456789',
+                'username': 'Demo User',
+                'discriminator': '0001',
+                'avatar': None
+            }
+            session['user_id'] = '123456789'
+            flash('Demo login successful!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            return "Demo login disabled in production", 403
+
+    @app.route('/logout')
+    def logout():
+        """Logout and clear session"""
+        session.clear()
+        flash('You have been logged out.', 'info')
+        return redirect(url_for('login'))
+
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found(error):
+        """Handle 404 errors"""
+        return jsonify({
+            'error': 'Page not found',
+            'status': 404
+        }), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 errors"""
+        logger.error(f"Internal server error: {error}")
+        return jsonify({
+            'error': 'Internal server error',
+            'status': 500
+        }), 500

@@ -1,6 +1,10 @@
-discord.py
-flask
-flask-cors
-python-dotenv
-requests
-gunicorn
+discord.py>=2.3.0
+flask>=2.3.0
+flask-cors>=4.0.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+gunicorn>=21.2.0
+psutil>=5.9.0
+aiohttp>=3.8.0
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.20.0
