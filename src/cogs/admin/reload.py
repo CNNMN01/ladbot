@@ -193,9 +193,9 @@ class Reload(commands.Cog):
             except Exception as final_e:
                 logger.error(f"Complete failure to send reload status: {final_e}")
 
-    @commands.command()
+    @commands.command(name="botstatus", aliases=["rstatus", "reloadstatus"])
     @admin_required()
-    async def status(self, ctx):
+    async def bot_status(self, ctx):
         """Show bot status and statistics (Admin Only)"""
         try:
             # Basic stats
@@ -224,9 +224,14 @@ class Reload(commands.Cog):
                 inline=True
             )
 
+            try:
+                admin_count = len(ctx.bot.settings.ADMIN_IDS) if hasattr(ctx.bot.settings, 'ADMIN_IDS') else 0
+            except:
+                admin_count = 0
+
             embed.add_field(
                 name="🔧 System",
-                value=f"**Admin Count:** {len(ctx.bot.settings.ADMIN_IDS)}\n**Requested by:** {ctx.author.mention}",
+                value=f"**Admin Count:** {admin_count}\n**Requested by:** {ctx.author.mention}",
                 inline=True
             )
 
@@ -234,12 +239,12 @@ class Reload(commands.Cog):
             await ctx.send(embed=embed)
 
         except Exception as e:
-            logger.error(f"Error in status command: {e}")
+            logger.error(f"Error in botstatus command: {e}")
             # Fallback status
             try:
                 await ctx.send(f"🤖 **Bot Status:** Online | **Cogs:** {len(ctx.bot.cogs)} | **Commands:** {len(list(ctx.bot.walk_commands()))}")
             except Exception as final_e:
-                logger.error(f"Complete failure in status command: {final_e}")
+                logger.error(f"Complete failure in botstatus command: {final_e}")
 
     def _get_uptime(self, bot):
         """Calculate bot uptime"""

@@ -52,6 +52,30 @@ def register_routes(app):
                 'bot_status': 'error', 'bot_ready': False
             }
 
+    def get_bot_settings():
+        """Get bot settings safely"""
+        try:
+            bot = app.bot
+            if not bot:
+                return {'prefix': 'l.', 'version': 'v2.0', 'status': 'offline'}
+
+            # Try to get actual settings
+            prefix = 'l.'
+            if hasattr(bot, 'settings') and hasattr(bot.settings, 'BOT_PREFIX'):
+                prefix = bot.settings.BOT_PREFIX
+            elif hasattr(bot, 'command_prefix'):
+                prefix = bot.command_prefix
+
+            return {
+                'prefix': prefix,
+                'version': 'v2.0',
+                'status': 'online' if bot.is_ready() else 'offline',
+                'name': getattr(bot.settings, 'BOT_NAME', 'Ladbot') if hasattr(bot, 'settings') else 'Ladbot'
+            }
+        except Exception as e:
+            logger.error(f"Error getting bot settings: {e}")
+            return {'prefix': 'l.', 'version': 'v2.0', 'status': 'error'}
+
     def require_auth():
         """Check if user is authenticated"""
         return 'user_id' in session
@@ -68,9 +92,12 @@ def register_routes(app):
         user_id = int(session['user_id'])
 
         # Check if user is bot admin
-        admin_ids = getattr(bot.settings, 'ADMIN_IDS', [])
-        if user_id in admin_ids:
-            return True
+        try:
+            admin_ids = getattr(bot.settings, 'ADMIN_IDS', [])
+            if user_id in admin_ids:
+                return True
+        except Exception as e:
+            logger.debug(f"Error checking admin IDs: {e}")
 
         # Check if user is guild admin
         if guild_id:
@@ -172,7 +199,12 @@ def register_routes(app):
             return redirect(url_for('login'))
 
         stats = get_bot_stats()
-        return render_template('settings.html', stats=stats, user=session.get('user'))
+        bot_settings = get_bot_settings()
+
+        return render_template('settings.html',
+                             stats=stats,
+                             settings=bot_settings,  # Fixed: Add settings variable
+                             user=session.get('user'))
 
     @app.route('/advanced-settings')
     def advanced_settings():
@@ -502,22 +534,22 @@ def register_routes(app):
                                  stats=fallback_stats,
                                  bot_stats=fallback_stats,
                                  user=session.get('user'),
-                                 error_message="Page not found"), 404
+                                   error_message="Page not found"), 404
 
-    @app.errorhandler(500)
-    def internal_error(error):
-        """Handle 500 errors"""
-        logger.error(f"Internal server error: {error}")
-        if request.path.startswith('/api/'):
-            return jsonify({'error': 'Internal server error', 'status': 500}), 500
-        else:
-            fallback_stats = {
-                'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
-                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
-                'bot_status': 'error', 'bot_ready': False
-            }
-            return render_template('dashboard.html',
-                                 stats=fallback_stats,
-                                 bot_stats=fallback_stats,
-                                 user=session.get('user'),
-                                 error_message="Internal server error"), 500
+        @app.errorhandler(500)
+        def internal_error(error):
+            """Handle 500 errors"""
+            logger.error(f"Internal server error: {error}")
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Internal server error', 'status': 500}), 500
+            else:
+                fallback_stats = {
+                    'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                    'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                    'bot_status': 'error', 'bot_ready': False
+                }
+                return render_template('dashboard.html',
+                                       stats=fallback_stats,
+                                       bot_stats=fallback_stats,
+                                       user=session.get('user'),
+                                       error_message="Internal server error"), 500

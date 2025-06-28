@@ -27,26 +27,24 @@
                                             <td><code>{{ settings.prefix or 'l.' }}</code></td>
                                         </tr>
                                         <tr>
-                                            <td><strong>Admin Count:</strong></td>
-                                            <td>{{ settings.admin_count or 0 }} configured</td>
+                                            <td><strong>Bot Version:</strong></td>
+                                            <td>{{ settings.version or 'v2.0' }}</td>
                                         </tr>
                                         <tr>
-                                            <td><strong>Total Commands:</strong></td>
-                                            <td>{{ settings.total_commands or 0 }} available</td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong>Loaded Modules:</strong></td>
-                                            <td>{{ settings.loaded_cogs or 0 }} active</td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong>Debug Mode:</strong></td>
+                                            <td><strong>Status:</strong></td>
                                             <td>
-                                                {% if settings.debug_mode %}
-                                                    <span class="badge bg-warning">Enabled</span>
+                                                {% if settings.status == 'online' %}
+                                                    <span class="badge bg-success">Online</span>
+                                                {% elif settings.status == 'offline' %}
+                                                    <span class="badge bg-danger">Offline</span>
                                                 {% else %}
-                                                    <span class="badge bg-success">Disabled</span>
+                                                    <span class="badge bg-warning">{{ settings.status|title }}</span>
                                                 {% endif %}
                                             </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Bot Name:</strong></td>
+                                            <td>{{ settings.name or 'Ladbot' }}</td>
                                         </tr>
                                     </table>
                                 </div>
@@ -54,19 +52,33 @@
                         </div>
 
                         <div class="col-md-6">
-                            <div class="card bg-info text-white">
+                            <div class="card bg-light">
                                 <div class="card-body">
                                     <h5 class="card-title">
-                                        <i class="fas fa-terminal"></i> Discord Commands
+                                        <i class="fas fa-chart-line text-success"></i> Bot Statistics
                                     </h5>
-                                    <p>Use these commands in Discord to manage your bot:</p>
-                                    <ul class="list-unstyled">
-                                        <li><code>{{ settings.prefix or 'l.' }}settings</code> - View server settings</li>
-                                        <li><code>{{ settings.prefix or 'l.' }}reload</code> - Reload bot modules</li>
-                                        <li><code>{{ settings.prefix or 'l.' }}help</code> - Show all commands</li>
-                                        <li><code>{{ settings.prefix or 'l.' }}info</code> - Bot information</li>
-                                        <li><code>{{ settings.prefix or 'l.' }}ping</code> - Check bot latency</li>
-                                    </ul>
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td><strong>Servers:</strong></td>
+                                            <td>{{ stats.guilds or 0 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Users:</strong></td>
+                                            <td>{{ stats.users or 0 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Commands:</strong></td>
+                                            <td>{{ stats.commands or 0 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Uptime:</strong></td>
+                                            <td>{{ stats.uptime or 'Unknown' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Latency:</strong></td>
+                                            <td>{{ stats.latency or 0 }}ms</td>
+                                        </tr>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -74,39 +86,71 @@
 
                     <div class="row mt-4">
                         <div class="col-12">
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i>
-                                <strong>Note:</strong> Advanced settings configuration via web interface is coming soon!
-                                For now, you can manage most bot settings using Discord commands.
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-tools"></i> Quick Actions
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <a href="{{ url_for('advanced_settings') }}" class="btn btn-primary btn-lg w-100">
+                                                <i class="fas fa-cogs"></i> Advanced Settings
+                                            </a>
+                                            <small class="text-muted d-block mt-1">Configure server-specific settings</small>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <a href="{{ url_for('analytics') }}" class="btn btn-info btn-lg w-100">
+                                                <i class="fas fa-chart-bar"></i> View Analytics
+                                            </a>
+                                            <small class="text-muted d-block mt-1">Monitor bot usage and performance</small>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <button class="btn btn-success btn-lg w-100" onclick="refreshStats()">
+                                                <i class="fas fa-sync-alt"></i> Refresh Stats
+                                            </button>
+                                            <small class="text-muted d-block mt-1">Update bot statistics</small>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="row">
+                    <div class="row mt-4">
                         <div class="col-12">
-                            <div class="card border-warning">
-                                <div class="card-header bg-warning text-dark">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-exclamation-triangle"></i> Admin Features
-                                    </h6>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-info-circle"></i> Getting Started
+                                    </h5>
                                 </div>
                                 <div class="card-body">
-                                    <p class="mb-2">These features require administrator permissions:</p>
                                     <div class="row">
                                         <div class="col-md-6">
+                                            <h6><i class="fas fa-play-circle text-primary"></i> Basic Commands</h6>
                                             <ul class="list-unstyled">
-                                                <li>• Auto-response management</li>
-                                                <li>• Command enabling/disabling</li>
-                                                <li>• User moderation tools</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}help</code> - Show all commands</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}ping</code> - Check bot responsiveness</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}info</code> - Bot information</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}weather [city]</code> - Weather info</li>
                                             </ul>
                                         </div>
                                         <div class="col-md-6">
+                                            <h6><i class="fas fa-gamepad text-success"></i> Entertainment</h6>
                                             <ul class="list-unstyled">
-                                                <li>• Bot reload and maintenance</li>
-                                                <li>• Error logs and debugging</li>
-                                                <li>• Guild-specific settings</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}8ball [question]</code> - Magic 8-ball</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}minesweeper</code> - Play minesweeper</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}jokes</code> - Random jokes</li>
+                                                <li><code>{{ settings.prefix or 'l.' }}dino [name]</code> - Dinosaur facts</li>
                                             </ul>
                                         </div>
+                                    </div>
+
+                                    <div class="alert alert-info mt-3">
+                                        <i class="fas fa-lightbulb"></i>
+                                        <strong>Tip:</strong> Use <code>{{ settings.prefix or 'l.' }}help [command]</code> to get detailed information about any specific command!
                                     </div>
                                 </div>
                             </div>
@@ -117,4 +161,126 @@
         </div>
     </div>
 </div>
+
+<!-- Toast for notifications -->
+<div class="toast position-fixed top-0 end-0 m-3" id="settingsToast" style="z-index: 9999;">
+    <div class="toast-header">
+        <strong class="me-auto">Ladbot Dashboard</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body"></div>
+</div>
+
+<script>
+function refreshStats() {
+    // Show loading state
+    const refreshBtn = event.target;
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+
+    // Fetch updated stats
+    fetch('/api/bot/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.guilds !== undefined) {
+                showToast('Stats refreshed successfully!', 'success');
+                // Optionally reload the page to show updated stats
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast('Failed to refresh stats', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing stats:', error);
+            showToast('Failed to refresh stats', 'error');
+        })
+        .finally(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalText;
+        });
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('settingsToast');
+    const toastBody = toast.querySelector('.toast-body');
+
+    toastBody.textContent = message;
+
+    // Change color based on type
+    toast.className = `toast position-fixed top-0 end-0 m-3 ${type === 'error' ? 'bg-danger text-white' : type === 'info' ? 'bg-info text-white' : 'bg-success text-white'}`;
+
+    const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+    bsToast.show();
+}
+
+// Auto-refresh stats every 30 seconds
+setInterval(function() {
+    fetch('/api/bot/stats')
+        .then(response => response.json())
+        .then(data => {
+            // Update stats display if needed
+            console.log('Background stats update:', data);
+        })
+        .catch(error => {
+            console.warn('Background stats update failed:', error);
+        });
+}, 30000);
+</script>
+
+<style>
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 15px 15px 0 0 !important;
+}
+
+.btn {
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.table td {
+    padding: 0.5rem 0;
+    border: none;
+}
+
+.badge {
+    font-size: 0.8em;
+    padding: 0.4em 0.8em;
+}
+
+.bg-light {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%) !important;
+}
+
+.alert-info {
+    background-color: #e3f2fd;
+    border-color: #90caf9;
+    color: #0d47a1;
+}
+
+code {
+    background-color: #f8f9fa;
+    color: #e83e8c;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+</style>
 {% endblock %}
