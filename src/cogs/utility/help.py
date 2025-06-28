@@ -1,5 +1,5 @@
 """
-Simple, reliable help command with proper admin filtering
+Enhanced Help command with fuzzy matching and case insensitivity
 """
 
 import sys
@@ -7,296 +7,287 @@ import sys
 import discord
 from discord.ext import commands
 from utils.pagination import PaginatedEmbed
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Help(commands.Cog):
-    """Simple help command system with admin filtering"""
+    """Enhanced help system with fuzzy matching"""
 
     def __init__(self, bot):
         self.bot = bot
-        # Remove the default help command
-        bot.remove_command('help')
+        self.bot.help_command = None  # Remove default help
 
-        # Define admin-only commands that should be hidden from public help
-        self.admin_only_commands = {
-            'amiadmin', 'autoresponse', 'clearmodules', 'forcereload',
-            'logs', 'reload', 'settings', 'status', 'botinfo', 'console',
-            'clearlogs', 'kick', 'ban', 'unban', 'purge'  # Added moderation commands
-        }
+        # Define admin-only cogs and commands
+        self.admin_only_cogs = ['Settings', 'Console', 'Reload', 'ErrorHandler', 'Moderation']
+        self.admin_only_commands = ['settings', 'reload', 'console', 'feedback_debug', 'ban', 'kick', 'purge']
 
-        # Define admin-only cogs
-        self.admin_only_cogs = {'Admin'}
-
-    def _is_admin(self, ctx) -> bool:
+    def _is_admin(self, ctx):
         """Check if user is admin"""
-        # Handle different config attribute names safely
-        admin_ids = []
-        try:
-            # Try lowercase first
-            if hasattr(ctx.bot.config, 'admin_ids'):
-                admin_ids = ctx.bot.settings.admin_ids
-            # Try uppercase if lowercase doesn't exist
-            elif hasattr(ctx.bot.config, 'ADMIN_IDS'):
-                admin_ids = ctx.bot.settings.ADMIN_IDS
-            # Fallback to empty list
-            else:
-                admin_ids = []
-        except Exception:
-            admin_ids = []
-
-        return (
-            ctx.author.guild_permissions.administrator or
-            ctx.author.id in admin_ids
-        )
-
-    def _should_show_command(self, command, ctx) -> bool:
-        """Determine if a command should be shown to this user"""
-        # Always hide hidden commands
-        if command.hidden:
+        if not ctx.guild:
             return False
 
-        # Check if command is admin-only
-        if command.name in self.admin_only_commands:
-            return self._is_admin(ctx)
+        # Check server admin
+        if ctx.author.guild_permissions.administrator:
+            return True
 
-        # Check if command's cog is admin-only
-        if command.cog and command.cog.qualified_name in self.admin_only_cogs:
-            return self._is_admin(ctx)
+        # Check bot admin list
+        try:
+            admin_ids = getattr(self.bot.config, 'ADMIN_IDS', []) or getattr(self.bot.config, 'admin_ids', [])
+            if ctx.author.id in admin_ids:
+                return True
+        except:
+            pass
 
-        # Show all other commands
+        return False
+
+    def _should_show_command(self, command, ctx):
+        """Determine if a command should be shown to the user"""
+        # Hide admin commands from non-admins
+        if command.name in self.admin_only_commands and not self._is_admin(ctx):
+            return False
+
+        # Check if command cog is admin-only
+        if command.cog and command.cog.qualified_name in self.admin_only_cogs and not self._is_admin(ctx):
+            return False
+
         return True
 
-    @commands.command(name="help", aliases=["h"])
+    @commands.command(name="help", aliases=["h", "commands"])
     async def help_command(self, ctx, *, command_name: str = None):
         """Show help information
 
         Usage:
-        l.help - Show all commands
-        l.help <command> - Show help for specific command
+        l.help - Show all categories
+        l.help <command> - Show help for a command
+        l.help <category> - Show commands in a category
         """
-        if command_name:
-            await self._show_command_help(ctx, command_name)
+        if command_name is None:
+            await self._show_main_help(ctx)
         else:
-            await self._show_all_commands(ctx)
+            await self._show_command_help(ctx, command_name)
 
-    async def _show_all_commands(self, ctx):
-        """Show all available commands organized by category"""
-
-        is_admin = self._is_admin(ctx)
-
-        # Get all cogs and their commands
-        cog_commands = {}
-
-        for cog_name, cog in self.bot.cogs.items():
-            # Skip certain cogs from help
-            if cog_name in ['Events', 'Help']:
-                continue
-
-            # Skip admin-only cogs for non-admins
-            if cog_name in self.admin_only_cogs and not is_admin:
-                continue
-
-            commands_list = []
-            for command in cog.get_commands():
-                if self._should_show_command(command, ctx):
-                    # Get command description
-                    desc = command.help or command.brief or "No description"
-                    if len(desc) > 50:
-                        desc = desc[:47] + "..."
-                    commands_list.append((command.name, desc))
-
-            if commands_list:
-                cog_commands[cog_name] = commands_list
-
-        # Create embeds for each category
-        embeds = []
-
-        # Main help embed
-        main_embed = discord.Embed(
-            title="🤖 Ladbot Help",
-            description="Here are all available commands organized by category!",
+    async def _show_main_help(self, ctx):
+        """Show the main help menu with categories"""
+        embed = discord.Embed(
+            title="🤖 Ladbot Help Menu",
+            description="Choose a category or use `help <command>` for specific command info",
             color=0x00ff00
         )
 
-        main_embed.add_field(
-            name="📋 How to Use",
-            value=f"`{ctx.prefix}help <command>` - Get detailed help for a command\n`{ctx.prefix}help <category>` - See commands in a category",
-            inline=False
-        )
+        # Group commands by category
+        categories = {}
 
-        # Add category overview
-        category_list = []
-        for cog_name in cog_commands.keys():
-            emoji = self._get_category_emoji(cog_name)
-            category_list.append(f"{emoji} **{cog_name}** ({len(cog_commands[cog_name])} commands)")
+        for cog_name, cog in self.bot.cogs.items():
+            # Skip internal cogs
+            if cog_name in ['Events', 'Help']:
+                continue
 
-        if category_list:
-            main_embed.add_field(
-                name="📚 Command Categories",
-                value="\n".join(category_list),
+            # Skip admin cogs for non-admins
+            if cog_name in self.admin_only_cogs and not self._is_admin(ctx):
+                continue
+
+            # Count visible commands in this cog
+            visible_commands = []
+            for command in cog.get_commands():
+                if self._should_show_command(command, ctx):
+                    visible_commands.append(command)
+
+            if visible_commands:
+                categories[cog_name] = {
+                    'cog': cog,
+                    'commands': visible_commands,
+                    'count': len(visible_commands)
+                }
+
+        # Create category fields
+        for category_name, category_info in categories.items():
+            emoji = self._get_category_emoji(category_name)
+            cog = category_info['cog']
+            count = category_info['count']
+
+            # Add admin indicator
+            display_name = category_name
+            if category_name in self.admin_only_cogs:
+                display_name += " 🛡️"
+
+            # Get some example commands
+            example_commands = [cmd.name for cmd in category_info['commands'][:3]]
+            examples = ", ".join([f"`{cmd}`" for cmd in example_commands])
+
+            if count > 3:
+                examples += f" (+{count-3} more)"
+
+            description = cog.description or f"Commands in the {category_name} category"
+
+            embed.add_field(
+                name=f"{emoji} {display_name} ({count})",
+                value=f"{description}\n**Examples:** {examples}",
                 inline=False
             )
 
-        main_embed.add_field(
-            name="💡 Examples",
-            value=f"`{ctx.prefix}help ping`\n`{ctx.prefix}help minesweeper`\n`{ctx.prefix}help Entertainment`",
+        embed.add_field(
+            name="📋 Quick Commands",
+            value=f"`{ctx.prefix}help <category>` - Show category commands\n`{ctx.prefix}help <command>` - Command details\n`{ctx.prefix}cmdlist` - All commands list",
             inline=False
         )
 
-        # Add admin notice if user is admin
-        if is_admin:
-            main_embed.add_field(
-                name="🛡️ Admin Status",
-                value="You have admin permissions - seeing all commands including admin-only ones.",
-                inline=False
-            )
-
-        total_commands = sum(len(cmds) for cmds in cog_commands.values())
-        footer_text = f"Total Commands: {total_commands}"
-        if not is_admin:
-            footer_text += " • Admin commands hidden"
-
-        main_embed.set_footer(text=footer_text)
-        embeds.append(main_embed)
-
-        # Create embeds for each category
-        for cog_name, commands_list in cog_commands.items():
-            emoji = self._get_category_emoji(cog_name)
-
-            # Add admin indicator for admin cogs
-            title = f"{emoji} {cog_name} Commands"
-            if cog_name in self.admin_only_cogs:
-                title += " 🛡️"
-
-            embed = discord.Embed(
-                title=title,
-                description=f"Commands in the {cog_name} category:",
-                color=0x00ff00
-            )
-
-            # Add admin warning for admin categories
-            if cog_name in self.admin_only_cogs:
-                embed.description += "\n⚠️ **Admin-only commands**"
-
-            # Add commands in batches to avoid hitting field limits
-            for i in range(0, len(commands_list), 10):
-                batch = commands_list[i:i+10]
-
-                cmd_text = ""
-                for cmd_name, cmd_desc in batch:
-                    # Add admin indicator for admin commands
-                    if cmd_name in self.admin_only_commands:
-                        cmd_text += f"`{ctx.prefix}{cmd_name}` 🛡️ - {cmd_desc}\n"
-                    else:
-                        cmd_text += f"`{ctx.prefix}{cmd_name}` - {cmd_desc}\n"
-
-                field_name = f"Commands" if i == 0 else f"Commands (continued)"
-                embed.add_field(
-                    name=field_name,
-                    value=cmd_text,
-                    inline=False
-                )
-
-            embed.set_footer(text=f"Use {ctx.prefix}help <command> for detailed information")
-            embeds.append(embed)
-
-        # Send paginated embeds
-        if len(embeds) == 1:
-            await ctx.send(embed=embeds[0])
-        else:
-            paginator = PaginatedEmbed(ctx, embeds, timeout=120)
-            await paginator.start()
+        embed.set_footer(text=f"Use {ctx.prefix}help <command> for detailed information about a command")
+        await ctx.send(embed=embed)
 
     async def _show_command_help(self, ctx, command_name: str):
-        """Show help for a specific command or category"""
+        """Show help for a specific command or category with improved matching"""
 
-        # First, try to find it as a command
+        # First, try exact command match
         command = self.bot.get_command(command_name.lower())
-
         if command:
-            # Check if user can see this command
-            if not self._should_show_command(command, ctx):
+            if self._should_show_command(command, ctx):
                 embed = discord.Embed(
-                    title="🔒 Access Denied",
-                    description=f"The command `{command_name}` requires administrator permissions.",
+                    title=f"📖 Command: {ctx.prefix}{command.name}",
+                    color=0x00ff00
+                )
+
+                # Add admin indicator if it's an admin command
+                if command.name in self.admin_only_commands:
+                    embed.title += " 🛡️"
+                    embed.add_field(
+                        name="🔒 Permissions",
+                        value="**Administrator Only**",
+                        inline=True
+                    )
+
+                # Command description
+                description = command.help or command.brief or "No description available."
+                embed.description = description
+
+                # Usage/signature
+                if command.signature:
+                    embed.add_field(
+                        name="📝 Usage",
+                        value=f"`{ctx.prefix}{command.name} {command.signature}`",
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="📝 Usage",
+                        value=f"`{ctx.prefix}{command.name}`",
+                        inline=False
+                    )
+
+                # Aliases
+                if command.aliases:
+                    aliases = ", ".join([f"`{alias}`" for alias in command.aliases])
+                    embed.add_field(
+                        name="🔄 Aliases",
+                        value=aliases,
+                        inline=False
+                    )
+
+                # Category
+                if command.cog:
+                    category_name = command.cog.qualified_name
+                    if category_name in self.admin_only_cogs:
+                        category_name += " 🛡️"
+                    embed.add_field(
+                        name="📁 Category",
+                        value=category_name,
+                        inline=True
+                    )
+
+                # Cooldown info
+                try:
+                    if hasattr(command, '_buckets') and command._buckets._cooldown:
+                        cooldown = command._buckets._cooldown
+                        embed.add_field(
+                            name="⏱️ Cooldown",
+                            value=f"{cooldown.rate} uses per {cooldown.per} seconds",
+                            inline=True
+                        )
+                except:
+                    pass  # Skip cooldown info if not available
+
+                embed.set_footer(text=f"Requested by {ctx.author.display_name}")
+                await ctx.send(embed=embed)
+                return
+            else:
+                embed = discord.Embed(
+                    title="🔒 Command Restricted",
+                    description=f"The command `{command_name}` requires special permissions.",
                     color=0xff0000
                 )
                 await ctx.send(embed=embed)
                 return
 
-            embed = discord.Embed(
-                title=f"📖 Command: {ctx.prefix}{command.name}",
-                color=0x00ff00
-            )
+        # Try to find it as a cog/category with improved case-insensitive matching
+        target_cog = None
 
-            # Add admin indicator if it's an admin command
-            if command.name in self.admin_only_commands:
-                embed.title += " 🛡️"
-                embed.add_field(
-                    name="🔒 Permissions",
-                    value="**Administrator Only**",
-                    inline=True
-                )
+        # Create variations of the search term
+        search_variations = [
+            command_name,                    # Original: "AsciiArt"
+            command_name.lower(),           # "asciiart"
+            command_name.title(),           # "Asciiart"
+            command_name.upper(),           # "ASCIIART"
+            command_name.replace('_', ''),  # Remove underscores
+            command_name.replace('-', ''),  # Remove hyphens
+        ]
 
-            # Command description
-            description = command.help or command.brief or "No description available."
-            embed.description = description
+        # Special handling for common variations
+        if 'ascii' in command_name.lower():
+            search_variations.extend(['AsciiArt', 'Ascii', 'ascii', 'art', 'Art'])
 
-            # Usage/signature
-            if command.signature:
-                embed.add_field(
-                    name="📝 Usage",
-                    value=f"`{ctx.prefix}{command.name} {command.signature}`",
-                    inline=False
-                )
-            else:
-                embed.add_field(
-                    name="📝 Usage",
-                    value=f"`{ctx.prefix}{command.name}`",
-                    inline=False
-                )
+        # Try direct cog name matches
+        for variation in search_variations:
+            cog = self.bot.get_cog(variation)
+            if cog:
+                target_cog = cog
+                break
 
-            # Aliases
-            if command.aliases:
-                aliases = ", ".join([f"`{alias}`" for alias in command.aliases])
-                embed.add_field(
-                    name="🔄 Aliases",
-                    value=aliases,
-                    inline=False
-                )
+        # If no direct match, try partial/fuzzy matching
+        if not target_cog:
+            command_name_lower = command_name.lower()
+            best_match = None
+            best_score = 0
 
-            # Category
-            if command.cog:
-                category_name = command.cog.qualified_name
-                if category_name in self.admin_only_cogs:
-                    category_name += " 🛡️"
-                embed.add_field(
-                    name="📁 Category",
-                    value=category_name,
-                    inline=True
-                )
+            for cog_name, cog in self.bot.cogs.items():
+                if cog_name in ['Events', 'Help']:
+                    continue
 
-            # Cooldown info
-            try:
-                if hasattr(command, '_buckets') and command._buckets._cooldown:
-                    cooldown = command._buckets._cooldown
-                    embed.add_field(
-                        name="⏱️ Cooldown",
-                        value=f"{cooldown.rate} uses per {cooldown.per} seconds",
-                        inline=True
-                    )
-            except:
-                pass  # Skip cooldown info if not available
+                cog_name_lower = cog_name.lower()
 
-            embed.set_footer(text=f"Requested by {ctx.author.display_name}")
-            await ctx.send(embed=embed)
-            return
+                # Calculate match score
+                score = 0
 
-        # Try to find it as a cog/category
-        cog = self.bot.get_cog(command_name.title())
-        if cog:
+                # Exact match (highest priority)
+                if command_name_lower == cog_name_lower:
+                    score = 100
+                # One contains the other
+                elif command_name_lower in cog_name_lower:
+                    score = 80
+                elif cog_name_lower in command_name_lower:
+                    score = 75
+                # Starts with
+                elif cog_name_lower.startswith(command_name_lower):
+                    score = 70
+                elif command_name_lower.startswith(cog_name_lower):
+                    score = 65
+                # Contains significant portion
+                elif len(command_name) >= 4:
+                    for i in range(len(command_name) - 3):
+                        substr = command_name_lower[i:i+4]
+                        if substr in cog_name_lower:
+                            score = max(score, 50)
+
+                if score > best_score:
+                    best_score = score
+                    best_match = cog
+
+            if best_score >= 50:  # Minimum match threshold
+                target_cog = best_match
+
+        if target_cog:
             # Check if user can see this cog
-            if cog.qualified_name in self.admin_only_cogs and not self._is_admin(ctx):
+            if target_cog.qualified_name in self.admin_only_cogs and not self._is_admin(ctx):
                 embed = discord.Embed(
                     title="🔒 Access Denied",
                     description=f"The `{command_name}` category requires administrator permissions.",
@@ -305,39 +296,53 @@ class Help(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            await self._show_category_help(ctx, cog)
+            await self._show_category_help(ctx, target_cog)
             return
 
-        # Command not found
+        # If still not found, show suggestions
+        suggestions = []
+        command_name_lower = command_name.lower()
+
+        # Collect command suggestions
+        for cmd in self.bot.commands:
+            if self._should_show_command(cmd, ctx):
+                # Add command name if it matches
+                if command_name_lower in cmd.name.lower() or cmd.name.lower() in command_name_lower:
+                    suggestions.append(cmd.name)
+                # Add aliases if they match
+                for alias in cmd.aliases:
+                    if command_name_lower in alias.lower() or alias.lower() in command_name_lower:
+                        suggestions.append(alias)
+
+        # Collect cog suggestions
+        for cog_name, cog in self.bot.cogs.items():
+            if cog_name in ['Events', 'Help']:
+                continue
+            if cog_name in self.admin_only_cogs and not self._is_admin(ctx):
+                continue
+
+            if command_name_lower in cog_name.lower() or cog_name.lower() in command_name_lower:
+                suggestions.append(cog_name)
+
+        # Remove duplicates and limit
+        suggestions = list(dict.fromkeys(suggestions))[:8]
+
         embed = discord.Embed(
             title="❌ Command Not Found",
             description=f"No command or category named `{command_name}` was found.",
             color=0xff0000
         )
 
-        # Suggest similar commands (only ones they can access)
-        all_commands = [cmd.name for cmd in self.bot.commands if self._should_show_command(cmd, ctx)]
-        all_cogs = [name for name in self.bot.cogs.keys()
-                   if name not in self.admin_only_cogs or self._is_admin(ctx)]
-
-        suggestions = []
-        search_term = command_name.lower()
-
-        # Simple similarity check
-        for cmd_name in all_commands + all_cogs:
-            if search_term in cmd_name.lower() or cmd_name.lower().startswith(search_term):
-                suggestions.append(cmd_name)
-
         if suggestions:
             embed.add_field(
                 name="💡 Did you mean?",
-                value="\n".join(f"• `{suggestion}`" for suggestion in suggestions[:5]),
+                value="\n".join(f"• `{suggestion}`" for suggestion in suggestions),
                 inline=False
             )
 
         embed.add_field(
             name="🔍 How to get help",
-            value=f"`{ctx.prefix}help` - Show all commands\n`{ctx.prefix}help <command>` - Get help for a command",
+            value=f"`{ctx.prefix}help` - Show all commands\n`{ctx.prefix}help <command>` - Get help for a command\n`{ctx.prefix}cmdlist` - List all commands",
             inline=False
         )
 
@@ -408,7 +413,19 @@ class Help(commands.Cog):
             'Tools': '🛠️',
             'Fun': '🎉',
             'Music': '🎵',
-            'Moderation': '🔨'
+            'Moderation': '🔨',
+            'AsciiArt': '🎨',
+            'Settings': '⚙️',
+            'Console': '💻',
+            'Reload': '🔄',
+            'ErrorHandler': '⚠️',
+            'Feedback': '📝',
+            'EightBall': '🎱',
+            'Weather': '🌤️',
+            'Crypto': '💰',
+            'Reddit': '🔗',
+            'Bible': '📖',
+            'Dinosaurs': '🦕'
         }
         return category_emojis.get(category_name, '📁')
 
