@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ladbot Enhanced - Main Entry Point (Render Compatible)
+Ladbot Enhanced - Universal Entry Point (Render & Railway Compatible)
 """
 import asyncio
 import logging
@@ -21,24 +21,29 @@ if project_root not in sys.path:
 
 
 def setup_logging():
-    """Setup logging configuration for Render"""
+    """Setup logging configuration for cloud platforms"""
     try:
         from config.settings import settings
 
         # Create logs directory if it doesn't exist
-        settings.LOGS_DIR.mkdir(exist_ok=True)
+        try:
+            settings.LOGS_DIR.mkdir(exist_ok=True)
+        except (PermissionError, OSError):
+            # Cloud platforms might not allow file creation
+            pass
 
         # Configure logging
         log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-        # Always log to stdout for Render
+        # Always log to stdout for cloud platforms
         handlers = [logging.StreamHandler(sys.stdout)]
 
-        # Also log to file if possible
+        # Try to add file logging if possible
         try:
-            handlers.append(logging.FileHandler(settings.LOGS_DIR / "bot.log"))
+            if settings.LOGS_DIR.exists():
+                handlers.append(logging.FileHandler(settings.LOGS_DIR / "bot.log"))
         except (PermissionError, OSError):
-            # If file logging fails, just use stdout
+            # File logging not available, just use stdout
             pass
 
         logging.basicConfig(
@@ -50,6 +55,7 @@ def setup_logging():
         # Reduce Discord.py noise
         logging.getLogger('discord').setLevel(logging.WARNING)
         logging.getLogger('discord.http').setLevel(logging.WARNING)
+        logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
     except Exception as e:
         print(f"❌ Failed to setup logging: {e}")
@@ -58,7 +64,7 @@ def setup_logging():
 
 
 def get_port():
-    """Get port from environment (Render sets this automatically)"""
+    """Get port from environment (works for both Render and Railway)"""
     return int(os.environ.get('PORT', 8080))
 
 
@@ -67,38 +73,112 @@ def get_host():
     return '0.0.0.0'
 
 
-async def start_render_web_server(bot):
-    """Start web server for Render port detection and health checks"""
+def detect_platform():
+    """Detect which platform we're running on"""
+    if os.getenv('RENDER'):
+        return 'render'
+    elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_PROJECT_ID'):
+        return 'railway'
+    else:
+        return 'local'
+
+
+async def start_web_server(bot):
+    """Start web server compatible with Render and Railway"""
+    port = get_port()
+    host = get_host()
+    platform = detect_platform()
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"🌐 Starting web server on {platform} - {host}:{port}")
+
     try:
-        port = get_port()
-        host = get_host()
-
-        logger = logging.getLogger(__name__)
-        logger.info(f"🌐 Starting web server for Render on {host}:{port}")
-
+        # Try to import full web dashboard first
         try:
-            # Try to import full web dashboard
             from web.app import create_app
             app = create_app(bot)
             logger.info("✅ Full web dashboard loaded")
-        except ImportError:
-            # Fallback to simple Flask app for port detection
-            logger.warning("⚠️ Full web dashboard not available, using simple health server")
-            from flask import Flask, jsonify
+            use_full_app = True
+        except ImportError as e:
+            logger.warning(f"⚠️ Full web dashboard not available: {e}")
+            use_full_app = False
+
+        # Create Flask app (full or fallback)
+        if use_full_app:
+            # Use the full web dashboard
+            pass  # app is already created above
+        else:
+            # Create minimal Flask app for platform requirements
+            from flask import Flask, jsonify, render_template_string
             app = Flask(__name__)
 
             @app.route('/')
-            def health_check():
-                return "Ladbot is running!", 200
+            def home():
+                return render_template_string("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Ladbot Dashboard</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .container { max-width: 600px; margin: 0 auto; }
+                        .status { color: #28a745; font-size: 24px; margin: 20px 0; }
+                        .info { background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>🤖 Ladbot Dashboard</h1>
+                        <div class="status">✅ Bot is Online!</div>
+                        <div class="info">
+                            <h3>Bot Statistics</h3>
+                            <p><strong>Guilds:</strong> {{ guilds }}</p>
+                            <p><strong>Users:</strong> {{ users }}</p>
+                            <p><strong>Commands:</strong> {{ commands }}</p>
+                            <p><strong>Platform:</strong> {{ platform }}</p>
+                        </div>
+                        <div class="info">
+                            <h3>Available Commands</h3>
+                            <p>Try <code>l.help</code> in Discord to see all commands!</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """,
+                                              guilds=len(bot.guilds) if hasattr(bot, 'guilds') else 0,
+                                              users=len(bot.users) if hasattr(bot, 'users') else 0,
+                                              commands=len(bot.commands) if hasattr(bot, 'commands') else 0,
+                                              platform=platform.title()
+                                              )
 
-            @app.route('/health')
-            def health():
-                return jsonify({
-                    "status": "healthy",
-                    "bot_name": "Ladbot",
-                    "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0,
-                    "timestamp": datetime.now().isoformat()
-                }), 200
+        # Add essential routes for platform health checks
+        @app.route('/health')
+        def health():
+            """Health check endpoint for platform monitoring"""
+            return jsonify({
+                "status": "healthy",
+                "bot_name": "Ladbot",
+                "platform": platform,
+                "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0,
+                "users": len(bot.users) if hasattr(bot, 'users') else 0,
+                "commands": len(bot.commands) if hasattr(bot, 'commands') else 0,
+                "timestamp": datetime.now().isoformat(),
+                "bot_online": hasattr(bot, 'is_ready') and bot.is_ready()
+            }), 200
+
+        @app.route('/ping')
+        def ping():
+            """Simple ping endpoint"""
+            return "pong", 200
+
+        @app.route('/status')
+        def status():
+            """Bot status endpoint"""
+            return jsonify({
+                "online": hasattr(bot, 'is_ready') and bot.is_ready(),
+                "latency": round(bot.latency * 1000) if hasattr(bot, 'latency') else 0,
+                "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0
+            }), 200
 
         def run_flask():
             """Run Flask in background thread"""
@@ -119,20 +199,28 @@ async def start_render_web_server(bot):
         flask_thread.start()
 
         # Give server time to bind to port
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
 
-        logger.info(f"✅ Web server should be accessible on port {port}")
+        logger.info(f"✅ Web server accessible on port {port}")
+        logger.info(f"🔗 Platform: {platform}")
+
+        if platform == 'render':
+            logger.info(f"🌍 Render URL: https://{os.getenv('RENDER_EXTERNAL_URL', 'your-app.onrender.com')}")
+        elif platform == 'railway':
+            service_name = os.getenv('RAILWAY_SERVICE_NAME', 'your-service')
+            logger.info(f"🚂 Railway URL: https://{service_name}.up.railway.app")
 
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f"❌ Failed to start web server: {e}")
+        logger.exception("Full traceback:")
 
-        # Create minimal fallback server for Render port detection
+        # Create absolute minimal fallback server
         try:
             import http.server
             import socketserver
 
-            class HealthHandler(http.server.SimpleHTTPRequestHandler):
+            class MinimalHandler(http.server.SimpleHTTPRequestHandler):
                 def do_GET(self):
                     self.send_response(200)
                     self.send_header('Content-type', 'text/plain')
@@ -143,9 +231,8 @@ async def start_render_web_server(bot):
                     pass  # Suppress logs
 
             def run_fallback():
-                port = get_port()
-                with socketserver.TCPServer(("", port), HealthHandler) as httpd:
-                    logger.info(f"🔧 Fallback health server on port {port}")
+                with socketserver.TCPServer(("", port), MinimalHandler) as httpd:
+                    logger.info(f"🔧 Fallback server on port {port}")
                     httpd.serve_forever()
 
             fallback_thread = threading.Thread(target=run_fallback, daemon=True)
@@ -159,11 +246,12 @@ async def start_render_web_server(bot):
 async def main():
     """Main application entry point"""
     logger = logging.getLogger(__name__)
+    platform = detect_platform()
 
     try:
         logger.info("🚀 Starting Ladbot Enhanced...")
         logger.info(f"📅 Started at: {datetime.now()}")
-        logger.info(f"🌍 Environment: {'PRODUCTION' if os.getenv('RENDER') else 'DEVELOPMENT'}")
+        logger.info(f"🌍 Platform: {platform.title()}")
 
         # Load environment variables
         try:
@@ -171,7 +259,7 @@ async def main():
             load_dotenv()
             logger.info("✅ Environment loaded")
         except ImportError:
-            logger.warning("python-dotenv not installed, using system environment")
+            logger.info("python-dotenv not installed, using system environment")
 
         setup_logging()
 
@@ -184,9 +272,15 @@ async def main():
         host = get_host()
         logger.info(f"🌐 Web server will run on {host}:{port}")
 
-        if os.getenv('RENDER'):
+        # Platform-specific logging
+        if platform == 'render':
             logger.info(f"🔗 Render deployment detected")
-            logger.info(f"🌍 Public URL will be available once deployed")
+            if os.getenv('RENDER_EXTERNAL_URL'):
+                logger.info(f"🌍 Public URL: {os.getenv('RENDER_EXTERNAL_URL')}")
+        elif platform == 'railway':
+            logger.info(f"🚂 Railway deployment detected")
+            if os.getenv('RAILWAY_PUBLIC_DOMAIN'):
+                logger.info(f"🌍 Public URL: https://{os.getenv('RAILWAY_PUBLIC_DOMAIN')}")
 
         # Import and start bot
         from bot.ladbot import LadBot
@@ -194,24 +288,26 @@ async def main():
         logger.info("🤖 Starting Discord bot...")
         bot = LadBot()
 
-        # Configure for Render
+        # Configure for platform
         bot.web_port = port
         bot.web_host = host
 
-        # Set production URL if on Render
-        if os.getenv('RENDER_EXTERNAL_URL'):
+        # Set production URL based on platform
+        if platform == 'render' and os.getenv('RENDER_EXTERNAL_URL'):
             bot.web_url = os.getenv('RENDER_EXTERNAL_URL')
-        elif os.getenv('RENDER_SERVICE_NAME'):
-            # Construct Render URL
-            service_name = os.getenv('RENDER_SERVICE_NAME')
-            bot.web_url = f"https://{service_name}.onrender.com"
+        elif platform == 'railway':
+            if os.getenv('RAILWAY_PUBLIC_DOMAIN'):
+                bot.web_url = f"https://{os.getenv('RAILWAY_PUBLIC_DOMAIN')}"
+            elif os.getenv('RAILWAY_SERVICE_NAME'):
+                service_name = os.getenv('RAILWAY_SERVICE_NAME')
+                bot.web_url = f"https://{service_name}.up.railway.app"
 
-        # CRITICAL FOR RENDER: Start web server FIRST for port detection
-        if os.getenv('RENDER'):
-            logger.info("🔧 Starting web server for Render port detection...")
-            asyncio.create_task(start_render_web_server(bot))
-            await asyncio.sleep(3)  # Give web server time to bind to port
-            logger.info("✅ Web server should be running for Render health checks")
+        # Start web server for platform requirements
+        if platform in ['render', 'railway']:
+            logger.info("🔧 Starting web server for platform health checks...")
+            asyncio.create_task(start_web_server(bot))
+            await asyncio.sleep(4)  # Give web server time to bind
+            logger.info("✅ Web server should be running for platform health checks")
 
         # Start the Discord bot
         async with bot:
