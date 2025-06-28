@@ -136,8 +136,10 @@ class Bible(commands.Cog):
             if not verse:
                 verse = random.choice(self.verse_categories['popular'])
                 is_random = True
+                category_used = "popular"
             else:
                 is_random = False
+                category_used = None
 
             # Clean and format verse reference
             verse = verse.replace(",", "").strip()
@@ -161,35 +163,24 @@ class Bible(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Create beautiful embed
+            # Create clean, beautiful embed
             embed = discord.Embed(
                 title=f"📖 {verse_data['reference']}",
                 description=f"*{verse_data['text']}*",
                 color=0x4169E1
             )
 
-            embed.add_field(
-                name="📚 Translation",
-                value=verse_data['translation'],
-                inline=True
-            )
-
-            embed.add_field(
-                name="🔗 Source",
-                value=verse_data['source'],
-                inline=True
-            )
-
-            if is_random:
+            # Only show category if it was a random verse
+            if is_random and category_used:
                 embed.add_field(
-                    name="🎲 Type",
-                    value="Random Verse",
+                    name="🎲 Random Verse",
+                    value=f"From {category_used.title()} category",
                     inline=True
                 )
 
-            # Add helpful footer
+            # Clean footer without technical details
             embed.set_footer(
-                text=f"Requested by {ctx.author.display_name} • Use 'l.bible help' for more options",
+                text=f"Requested by {ctx.author.display_name}",
                 icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
             )
 
@@ -222,7 +213,36 @@ class Bible(commands.Cog):
             return
 
         verse = random.choice(self.verse_categories[category])
-        await self.bible.callback(self, ctx, verse=verse)
+
+        # Fetch and display the verse with category info
+        verse_data = await self._fetch_verse_primary(verse)
+
+        if not verse_data:
+            verse_data = await self._fetch_verse_fallback(verse)
+
+        if not verse_data:
+            await ctx.send("❌ Sorry, couldn't fetch a verse right now. Please try again.")
+            return
+
+        # Create embed with category information
+        embed = discord.Embed(
+            title=f"📖 {verse_data['reference']}",
+            description=f"*{verse_data['text']}*",
+            color=0x4169E1
+        )
+
+        embed.add_field(
+            name=f"🎲 Random {category.title()} Verse",
+            value=f"One of {len(self.verse_categories[category])} verses in this category",
+            inline=True
+        )
+
+        embed.set_footer(
+            text=f"Requested by {ctx.author.display_name}",
+            icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
+        )
+
+        await ctx.send(embed=embed)
 
     @bible.command(name="daily")
     @guild_setting_enabled("bible")
@@ -239,9 +259,35 @@ class Bible(commands.Cog):
         day_of_year = datetime.now().timetuple().tm_yday
         verse = daily_verses[day_of_year % len(daily_verses)]
 
-        embed_title_suffix = f" (Daily Verse - {datetime.now().strftime('%B %d')})"
+        # Fetch the verse
+        verse_data = await self._fetch_verse_primary(verse)
 
-        await self.bible.callback(self, ctx, verse=verse)
+        if not verse_data:
+            verse_data = await self._fetch_verse_fallback(verse)
+
+        if not verse_data:
+            await ctx.send("❌ Sorry, couldn't fetch today's verse. Please try again.")
+            return
+
+        # Create embed for daily verse
+        embed = discord.Embed(
+            title=f"📖 {verse_data['reference']}",
+            description=f"*{verse_data['text']}*",
+            color=0x4169E1
+        )
+
+        embed.add_field(
+            name=f"📅 Daily Verse - {datetime.now().strftime('%B %d')}",
+            value="Today's inspirational message",
+            inline=True
+        )
+
+        embed.set_footer(
+            text=f"Requested by {ctx.author.display_name}",
+            icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
+        )
+
+        await ctx.send(embed=embed)
 
     @bible.command(name="search")
     @guild_setting_enabled("bible")
