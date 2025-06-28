@@ -1,5 +1,5 @@
 """
-Enhanced Dinosaur information using API data
+Enhanced Dinosaur information with reliable fallback data
 """
 
 import discord
@@ -15,101 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 class Dinosaurs(commands.Cog):
-    """Enhanced dinosaur facts using real paleontology APIs"""
+    """Enhanced dinosaur facts with reliable data sources"""
 
     def __init__(self, bot):
         self.bot = bot
 
-        # Multiple API endpoints for dinosaur data
-        self.apis = {
-            'paleodb': 'https://paleobiodb.org/data1.2/taxa/list.json',
-            'dinoapi': 'https://chinguun.github.io/dinoapi',
-            'nhm': 'https://data.nhm.ac.uk/api/3/action/datastore_search'
-        }
-
-        # Cache for performance
-        self._dino_cache = {}
-        self._popular_dinos = [
-            'Tyrannosaurus', 'Triceratops', 'Velociraptor', 'Stegosaurus',
-            'Allosaurus', 'Brontosaurus', 'Spinosaurus', 'Diplodocus',
-            'Ankylosaurus', 'Parasaurolophus', 'Carnotaurus', 'Iguanodon'
-        ]
-
-    async def _fetch_dinosaur_info(self, dino_name):
-        """Fetch dinosaur information from APIs"""
-        try:
-            # Try PaleoDB API first (most comprehensive)
-            url = f"{self.apis['paleodb']}?name={dino_name}&show=attr,ecospace,taphonomy&format=json"
-
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        records = data.get('records', [])
-
-                        if records:
-                            dino = records[0]  # Get first match
-                            return self._format_paleodb_data(dino)
-
-            # Fallback to local enhanced data if API fails
-            return self._get_enhanced_fallback_data(dino_name)
-
-        except Exception as e:
-            logger.warning(f"API fetch failed for {dino_name}: {e}")
-            return self._get_enhanced_fallback_data(dino_name)
-
-    def _format_paleodb_data(self, dino_data):
-        """Format PaleoDB API data into readable format"""
-        name = dino_data.get('taxon_name', 'Unknown')
-        rank = dino_data.get('taxon_rank', 'species')
-
-        # Build description from available data
-        description_parts = []
-
-        # Basic classification
-        if dino_data.get('taxon_rank'):
-            description_parts.append(f"**Classification:** {rank.title()}")
-
-        # Time period
-        early_interval = dino_data.get('early_interval', '')
-        late_interval = dino_data.get('late_interval', '')
-        if early_interval and late_interval:
-            if early_interval == late_interval:
-                description_parts.append(f"**Time Period:** {early_interval}")
-            else:
-                description_parts.append(f"**Time Period:** {early_interval} to {late_interval}")
-        elif early_interval:
-            description_parts.append(f"**Time Period:** {early_interval}")
-
-        # Geographic info
-        if dino_data.get('cc', []):
-            countries = ', '.join(dino_data['cc'][:3])  # First 3 countries
-            description_parts.append(f"**Found in:** {countries}")
-
-        # Ecological information
-        if dino_data.get('environment'):
-            env = dino_data['environment']
-            description_parts.append(f"**Environment:** {env}")
-
-        # Diet information (if available)
-        if 'carnivore' in name.lower() or 'carno' in name.lower():
-            description_parts.append(f"**Diet:** Carnivore (meat-eater)")
-        elif any(word in name.lower() for word in ['sauro', 'ceratops', 'stego']):
-            description_parts.append(f"**Diet:** Herbivore (plant-eater)")
-
-        description = '\n'.join(description_parts) if description_parts else "A fascinating dinosaur species!"
-
-        return {
-            'name': name,
-            'description': description,
-            'scientific_name': dino_data.get('taxon_name', name),
-            'rank': rank,
-            'source': 'Paleobiology Database'
-        }
-
-    def _get_enhanced_fallback_data(self, dino_name):
-        """Enhanced fallback dinosaur data with more details"""
-        fallback_data = {
+        # Comprehensive dinosaur database with aliases
+        self.dinosaur_data = {
+            # T-Rex and variants
             'tyrannosaurus': {
                 'name': 'Tyrannosaurus Rex',
                 'description': '''**Classification:** Theropod dinosaur
@@ -120,8 +33,7 @@ class Dinosaurs(commands.Cog):
 **Found in:** North America (Montana, Wyoming, South Dakota)
 **Fun Fact:** Had teeth up to 8 inches long and one of the strongest bite forces ever recorded!''',
                 'scientific_name': 'Tyrannosaurus rex',
-                'rank': 'species',
-                'source': 'Enhanced Database'
+                'aliases': ['t-rex', 'trex', 't rex', 'tyrannosaurus rex']
             },
             'triceratops': {
                 'name': 'Triceratops',
@@ -133,8 +45,7 @@ class Dinosaurs(commands.Cog):
 **Found in:** North America (Colorado, Wyoming, Montana)
 **Fun Fact:** Its iconic three-horned skull could grow up to 7 feet long!''',
                 'scientific_name': 'Triceratops horridus',
-                'rank': 'species',
-                'source': 'Enhanced Database'
+                'aliases': ['three horn', 'threehorn']
             },
             'velociraptor': {
                 'name': 'Velociraptor',
@@ -146,8 +57,7 @@ class Dinosaurs(commands.Cog):
 **Found in:** Mongolia and China
 **Fun Fact:** Actually turkey-sized with feathers, not the giant movie monsters!''',
                 'scientific_name': 'Velociraptor mongoliensis',
-                'rank': 'species',
-                'source': 'Enhanced Database'
+                'aliases': ['raptor', 'velociraptors']
             },
             'stegosaurus': {
                 'name': 'Stegosaurus',
@@ -159,8 +69,7 @@ class Dinosaurs(commands.Cog):
 **Found in:** Western United States
 **Fun Fact:** Had a brain the size of a walnut but survived for millions of years!''',
                 'scientific_name': 'Stegosaurus stenops',
-                'rank': 'species',
-                'source': 'Enhanced Database'
+                'aliases': ['stego', 'spike tail']
             },
             'spinosaurus': {
                 'name': 'Spinosaurus',
@@ -172,8 +81,7 @@ class Dinosaurs(commands.Cog):
 **Found in:** North Africa (Egypt, Morocco)
 **Fun Fact:** First known semi-aquatic dinosaur with a massive sail on its back!''',
                 'scientific_name': 'Spinosaurus aegyptiacus',
-                'rank': 'species',
-                'source': 'Enhanced Database'
+                'aliases': ['spino', 'sail back']
             },
             'brontosaurus': {
                 'name': 'Brontosaurus',
@@ -185,13 +93,126 @@ class Dinosaurs(commands.Cog):
 **Found in:** Western United States
 **Fun Fact:** Name means "thunder lizard" - once thought to be Apatosaurus but proven distinct in 2015!''',
                 'scientific_name': 'Brontosaurus excelsus',
-                'rank': 'species',
-                'source': 'Enhanced Database'
+                'aliases': ['thunder lizard', 'apatosaurus', 'long neck']
+            },
+            'allosaurus': {
+                'name': 'Allosaurus',
+                'description': '''**Classification:** Theropod dinosaur
+**Time Period:** Late Jurassic (155-145 million years ago)
+**Diet:** Carnivore (pack hunter)
+**Size:** Up to 32 feet long, 9.5 feet tall at hips
+**Weight:** 3-5 tons
+**Found in:** Western United States
+**Fun Fact:** One of the first well-known predatory dinosaurs and lived alongside Stegosaurus!''',
+                'scientific_name': 'Allosaurus fragilis',
+                'aliases': ['allo']
+            },
+            'diplodocus': {
+                'name': 'Diplodocus',
+                'description': '''**Classification:** Diplodocid sauropod dinosaur
+**Time Period:** Late Jurassic (154-150 million years ago)
+**Diet:** Herbivore (low-browsing plant-eater)
+**Size:** Up to 90 feet long, 13 feet tall at shoulders
+**Weight:** 10-16 tons
+**Found in:** Western United States
+**Fun Fact:** One of the longest dinosaurs ever discovered with an incredibly long whip-like tail!''',
+                'scientific_name': 'Diplodocus carnegii',
+                'aliases': ['diplo', 'whip tail']
+            },
+            'ankylosaurus': {
+                'name': 'Ankylosaurus',
+                'description': '''**Classification:** Ankylosaurid dinosaur
+**Time Period:** Late Cretaceous (68-66 million years ago)
+**Diet:** Herbivore (low-browsing plant-eater)
+**Size:** Up to 35 feet long, 5.5 feet tall
+**Weight:** 6-8 tons
+**Found in:** North America (Montana, Wyoming, Alberta)
+**Fun Fact:** Living tank with a massive club tail that could break the bones of predators!''',
+                'scientific_name': 'Ankylosaurus magniventris',
+                'aliases': ['armored dinosaur', 'club tail', 'tank dinosaur']
+            },
+            'carnotaurus': {
+                'name': 'Carnotaurus',
+                'description': '''**Classification:** Abelisaurid theropod dinosaur
+**Time Period:** Late Cretaceous (72-69 million years ago)
+**Diet:** Carnivore (fast pursuit predator)
+**Size:** Up to 26 feet long, 11 feet tall
+**Weight:** 1.35-2.1 tons
+**Found in:** Argentina, South America
+**Fun Fact:** The "meat-eating bull" with horns above its eyes and tiny, almost useless arms!''',
+                'scientific_name': 'Carnotaurus sastrei',
+                'aliases': ['meat eating bull', 'horned carnivore']
+            },
+            'parasaurolophus': {
+                'name': 'Parasaurolophus',
+                'description': '''**Classification:** Hadrosaurid dinosaur
+**Time Period:** Late Cretaceous (76-73 million years ago)
+**Diet:** Herbivore (duck-billed plant-eater)
+**Size:** Up to 31 feet long, 16 feet tall
+**Weight:** 2.5-5 tons
+**Found in:** North America (Alberta, Utah, New Mexico)
+**Fun Fact:** Could make loud honking sounds through its distinctive hollow crest!''',
+                'scientific_name': 'Parasaurolophus walkeri',
+                'aliases': ['duck bill', 'honker', 'trumpet dinosaur']
+            },
+            'iguanodon': {
+                'name': 'Iguanodon',
+                'description': '''**Classification:** Iguanodontid dinosaur
+**Time Period:** Early Cretaceous (140-110 million years ago)
+**Diet:** Herbivore (browsing plant-eater)
+**Size:** Up to 43 feet long, 16 feet tall
+**Weight:** 3-5 tons
+**Found in:** Europe (England, Belgium, Germany)
+**Fun Fact:** One of the first dinosaurs ever discovered and had distinctive thumb spikes!''',
+                'scientific_name': 'Iguanodon bernissartensis',
+                'aliases': ['thumb spike', 'iguana tooth']
             }
         }
 
-        key = dino_name.lower().replace(' ', '').replace('-', '')
-        return fallback_data.get(key)
+        # Popular dinosaurs for random selection
+        self._popular_dinos = list(self.dinosaur_data.keys())
+
+    def _find_dinosaur(self, search_name):
+        """Find dinosaur by name or alias with flexible matching"""
+        search_name = search_name.lower().strip().replace('-', ' ').replace('_', ' ')
+
+        # Try exact match first
+        if search_name in self.dinosaur_data:
+            return self.dinosaur_data[search_name]
+
+        # Try aliases
+        for dino_key, dino_data in self.dinosaur_data.items():
+            aliases = dino_data.get('aliases', [])
+            if search_name in [alias.lower() for alias in aliases]:
+                return dino_data
+
+        # Try partial matches
+        for dino_key, dino_data in self.dinosaur_data.items():
+            if search_name in dino_key.lower() or dino_key.lower() in search_name:
+                return dino_data
+
+            # Check if search term is in the dinosaur name
+            if search_name in dino_data['name'].lower():
+                return dino_data
+
+        return None
+
+    async def _try_api_fetch(self, dino_name):
+        """Try to fetch from API with timeout"""
+        try:
+            url = f"https://paleobiodb.org/data1.2/taxa/list.json?name={dino_name}&show=attr&format=json"
+
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        records = data.get('records', [])
+                        if records:
+                            return records[0]
+            return None
+        except Exception as e:
+            logger.debug(f"API fetch failed for {dino_name}: {e}")
+            return None
 
     @commands.group(aliases=["dinosaur", "dinos"], invoke_without_command=True)
     @guild_setting_enabled("dinosaurs")
@@ -220,22 +241,32 @@ class Dinosaurs(commands.Cog):
             else:
                 is_random = False
 
-            # Clean the name
-            dinosaur_name = dinosaur_name.strip()
-
-            # Fetch dinosaur information
-            dino_info = await self._fetch_dinosaur_info(dinosaur_name)
+            # Try to find the dinosaur
+            dino_info = self._find_dinosaur(dinosaur_name)
 
             if not dino_info:
+                # Show helpful error message
                 embed = discord.Embed(
-                    description=f"🦕 Sorry, I couldn't find information about `{dinosaur_name}`.\n\nTry searching for popular dinosaurs like T-Rex, Triceratops, or Stegosaurus!",
+                    description=f"🦕 Sorry, I couldn't find information about `{dinosaur_name}`.",
                     color=0xff0000
                 )
+
+                # Suggest some alternatives
+                suggestions = random.sample(self._popular_dinos, min(3, len(self._popular_dinos)))
+                suggest_text = '\n'.join([f"• `l.dino {dino.title()}`" for dino in suggestions])
+
                 embed.add_field(
-                    name="💡 Suggestions",
-                    value=f"• `l.dino random` - Random dinosaur\n• `l.dino popular` - Show popular dinosaurs\n• `l.dino Tyrannosaurus` - Specific dinosaur",
+                    name="💡 Try these dinosaurs:",
+                    value=suggest_text,
                     inline=False
                 )
+
+                embed.add_field(
+                    name="📚 More Options",
+                    value="`l.dino random` - Random dinosaur\n`l.dino popular` - Show all available",
+                    inline=False
+                )
+
                 await ctx.send(embed=embed)
                 return
 
@@ -263,7 +294,7 @@ class Dinosaurs(commands.Cog):
 
             # Add footer
             embed.set_footer(
-                text=f"Requested by {ctx.author.display_name} • Data from {dino_info.get('source', 'Paleontology APIs')}",
+                text=f"Requested by {ctx.author.display_name} • Enhanced Paleontology Database",
                 icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
             )
 
@@ -272,7 +303,7 @@ class Dinosaurs(commands.Cog):
         except Exception as e:
             logger.error(f"Error in dino command: {e}")
             embed = discord.Embed(
-                description="🦕 Sorry, there was an error getting dinosaur information. Please try again later!",
+                description="🦕 Sorry, there was an error getting dinosaur information. Please try again!",
                 color=0xff0000
             )
             await ctx.send(embed=embed)
@@ -299,16 +330,17 @@ class Dinosaurs(commands.Cog):
     @dino.command(name="popular")
     @guild_setting_enabled("dinosaurs")
     async def dino_popular(self, ctx):
-        """Show popular dinosaurs"""
+        """Show all available dinosaurs"""
         embed = discord.Embed(
-            title="🦕 Popular Dinosaurs",
-            description="Here are some of the most well-known dinosaurs:",
+            title="🦕 Available Dinosaurs",
+            description=f"Here are all {len(self.dinosaur_data)} dinosaurs in our database:",
             color=0x228B22
         )
 
         # Split into chunks for better display
+        dino_names = [data['name'] for data in self.dinosaur_data.values()]
         chunk_size = 6
-        chunks = [self._popular_dinos[i:i + chunk_size] for i in range(0, len(self._popular_dinos), chunk_size)]
+        chunks = [dino_names[i:i + chunk_size] for i in range(0, len(dino_names), chunk_size)]
 
         for i, chunk in enumerate(chunks):
             dino_list = '\n'.join([f"🦴 {dino}" for dino in chunk])
@@ -320,70 +352,9 @@ class Dinosaurs(commands.Cog):
 
         embed.add_field(
             name="📝 Usage",
-            value="`l.dino [name]` to learn about any of these dinosaurs!",
+            value="`l.dino [name]` to learn about any dinosaur!\nExample: `l.dino T-Rex`",
             inline=False
         )
-
-        await ctx.send(embed=embed)
-
-    @dino.command(name="search")
-    @guild_setting_enabled("dinosaurs")
-    async def dino_search(self, ctx, *, keywords: str):
-        """Search for dinosaurs by characteristics"""
-        # Simple keyword-based suggestions
-        keyword_suggestions = {
-            'carnivore': ['Tyrannosaurus', 'Velociraptor', 'Allosaurus', 'Carnotaurus'],
-            'herbivore': ['Triceratops', 'Stegosaurus', 'Brontosaurus', 'Iguanodon'],
-            'flying': ['Pteranodon', 'Quetzalcoatlus', 'Archaeopteryx'],
-            'marine': ['Plesiosaur', 'Mosasaurus', 'Ichthyosaur'],
-            'armored': ['Ankylosaurus', 'Stegosaurus', 'Triceratops'],
-            'long neck': ['Brontosaurus', 'Diplodocus', 'Brachiosaurus'],
-            'small': ['Velociraptor', 'Compsognathus', 'Microraptor'],
-            'large': ['Tyrannosaurus', 'Spinosaurus', 'Giganotosaurus']
-        }
-
-        keywords_lower = keywords.lower()
-        matches = []
-
-        for key, dinos in keyword_suggestions.items():
-            if key in keywords_lower:
-                matches.extend(dinos)
-
-        if matches:
-            # Remove duplicates and limit results
-            matches = list(set(matches))[:8]
-
-            embed = discord.Embed(
-                title=f"🔍 Search Results for '{keywords}'",
-                description=f"Found {len(matches)} dinosaurs matching your search:",
-                color=0x228B22
-            )
-
-            match_list = '\n'.join([f"🦴 {dino}" for dino in matches])
-            embed.add_field(
-                name="Matching Dinosaurs",
-                value=match_list,
-                inline=False
-            )
-
-            embed.add_field(
-                name="📝 Next Steps",
-                value=f"Use `l.dino [name]` to learn more about any of these dinosaurs!",
-                inline=False
-            )
-
-        else:
-            embed = discord.Embed(
-                title="🔍 No Matches Found",
-                description=f"No dinosaurs found matching '{keywords}'.",
-                color=0xffaa00
-            )
-
-            embed.add_field(
-                name="💡 Try These Keywords",
-                value="carnivore, herbivore, armored, flying, marine, long neck, small, large",
-                inline=False
-            )
 
         await ctx.send(embed=embed)
 
@@ -399,9 +370,8 @@ class Dinosaurs(commands.Cog):
 
         commands_help = [
             ("`l.dino [name]`", "Get detailed info about a specific dinosaur"),
-            ("`l.dino random`", "Get a random dinosaur"),
-            ("`l.dino popular`", "Show popular dinosaurs"),
-            ("`l.dino search [keywords]`", "Search dinosaurs by characteristics"),
+            ("`l.dino random [count]`", "Get random dinosaur(s)"),
+            ("`l.dino popular`", "Show all available dinosaurs"),
             ("`l.dino help`", "Show this help message")
         ]
 
@@ -415,10 +385,10 @@ class Dinosaurs(commands.Cog):
         embed.add_field(
             name="📝 Examples",
             value=(
-                "`l.dino Tyrannosaurus` - Learn about T-Rex\n"
+                "`l.dino T-Rex` - Learn about Tyrannosaurus\n"
                 "`l.dino random 3` - Get 3 random dinosaurs\n"
-                "`l.dino search carnivore` - Find meat-eating dinosaurs\n"
-                "`l.dino search armored` - Find armored dinosaurs"
+                "`l.dino Triceratops` - Three-horned dinosaur\n"
+                "`l.dino raptor` - Velociraptor info"
             ),
             inline=False
         )
