@@ -26,3 +26,5 @@ gunicorn>=21.2.0
 asyncio-mqtt>=0.11.0
 
 Pillow>=10.0.0
+
+art>=6.0
