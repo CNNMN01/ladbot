@@ -184,10 +184,10 @@ class LadBot(commands.Bot):
         return True
 
     async def setup_hook(self):
-        """Setup bot components and load cogs"""
+        """Setup bot components and load cogs - SINGLE LOADING POINT"""
         logger.info("🔧 Setting up bot components...")
 
-        # Load all cogs
+        # Load all cogs ONCE
         await self.load_cogs()
 
         # Start web dashboard if not on Render (Render handles this separately)
@@ -252,7 +252,7 @@ class LadBot(commands.Bot):
             logger.error(f"Failed to start web dashboard: {e}")
 
     async def on_ready(self):
-        """Called when the bot is ready"""
+        """Called when the bot is ready - NO COG LOADING HERE"""
         logger.info(f"🤖 {self.user.name} (ID: {self.user.id}) is online!")
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
 
@@ -267,8 +267,8 @@ class LadBot(commands.Bot):
         )
         await self.change_presence(activity=activity)
 
-        # Update cog loader tracking after bot is ready - ADDITIONAL FIX
-        self.cog_loader.update_loaded_cogs()
+        # DON'T update cog loader here - cogs already loaded in setup_hook
+        # Removed: self.cog_loader.update_loaded_cogs()  # ← This was causing duplicates
 
         # Log startup summary
         if not os.getenv('RENDER'):
