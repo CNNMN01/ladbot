@@ -1,5 +1,5 @@
 """
-Enhanced Ladbot with Complete Compatibility Layer - Render Production Ready
+Enhanced Ladbot with Complete Compatibility Layer - Background Worker Ready
 """
 
 import discord
@@ -104,12 +104,12 @@ DEFAULT_SETTINGS = {
 
 
 class LadBot(commands.Bot):
-    """Enhanced Discord bot with compatibility layers - Production Ready"""
+    """Enhanced Discord bot optimized for Background Worker deployment"""
 
     def __init__(self):
         from config.settings import settings
 
-        # Configure intents
+        # Configure intents for Discord bot
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -123,7 +123,7 @@ class LadBot(commands.Bot):
         )
 
         self.settings = settings
-        self.config = settings  # Backward compatibility - CRITICAL FIX
+        self.config = settings  # Backward compatibility
 
         # Create compatibility components
         self.data_manager = SimpleDataManager()
@@ -141,7 +141,7 @@ class LadBot(commands.Bot):
         # Add error tracking
         self.error_count = 0
 
-        # Web server configuration
+        # Web server configuration (optional)
         self.web_host = '0.0.0.0'
         self.web_port = int(os.environ.get('PORT', 8080))
         self.web_thread = None
@@ -183,19 +183,46 @@ class LadBot(commands.Bot):
         # Default to True for unknown settings to avoid breaking commands
         return True
 
+    def set_setting(self, guild_id, setting_name, value):
+        """Set a setting value (compatibility method)"""
+        if guild_id not in self.settings_cache:
+            self.settings_cache[guild_id] = {}
+
+        self.settings_cache[guild_id][setting_name] = value
+
+        # Save to file for persistence
+        try:
+            settings_file = self.data_manager.data_dir / f"guild_settings_{guild_id}.json"
+            current_settings = {}
+            if settings_file.exists():
+                with open(settings_file, 'r') as f:
+                    current_settings = json.load(f)
+
+            current_settings[setting_name] = value
+
+            with open(settings_file, 'w') as f:
+                json.dump(current_settings, f, indent=2)
+
+        except Exception as e:
+            logger.error(f"Error saving setting {setting_name} for guild {guild_id}: {e}")
+
     async def setup_hook(self):
-        """Setup bot components and load cogs - SINGLE LOADING POINT"""
+        """Setup bot components - Background Worker optimized"""
         logger.info("🔧 Setting up bot components...")
 
-        # Load all cogs ONCE
+        # Load all cogs
         await self.load_cogs()
 
-        # Start web dashboard if not on Render (Render handles this separately)
-        if not os.getenv('RENDER'):
+        # Only start web dashboard if explicitly enabled
+        web_dashboard_enabled = os.getenv('WEB_DASHBOARD', 'false').lower() == 'true'
+
+        if web_dashboard_enabled and not os.getenv('RENDER'):
             try:
                 await self.start_web_dashboard()
             except Exception as e:
                 logger.warning(f"Web dashboard failed to start: {e}")
+        elif web_dashboard_enabled:
+            logger.info("🌐 Web dashboard disabled for Background Worker deployment")
 
         logger.info("✅ Bot setup completed")
 
@@ -223,13 +250,13 @@ class LadBot(commands.Bot):
                             logger.error(f"❌ Failed to load {cog_name}: {e}")
                             failed += 1
 
-        # Update the cog loader with currently loaded cogs - CRITICAL FIX
+        # Update the cog loader with currently loaded cogs
         self.cog_loader.update_loaded_cogs()
 
         logger.info(f"🎮 Cog loading complete: {loaded} loaded, {failed} failed")
 
     async def start_web_dashboard(self):
-        """Start the web dashboard in a separate thread"""
+        """Start the web dashboard in a separate thread (optional)"""
         try:
             from web.app import create_app
 
@@ -252,34 +279,35 @@ class LadBot(commands.Bot):
             logger.error(f"Failed to start web dashboard: {e}")
 
     async def on_ready(self):
-        """Called when the bot is ready - NO COG LOADING HERE"""
+        """Called when the bot is ready"""
         logger.info(f"🤖 {self.user.name} (ID: {self.user.id}) is online!")
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
 
         # Calculate stats
-        total_users = sum(guild.member_count for guild in self.guilds)
+        total_users = sum(guild.member_count or 0 for guild in self.guilds)
         total_commands = len([cmd for cmd in self.walk_commands()])
 
-        # Set activity
+        # Set activity status
         activity = discord.Activity(
             type=discord.ActivityType.watching,
             name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
         )
         await self.change_presence(activity=activity)
 
-        # DON'T update cog loader here - cogs already loaded in setup_hook
-        # Removed: self.cog_loader.update_loaded_cogs()  # ← This was causing duplicates
-
         # Log startup summary
-        if not os.getenv('RENDER'):
-            logger.info(f"🌐 Web dashboard started at {self.web_url}")
-
+        environment = "BACKGROUND WORKER" if os.getenv('RENDER') else "DEVELOPMENT"
         logger.info(f"📈 Serving {total_users} users with {total_commands} commands")
         logger.info("🎯 Bot Status Summary:")
+        logger.info(f"   • Environment: {environment}")
         logger.info(f"   • Cogs: {len(self.cogs)} loaded")
         logger.info(f"   • Commands: {total_commands} available")
         logger.info(f"   • Latency: {round(self.latency * 1000)}ms")
-        logger.info(f"   • Web Dashboard: {self.web_url}")
+
+        if os.getenv('WEB_DASHBOARD', 'false').lower() == 'true':
+            logger.info(f"   • Web Dashboard: {self.web_url}")
+        else:
+            logger.info(f"   • Web Dashboard: Disabled (Background Worker mode)")
+
         logger.info("🚀 Ladbot is fully operational!")
 
     async def on_command_error(self, ctx, error):
@@ -301,6 +329,28 @@ class LadBot(commands.Bot):
             await ctx.send(embed=embed, delete_after=10)
         except:
             pass
+
+    async def on_guild_join(self, guild):
+        """Called when bot joins a new guild"""
+        logger.info(f"✅ Joined new guild: {guild.name} (ID: {guild.id}) with {guild.member_count} members")
+
+        # Update activity status
+        activity = discord.Activity(
+            type=discord.ActivityType.watching,
+            name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
+        )
+        await self.change_presence(activity=activity)
+
+    async def on_guild_remove(self, guild):
+        """Called when bot leaves a guild"""
+        logger.info(f"❌ Left guild: {guild.name} (ID: {guild.id})")
+
+        # Update activity status
+        activity = discord.Activity(
+            type=discord.ActivityType.watching,
+            name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
+        )
+        await self.change_presence(activity=activity)
 
     async def close(self):
         """Cleanup when bot shuts down"""

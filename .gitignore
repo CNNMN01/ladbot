@@ -19,3 +19,5 @@ Thumbs.db
 backup_*/
 venv/
 env/
+.dockerignore
+Dockerfile
