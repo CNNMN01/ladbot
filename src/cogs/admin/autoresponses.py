@@ -433,13 +433,55 @@ class AutoResponseSystem(commands.Cog):
             current = self.bot.get_setting(ctx.guild.id, "autoresponses")
             new_state = not current
 
-            # Save the new setting
-            success = await self._save_setting(ctx.guild.id, "autoresponses", new_state)
+            # Try to save the new setting using multiple methods
+            saved = False
 
-            if success:
+            # Method 1: Try bot's set_setting method
+            if hasattr(self.bot, 'set_setting'):
+                try:
+                    self.bot.set_setting(ctx.guild.id, "autoresponses", new_state)
+                    saved = True
+                except Exception as e:
+                    logger.debug(f"Method 1 failed: {e}")
+
+            # Method 2: Try updating cache directly
+            if hasattr(self.bot, 'settings_cache'):
+                try:
+                    if ctx.guild.id not in self.bot.settings_cache:
+                        self.bot.settings_cache[ctx.guild.id] = {}
+                    self.bot.settings_cache[ctx.guild.id]["autoresponses"] = new_state
+                    saved = True
+                except Exception as e:
+                    logger.debug(f"Method 2 failed: {e}")
+
+            # Method 3: Direct file save
+            try:
+                settings_file = self.bot.data_manager.data_dir / f"guild_settings_{ctx.guild.id}.json"
+
+                # Load existing settings
+                settings_data = {}
+                if settings_file.exists():
+                    with open(settings_file, 'r') as f:
+                        settings_data = json.load(f)
+
+                # Update setting
+                settings_data["autoresponses"] = new_state
+
+                # Save back to file
+                with open(settings_file, 'w') as f:
+                    json.dump(settings_data, f, indent=2)
+                saved = True
+            except Exception as e:
+                logger.debug(f"Method 3 failed: {e}")
+
+            # Verify the setting actually changed by checking it again
+            updated_setting = self.bot.get_setting(ctx.guild.id, "autoresponses")
+
+            if updated_setting == new_state:
+                # Setting actually changed - show success
                 status = "enabled" if new_state else "disabled"
                 embed = discord.Embed(
-                    title=f"🔄 Auto-Responses {status.title()}",
+                    title=f"✅ Auto-Responses {status.title()}",
                     description=f"Auto-response system is now **{status}** for this server.",
                     color=0x00ff00 if new_state else 0xff9900
                 )
@@ -462,63 +504,24 @@ class AutoResponseSystem(commands.Cog):
                         value="Responses are saved but won't trigger until re-enabled",
                         inline=False
                     )
-
-                await ctx.send(embed=embed)
             else:
-                await ctx.send("❌ Failed to update auto-response setting. Please try again.")
+                # Setting didn't actually change - show error
+                embed = discord.Embed(
+                    title="❌ Toggle Failed",
+                    description="Failed to update auto-response setting. The setting may not have changed.",
+                    color=0xff0000
+                )
+                embed.add_field(
+                    name="🔍 Debug Info",
+                    value=f"Current: {current}, Attempted: {new_state}, Actual: {updated_setting}",
+                    inline=False
+                )
+
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Error toggling autoresponses: {e}")
             await ctx.send("❌ Error toggling auto-response system.")
-
-    async def _save_setting(self, guild_id, setting_name, value):
-        """Save a guild setting"""
-        try:
-            # Method 1: Try using bot's set_setting method if it exists
-            if hasattr(self.bot, 'set_setting'):
-                return self.bot.set_setting(guild_id, setting_name, value)
-
-            # Method 2: Try saving to settings cache
-            if hasattr(self.bot, 'settings_cache'):
-                if guild_id not in self.bot.settings_cache:
-                    self.bot.settings_cache[guild_id] = {}
-                self.bot.settings_cache[guild_id][setting_name] = value
-
-                # Try to save to file
-                settings_file = self.bot.data_manager.data_dir / f"guild_settings_{guild_id}.json"
-                settings_data = self.bot.settings_cache[guild_id]
-
-                with open(settings_file, 'w') as f:
-                    json.dump(settings_data, f, indent=2)
-                return True
-
-            # Method 3: Direct file save
-            settings_file = self.bot.data_manager.data_dir / f"guild_settings_{guild_id}.json"
-
-            # Load existing settings
-            settings_data = {}
-            if settings_file.exists():
-                with open(settings_file, 'r') as f:
-                    settings_data = json.load(f)
-
-            # Update setting
-            settings_data[setting_name] = value
-
-            # Save back to file
-            with open(settings_file, 'w') as f:
-                json.dump(settings_data, f, indent=2)
-
-            # Update cache if it exists
-            if hasattr(self.bot, 'settings_cache'):
-                if guild_id not in self.bot.settings_cache:
-                    self.bot.settings_cache[guild_id] = {}
-                self.bot.settings_cache[guild_id][setting_name] = value
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error saving setting {setting_name} for guild {guild_id}: {e}")
-            return False
 
 
 async def setup(bot):
