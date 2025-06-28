@@ -118,36 +118,30 @@ class AutoResponseSystem(commands.Cog):
 
     def _find_matching_response(self, message_content, responses):
         """Find the first matching response"""
-        content_lower = message_content.lower().strip()
+        message_lower = message_content.lower().strip()
 
-        for response_data in responses:
-            trigger = response_data.get("trigger", "").lower().strip()
-            if not trigger:
-                continue
+        for response in responses:
+            trigger = response.get("trigger", "").lower()
+            match_type = response.get("match_type", "contains")
 
-            # Exact match
-            if trigger == content_lower:
-                return response_data
-
-            # Word boundary match (safer than contains)
-            if f" {trigger} " in f" {content_lower} ":
-                return response_data
-
-            # Starts with match for phrases
-            if content_lower.startswith(f"{trigger} ") or content_lower.endswith(f" {trigger}"):
-                return response_data
+            if match_type == "exact" and message_lower == trigger:
+                return response
+            elif match_type == "contains" and trigger in message_lower:
+                return response
+            elif match_type == "starts_with" and message_lower.startswith(trigger):
+                return response
+            elif match_type == "ends_with" and message_lower.endswith(trigger):
+                return response
 
         return None
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Process messages for auto-responses - DESIGNED TO NOT INTERFERE"""
+        """Handle auto-responses"""
         try:
-            # Quick exit checks first
             if not self._should_respond(message):
                 return
 
-            # Load responses
             responses = self._load_responses(message.guild.id)
             if not responses:
                 return
@@ -262,7 +256,8 @@ class AutoResponseSystem(commands.Cog):
             "trigger": trigger,
             "response": response,
             "created_by": str(ctx.author.id),
-            "created_at": ctx.message.created_at.isoformat()
+            "created_at": ctx.message.created_at.isoformat(),
+            "match_type": "contains"  # Default match type
         }
 
         responses.append(new_response)
@@ -274,6 +269,16 @@ class AutoResponseSystem(commands.Cog):
             )
             embed.add_field(name="Trigger", value=f"`{trigger}`", inline=True)
             embed.add_field(name="Response", value=response[:100] + ("..." if len(response) > 100 else ""), inline=False)
+
+            # Show if system is enabled
+            enabled = self.bot.get_setting(ctx.guild.id, "autoresponses")
+            if not enabled:
+                embed.add_field(
+                    name="⚠️ Notice",
+                    value="Auto-responses are currently disabled. Use `l.ar toggle` to enable them.",
+                    inline=False
+                )
+
             await ctx.send(embed=embed)
         else:
             await ctx.send("❌ Failed to save auto-response.")
@@ -335,6 +340,14 @@ class AutoResponseSystem(commands.Cog):
         embed = discord.Embed(
             title=f"🤖 Auto-Responses ({len(responses)})",
             color=0x00ff00
+        )
+
+        # Show current status
+        enabled = self.bot.get_setting(ctx.guild.id, "autoresponses")
+        embed.add_field(
+            name="📊 System Status",
+            value=f"{'✅ Enabled' if enabled else '❌ Disabled'}",
+            inline=True
         )
 
         # Show up to 10 responses
@@ -415,18 +428,97 @@ class AutoResponseSystem(commands.Cog):
 
     async def _toggle_system(self, ctx):
         """Internal method to toggle system"""
-        current = self.bot.get_setting(ctx.guild.id, "autoresponses")
-        new_state = not current
+        try:
+            # Get current setting
+            current = self.bot.get_setting(ctx.guild.id, "autoresponses")
+            new_state = not current
 
-        # Note: You'll need to implement bot.set_setting for this to actually work
-        # For now, just show what would happen
-        status = "enabled" if new_state else "disabled"
-        embed = discord.Embed(
-            title=f"🔄 Auto-Responses {status.title()}",
-            description=f"Auto-response system is now **{status}** for this server.",
-            color=0x00ff00 if new_state else 0xff9900
-        )
-        await ctx.send(embed=embed)
+            # Save the new setting
+            success = await self._save_setting(ctx.guild.id, "autoresponses", new_state)
+
+            if success:
+                status = "enabled" if new_state else "disabled"
+                embed = discord.Embed(
+                    title=f"🔄 Auto-Responses {status.title()}",
+                    description=f"Auto-response system is now **{status}** for this server.",
+                    color=0x00ff00 if new_state else 0xff9900
+                )
+
+                if new_state:
+                    responses = self._load_responses(ctx.guild.id)
+                    embed.add_field(
+                        name="📊 Current Responses",
+                        value=f"{len(responses)} auto-responses ready",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="✅ Status",
+                        value="Auto-responses will now trigger",
+                        inline=True
+                    )
+                else:
+                    embed.add_field(
+                        name="ℹ️ Note",
+                        value="Responses are saved but won't trigger until re-enabled",
+                        inline=False
+                    )
+
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send("❌ Failed to update auto-response setting. Please try again.")
+
+        except Exception as e:
+            logger.error(f"Error toggling autoresponses: {e}")
+            await ctx.send("❌ Error toggling auto-response system.")
+
+    async def _save_setting(self, guild_id, setting_name, value):
+        """Save a guild setting"""
+        try:
+            # Method 1: Try using bot's set_setting method if it exists
+            if hasattr(self.bot, 'set_setting'):
+                return self.bot.set_setting(guild_id, setting_name, value)
+
+            # Method 2: Try saving to settings cache
+            if hasattr(self.bot, 'settings_cache'):
+                if guild_id not in self.bot.settings_cache:
+                    self.bot.settings_cache[guild_id] = {}
+                self.bot.settings_cache[guild_id][setting_name] = value
+
+                # Try to save to file
+                settings_file = self.bot.data_manager.data_dir / f"guild_settings_{guild_id}.json"
+                settings_data = self.bot.settings_cache[guild_id]
+
+                with open(settings_file, 'w') as f:
+                    json.dump(settings_data, f, indent=2)
+                return True
+
+            # Method 3: Direct file save
+            settings_file = self.bot.data_manager.data_dir / f"guild_settings_{guild_id}.json"
+
+            # Load existing settings
+            settings_data = {}
+            if settings_file.exists():
+                with open(settings_file, 'r') as f:
+                    settings_data = json.load(f)
+
+            # Update setting
+            settings_data[setting_name] = value
+
+            # Save back to file
+            with open(settings_file, 'w') as f:
+                json.dump(settings_data, f, indent=2)
+
+            # Update cache if it exists
+            if hasattr(self.bot, 'settings_cache'):
+                if guild_id not in self.bot.settings_cache:
+                    self.bot.settings_cache[guild_id] = {}
+                self.bot.settings_cache[guild_id][setting_name] = value
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error saving setting {setting_name} for guild {guild_id}: {e}")
+            return False
 
 
 async def setup(bot):
