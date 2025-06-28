@@ -121,9 +121,24 @@ def register_routes(app):
     @app.route('/login')
     def login():
         """Discord OAuth login"""
-        from .oauth import get_discord_oauth_url
-        oauth_url = get_discord_oauth_url(app.config['DISCORD_CLIENT_ID'], app.config['DISCORD_REDIRECT_URI'])
-        return redirect(oauth_url)
+        try:
+            from .oauth import get_discord_oauth_url
+            oauth_url = get_discord_oauth_url(app.config['DISCORD_CLIENT_ID'], app.config['DISCORD_REDIRECT_URI'])
+            return redirect(oauth_url)
+        except Exception as e:
+            logger.error(f"Login error: {e}")
+            flash('Login service temporarily unavailable', 'error')
+            return render_template('login.html')
+
+    @app.route('/discord-auth')
+    def discord_auth():
+        """Discord OAuth login (alternative endpoint for compatibility)"""
+        return redirect(url_for('login'))
+
+    @app.route('/auth')
+    def auth():
+        """Auth endpoint (alternative for login)"""
+        return redirect(url_for('login'))
 
     @app.route('/callback')
     def oauth_callback():
@@ -534,22 +549,22 @@ def register_routes(app):
                                  stats=fallback_stats,
                                  bot_stats=fallback_stats,
                                  user=session.get('user'),
-                                   error_message="Page not found"), 404
+                                 error_message="Page not found"), 404
 
-        @app.errorhandler(500)
-        def internal_error(error):
-            """Handle 500 errors"""
-            logger.error(f"Internal server error: {error}")
-            if request.path.startswith('/api/'):
-                return jsonify({'error': 'Internal server error', 'status': 500}), 500
-            else:
-                fallback_stats = {
-                    'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
-                    'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
-                    'bot_status': 'error', 'bot_ready': False
-                }
-                return render_template('dashboard.html',
-                                       stats=fallback_stats,
-                                       bot_stats=fallback_stats,
-                                       user=session.get('user'),
-                                       error_message="Internal server error"), 500
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 errors"""
+        logger.error(f"Internal server error: {error}")
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Internal server error', 'status': 500}), 500
+        else:
+            fallback_stats = {
+                'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                'bot_status': 'error', 'bot_ready': False
+            }
+            return render_template('dashboard.html',
+                                 stats=fallback_stats,
+                                 bot_stats=fallback_stats,
+                                 user=session.get('user'),
+                                 error_message="Internal server error"), 500

@@ -195,7 +195,7 @@ class Reload(commands.Cog):
 
     @commands.command(name="botstatus", aliases=["rstatus", "reloadstatus"])
     @admin_required()
-    async def bot_status(self, ctx):
+    async def system_status(self, ctx):  # FIXED: Changed from bot_status to system_status
         """Show bot status and statistics (Admin Only)"""
         try:
             # Basic stats
