@@ -1,22 +1,21 @@
 """
-Cog reloading commands for administrators - SECURED VERSION
+Cog reloading commands for administrators - CLEANED VERSION
 """
 
 import discord
 from discord.ext import commands
-from utils.decorators import admin_required, owner_only, dangerous_command
+from utils.decorators import admin_required, owner_only
 from utils.embeds import EmbedBuilder
-import time
 import importlib
 import sys
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class Reload(commands.Cog):
-    """Cog management commands - SECURED"""
+    """Cog management commands - CLEANED"""
 
     def __init__(self, bot):
         self.bot = bot
@@ -24,7 +23,7 @@ class Reload(commands.Cog):
 
     @commands.command()
     @admin_required()
-    @commands.cooldown(1, 10, commands.BucketType.user)  # Prevent spam
+    @commands.cooldown(1, 10, commands.BucketType.user)
     async def reload(self, ctx, cog_name: str = None):
         """Reload cogs with proper cache clearing (Admin Only)
 
@@ -32,13 +31,10 @@ class Reload(commands.Cog):
         l.reload - Reload all cogs
         l.reload <cog_name> - Reload specific cog
         """
-        # Add execution tracking to prevent duplicates
-        if hasattr(ctx.bot, '_reload_in_progress'):
-            if ctx.bot._reload_in_progress:
-                await ctx.send("🔄 Reload already in progress, please wait...")
-                return
+        # CRITICAL: Single execution protection
+        if hasattr(ctx.bot, '_reload_in_progress') and ctx.bot._reload_in_progress:
+            return await ctx.send("🔄 Reload already in progress, please wait...")
 
-        # Set execution flag
         ctx.bot._reload_in_progress = True
 
         try:
@@ -47,7 +43,6 @@ class Reload(commands.Cog):
             else:
                 await self._reload_all_cogs(ctx)
         finally:
-            # Clear execution flag
             ctx.bot._reload_in_progress = False
 
     async def _reload_single_cog(self, ctx, cog_name: str):
@@ -60,10 +55,7 @@ class Reload(commands.Cog):
                 break
 
         if not full_cog_name:
-            await ctx.send(embed=self.embed_builder.create_error_embed(
-                f"Cog `{cog_name}` not found in loaded cogs."
-            ))
-            return
+            return await ctx.send(f"❌ Cog `{cog_name}` not found in loaded cogs.")
 
         try:
             # Step 1: Unload the extension
@@ -78,22 +70,28 @@ class Reload(commands.Cog):
             # Step 3: Load the extension again
             await self.bot.load_extension(full_cog_name)
 
-            await ctx.send(embed=self.embed_builder.create_success_embed(
-                f"Successfully reloaded `{full_cog_name}` with cache clearing"
-            ))
+            embed = discord.Embed(
+                title="✅ Single Cog Reloaded",
+                description=f"Successfully reloaded `{full_cog_name}` with cache clearing",
+                color=0x00ff00
+            )
+            await ctx.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Failed to reload {full_cog_name}: {e}")
-            await ctx.send(embed=self.embed_builder.create_error_embed(
-                f"Failed to reload `{full_cog_name}`: {str(e)[:100]}..."
-            ))
+            embed = discord.Embed(
+                title="❌ Reload Failed",
+                description=f"Failed to reload `{full_cog_name}`: {str(e)[:100]}...",
+                color=0xff0000
+            )
+            await ctx.send(embed=embed)
 
     async def _reload_all_cogs(self, ctx):
         """Reload all cogs with progress updates and cache clearing"""
         embed = discord.Embed(
             title="🔄 Reloading All Cogs",
             description="Clearing Python cache and reloading extensions...",
-            color=self.bot.data_manager.embed_color
+            color=0x00ff00
         )
         message = await ctx.send(embed=embed)
 
@@ -118,11 +116,13 @@ class Reload(commands.Cog):
         failed_cogs = []
 
         for i, cog_name in enumerate(cogs_to_reload, 1):
-            # Update progress every 3 cogs or on completion
-            if i % 3 == 0 or i == total_cogs:
+            # Update progress every 5 cogs to reduce rate limits
+            if i % 5 == 0 or i == total_cogs:
                 embed.description = f"Reloading extensions... ({i}/{total_cogs})\n`{cog_name}`"
                 try:
                     await message.edit(embed=embed)
+                    # Small delay to prevent rate limits
+                    await asyncio.sleep(0.5)
                 except discord.NotFound:
                     break
 
@@ -158,148 +158,16 @@ class Reload(commands.Cog):
             await ctx.send(embed=embed)
 
     @commands.command()
-    @owner_only()
-    @commands.cooldown(1, 15, commands.BucketType.user)  # Owner commands need longer cooldown
-    async def forcereload(self, ctx, cog_name: str = None):
-        """Force reload with aggressive cache clearing (Bot Owner Only)"""
-
-        # Add execution tracking for force reload too
-        if hasattr(ctx.bot, '_forcereload_in_progress'):
-            if ctx.bot._forcereload_in_progress:
-                await ctx.send("🔄 Force reload already in progress, please wait...")
-                return
-
-        ctx.bot._forcereload_in_progress = True
-
-        try:
-            if cog_name:
-                # Single cog force reload
-                try:
-                    # Find the full cog name
-                    full_cog_name = None
-                    for loaded_cog in self.bot.cog_loader.loaded_cogs:
-                        if cog_name.lower() in loaded_cog.lower():
-                            full_cog_name = loaded_cog
-                            break
-
-                    if not full_cog_name:
-                        await ctx.send(f"❌ Cog `{cog_name}` not found.")
-                        return
-
-                    embed = discord.Embed(
-                        title="🔄 Force Reloading Cog",
-                        description=f"Aggressively reloading `{full_cog_name}`...",
-                        color=0xffaa00
-                    )
-                    message = await ctx.send(embed=embed)
-
-                    # Step 1: Unload extension
-                    if full_cog_name in self.bot.extensions:
-                        await self.bot.unload_extension(full_cog_name)
-
-                    # Step 2: Clear from sys.modules and all related modules
-                    modules_to_clear = [name for name in sys.modules.keys()
-                                        if name.startswith(full_cog_name) or name == full_cog_name]
-
-                    for module in modules_to_clear:
-                        if module in sys.modules:
-                            try:
-                                importlib.reload(sys.modules[module])
-                            except:
-                                # If reload fails, remove from cache entirely
-                                del sys.modules[module]
-
-                    # Step 3: Load again
-                    await self.bot.load_extension(full_cog_name)
-
-                    embed.title = "✅ Force Reload Complete"
-                    embed.description = f"Successfully force reloaded `{full_cog_name}`\nCleared {len(modules_to_clear)} modules from cache"
-                    embed.color = 0x00ff00
-
-                    await message.edit(embed=embed)
-                    logger.warning(f"Bot Owner {ctx.author} force reloaded {full_cog_name}")
-
-                except Exception as e:
-                    embed = discord.Embed(
-                        title="❌ Force Reload Failed",
-                        description=f"Error: {str(e)[:200]}...",
-                        color=0xff0000
-                    )
-                    await ctx.send(embed=embed)
-
-            else:
-                # Force reload all
-                embed = discord.Embed(
-                    title="🔄 Force Reloading All Cogs",
-                    description="⚠️ **DANGEROUS OPERATION** ⚠️\nAggressively clearing cache and reloading...",
-                    color=0xffaa00
-                )
-                message = await ctx.send(embed=embed)
-
-                # Clear ALL cog-related modules from cache
-                cog_modules = [name for name in list(sys.modules.keys()) if name.startswith('cogs.')]
-                utils_modules = [name for name in list(sys.modules.keys()) if name.startswith('utils.')]
-
-                cleared_count = 0
-                for module_name in cog_modules + utils_modules:
-                    if module_name in sys.modules:
-                        try:
-                            importlib.reload(sys.modules[module_name])
-                            cleared_count += 1
-                        except:
-                            try:
-                                del sys.modules[module_name]
-                                cleared_count += 1
-                            except:
-                                pass
-
-                # Reload all cogs
-                cogs_to_reload = list(self.bot.cog_loader.loaded_cogs)
-                reloaded = 0
-                failed = 0
-                failed_list = []
-
-                for cog_name in cogs_to_reload:
-                    try:
-                        await self.bot.reload_extension(cog_name)
-                        reloaded += 1
-                    except Exception as e:
-                        failed += 1
-                        failed_list.append(cog_name)
-                        logger.error(f"Failed to force reload {cog_name}: {e}")
-
-                embed.title = "✅ Force Reload Complete"
-                embed.description = f"**Cache cleared:** {cleared_count} modules\n**Reloaded:** {reloaded}\n**Failed:** {failed}"
-                embed.color = 0x00ff00 if failed == 0 else 0xffaa00
-
-                if failed_list:
-                    embed.add_field(
-                        name="Failed Cogs",
-                        value="\n".join(f"• {cog}" for cog in failed_list[:5]),
-                        inline=False
-                    )
-
-                await message.edit(embed=embed)
-                logger.warning(f"Bot Owner {ctx.author} performed FORCE RELOAD ALL")
-
-        finally:
-            ctx.bot._forcereload_in_progress = False
-
-    @commands.command()
     @admin_required()
     async def status(self, ctx):
         """Show bot status and statistics (Admin Only)"""
-
         # Basic stats
         cog_count = len(ctx.bot.cogs)
         command_count = len(list(ctx.bot.walk_commands()))
         guild_count = len(ctx.bot.guilds)
 
         # Calculate total users
-        user_count = 0
-        for guild in ctx.bot.guilds:
-            if guild.member_count:
-                user_count += guild.member_count
+        user_count = sum(guild.member_count or 0 for guild in ctx.bot.guilds)
 
         embed = discord.Embed(
             title="🤖 Ladbot Status",
@@ -315,7 +183,7 @@ class Reload(commands.Cog):
 
         embed.add_field(
             name="⚡ Performance",
-            value=f"**Latency:** {round(ctx.bot.latency * 1000)}ms\n**Uptime:** {self._get_uptime(ctx.bot)}\n**Commands Used:** {getattr(ctx.bot, 'commands_used_today', 0)}",
+            value=f"**Latency:** {round(ctx.bot.latency * 1000)}ms\n**Uptime:** {self._get_uptime(ctx.bot)}",
             inline=True
         )
 
