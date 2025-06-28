@@ -105,8 +105,8 @@ async def start_web_server(bot):
 
         # Create Flask app (full or fallback)
         if use_full_app:
-            # Use the full web dashboard
-            pass  # app is already created above
+            # Use the full web dashboard - don't add duplicate routes
+            logger.info("🎯 Using existing web dashboard routes")
         else:
             # Create minimal Flask app for platform requirements
             from flask import Flask, jsonify, render_template_string
@@ -151,34 +151,24 @@ async def start_web_server(bot):
                                               platform=platform.title()
                                               )
 
-        # Add essential routes for platform health checks
-        @app.route('/health')
-        def health():
-            """Health check endpoint for platform monitoring"""
-            return jsonify({
-                "status": "healthy",
-                "bot_name": "Ladbot",
-                "platform": platform,
-                "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0,
-                "users": len(bot.users) if hasattr(bot, 'users') else 0,
-                "commands": len(bot.commands) if hasattr(bot, 'commands') else 0,
-                "timestamp": datetime.now().isoformat(),
-                "bot_online": hasattr(bot, 'is_ready') and bot.is_ready()
-            }), 200
+            @app.route('/health')
+            def health():
+                """Health check endpoint for platform monitoring"""
+                return jsonify({
+                    "status": "healthy",
+                    "bot_name": "Ladbot",
+                    "platform": platform,
+                    "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0,
+                    "users": len(bot.users) if hasattr(bot, 'users') else 0,
+                    "commands": len(bot.commands) if hasattr(bot, 'commands') else 0,
+                    "timestamp": datetime.now().isoformat(),
+                    "bot_online": hasattr(bot, 'is_ready') and bot.is_ready()
+                }), 200
 
-        @app.route('/ping')
-        def ping():
-            """Simple ping endpoint"""
-            return "pong", 200
-
-        @app.route('/status')
-        def status():
-            """Bot status endpoint"""
-            return jsonify({
-                "online": hasattr(bot, 'is_ready') and bot.is_ready(),
-                "latency": round(bot.latency * 1000) if hasattr(bot, 'latency') else 0,
-                "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0
-            }), 200
+            @app.route('/ping')
+            def ping():
+                """Simple ping endpoint"""
+                return "pong", 200
 
         def run_flask():
             """Run Flask in background thread"""
@@ -207,8 +197,7 @@ async def start_web_server(bot):
         if platform == 'render':
             logger.info(f"🌍 Render URL: https://{os.getenv('RENDER_EXTERNAL_URL', 'your-app.onrender.com')}")
         elif platform == 'railway':
-            service_name = os.getenv('RAILWAY_SERVICE_NAME', 'your-service')
-            logger.info(f"🚂 Railway URL: https://{service_name}.up.railway.app")
+            logger.info(f"🚂 Railway URL: https://web-production-701c.up.railway.app")
 
     except Exception as e:
         logger = logging.getLogger(__name__)
@@ -279,8 +268,7 @@ async def main():
                 logger.info(f"🌍 Public URL: {os.getenv('RENDER_EXTERNAL_URL')}")
         elif platform == 'railway':
             logger.info(f"🚂 Railway deployment detected")
-            if os.getenv('RAILWAY_PUBLIC_DOMAIN'):
-                logger.info(f"🌍 Public URL: https://{os.getenv('RAILWAY_PUBLIC_DOMAIN')}")
+            logger.info(f"🌍 Public URL: https://web-production-701c.up.railway.app")
 
         # Import and start bot
         from bot.ladbot import LadBot
@@ -296,11 +284,7 @@ async def main():
         if platform == 'render' and os.getenv('RENDER_EXTERNAL_URL'):
             bot.web_url = os.getenv('RENDER_EXTERNAL_URL')
         elif platform == 'railway':
-            if os.getenv('RAILWAY_PUBLIC_DOMAIN'):
-                bot.web_url = f"https://{os.getenv('RAILWAY_PUBLIC_DOMAIN')}"
-            elif os.getenv('RAILWAY_SERVICE_NAME'):
-                service_name = os.getenv('RAILWAY_SERVICE_NAME')
-                bot.web_url = f"https://{service_name}.up.railway.app"
+            bot.web_url = "https://web-production-701c.up.railway.app"
 
         # Start web server for platform requirements
         if platform in ['render', 'railway']:
