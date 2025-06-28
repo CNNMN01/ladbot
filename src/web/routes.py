@@ -1,709 +1,489 @@
 """
-Complete Flask routes for Ladbot web dashboard with Advanced Settings
+Web Dashboard Routes - Enhanced with Reset Defaults Functionality
 """
+import os
+import sys
+from pathlib import Path
 from flask import render_template, session, redirect, url_for, request, jsonify, flash
+import json
 import logging
 from datetime import datetime
-import requests
 
 logger = logging.getLogger(__name__)
 
 
 def register_routes(app):
-    """Register all routes with the Flask app"""
+    """Register all web routes"""
+
+    # ===== UTILITY FUNCTIONS =====
+
+    def get_bot_stats():
+        """Get bot statistics safely"""
+        try:
+            bot = app.bot
+            if not bot or not bot.is_ready():
+                return {
+                    'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                    'uptime': 'Offline', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                    'bot_status': 'offline', 'bot_ready': False
+                }
+
+            # Calculate uptime
+            uptime = datetime.now() - bot.start_time if hasattr(bot, 'start_time') else None
+            uptime_str = str(uptime).split('.')[0] if uptime else 'Unknown'
+
+            return {
+                'guilds': len(bot.guilds),
+                'users': len(bot.users),
+                'commands': len(bot.commands),
+                'latency': round(bot.latency * 1000),
+                'uptime': uptime_str,
+                'loaded_cogs': len(bot.cogs),
+                'commands_today': getattr(bot, 'commands_used_today', 0),
+                'error_count': getattr(bot, 'error_count', 0),
+                'bot_status': 'online',
+                'bot_ready': True
+            }
+        except Exception as e:
+            logger.error(f"Error getting bot stats: {e}")
+            return {
+                'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                'bot_status': 'error', 'bot_ready': False
+            }
+
+    def require_auth():
+        """Check if user is authenticated"""
+        return 'user_id' in session
+
+    def require_admin(guild_id=None):
+        """Check if user is admin"""
+        if not require_auth():
+            return False
+
+        bot = app.bot
+        if not bot:
+            return False
+
+        user_id = int(session['user_id'])
+
+        # Check if user is bot admin
+        admin_ids = getattr(bot.settings, 'ADMIN_IDS', [])
+        if user_id in admin_ids:
+            return True
+
+        # Check if user is guild admin
+        if guild_id:
+            guild = bot.get_guild(guild_id)
+            if guild:
+                member = guild.get_member(user_id)
+                if member and member.guild_permissions.administrator:
+                    return True
+
+        return False
+
+    # ===== MAIN ROUTES =====
 
     @app.route('/')
     def index():
-        """Home page - redirect to dashboard or login"""
-        if 'user' in session:
+        """Home page - redirect to dashboard if logged in"""
+        if require_auth():
             return redirect(url_for('dashboard'))
-        return redirect(url_for('login'))
+        return render_template('login.html')
 
     @app.route('/login')
     def login():
-        """Login page"""
-        return render_template('login.html')
-
-    @app.route('/auth/discord')
-    def discord_auth():
-        """Redirect to Discord OAuth"""
-        if not app.config['DISCORD_CLIENT_ID']:
-            flash('Discord OAuth not configured', 'error')
-            return redirect(url_for('login'))
-
-        discord_auth_url = (
-            f"https://discord.com/api/oauth2/authorize?"
-            f"client_id={app.config['DISCORD_CLIENT_ID']}&"
-            f"redirect_uri={app.config['DISCORD_REDIRECT_URI']}&"
-            f"response_type=code&"
-            f"scope=identify"
-        )
-        return redirect(discord_auth_url)
+        """Discord OAuth login"""
+        from .oauth import get_discord_oauth_url
+        oauth_url = get_discord_oauth_url(app.config['DISCORD_CLIENT_ID'], app.config['DISCORD_REDIRECT_URI'])
+        return redirect(oauth_url)
 
     @app.route('/callback')
-    def discord_callback():
+    def oauth_callback():
         """Handle Discord OAuth callback"""
         code = request.args.get('code')
         if not code:
-            flash('Authorization failed', 'error')
-            return redirect(url_for('login'))
+            flash('Authentication failed: No authorization code received', 'error')
+            return redirect(url_for('index'))
 
         try:
-            # Exchange code for access token
-            token_data = {
-                'client_id': app.config['DISCORD_CLIENT_ID'],
-                'client_secret': app.config['DISCORD_CLIENT_SECRET'],
-                'grant_type': 'authorization_code',
-                'code': code,
-                'redirect_uri': app.config['DISCORD_REDIRECT_URI']
-            }
+            from .oauth import exchange_code_for_token, get_user_info
 
-            # Get access token
-            token_response = requests.post(
-                'https://discord.com/api/oauth2/token',
-                data=token_data,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            # Exchange code for token
+            token_data = exchange_code_for_token(
+                code,
+                app.config['DISCORD_CLIENT_ID'],
+                app.config['DISCORD_CLIENT_SECRET'],
+                app.config['DISCORD_REDIRECT_URI']
             )
-            token_json = token_response.json()
 
-            if 'access_token' not in token_json:
-                flash('Failed to get access token', 'error')
-                return redirect(url_for('login'))
+            if not token_data:
+                flash('Authentication failed: Could not exchange code for token', 'error')
+                return redirect(url_for('index'))
 
             # Get user info
-            headers = {'Authorization': f"Bearer {token_json['access_token']}"}
-            user_response = requests.get('https://discord.com/api/users/@me', headers=headers)
-            user_data = user_response.json()
+            user_info = get_user_info(token_data['access_token'])
+            if not user_info:
+                flash('Authentication failed: Could not get user information', 'error')
+                return redirect(url_for('index'))
 
-            # Store user in session
-            session['user'] = {
-                'id': user_data['id'],
-                'username': user_data['username'],
-                'discriminator': user_data.get('discriminator', '0'),
-                'avatar': user_data.get('avatar')
-            }
-            session['user_id'] = user_data['id']
+            # Store in session
+            session['user_id'] = user_info['id']
+            session['user'] = user_info
+            session['access_token'] = token_data['access_token']
 
-            flash('Successfully logged in!', 'success')
+            flash(f'Welcome, {user_info["username"]}!', 'success')
             return redirect(url_for('dashboard'))
 
         except Exception as e:
-            logger.error(f"OAuth error: {e}")
-            flash('Login failed', 'error')
-            return redirect(url_for('login'))
+            logger.error(f"OAuth callback error: {e}")
+            flash('Authentication failed: Internal error', 'error')
+            return redirect(url_for('index'))
 
     @app.route('/dashboard')
     def dashboard():
-        """Main dashboard page"""
-        # Check if user is logged in
-        if 'user' not in session:
-            flash('Please log in to access the dashboard', 'warning')
+        """Main dashboard"""
+        if not require_auth():
             return redirect(url_for('login'))
 
-        # Get bot stats safely
-        bot = app.bot
-        stats = {}
-
         try:
-            if bot and bot.is_ready():
-                stats = {
-                    'guilds': len(bot.guilds),
-                    'users': len(bot.users),
-                    'commands': len(bot.commands),
-                    'latency': round(bot.latency * 1000),
-                    'uptime': str(datetime.now() - bot.start_time).split('.')[0],
-                    'loaded_cogs': len(bot.cogs),
-                    'commands_today': getattr(bot, 'commands_used_today', 0),
-                    'error_count': getattr(bot, 'error_count', 0),
-                    'bot_status': 'online',
-                    'bot_ready': True
-                }
-            else:
-                # Default stats if bot not ready
-                stats = {
-                    'guilds': 0,
-                    'users': 0,
-                    'commands': 0,
-                    'latency': 0,
-                    'uptime': 'Starting...',
-                    'loaded_cogs': 0,
-                    'commands_today': 0,
-                    'error_count': 0,
-                    'bot_status': 'offline',
-                    'bot_ready': False
-                }
+            stats = get_bot_stats()
+            return render_template('dashboard.html',
+                                 stats=stats,
+                                 bot_stats=stats,  # For backwards compatibility
+                                 user=session.get('user'))
         except Exception as e:
-            logger.error(f"Error getting bot stats: {e}")
-            stats = {
-                'guilds': 0,
-                'users': 0,
-                'commands': 0,
-                'latency': 0,
-                'uptime': 'Error',
-                'loaded_cogs': 0,
-                'commands_today': 0,
-                'error_count': 0,
-                'bot_status': 'error',
-                'bot_ready': False
+            logger.error(f"Dashboard error: {e}")
+            fallback_stats = {
+                'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
+                'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
+                'bot_status': 'error', 'bot_ready': False
             }
-
-        return render_template('dashboard.html',
-                             stats=stats,
-                             bot_stats=stats,  # Alias for template compatibility
-                             user=session.get('user'))
-
-    @app.route('/analytics')
-    def analytics():
-        """Analytics page with real data"""
-        # Check if user is logged in
-        if 'user' not in session:
-            flash('Please log in to access analytics', 'warning')
-            return redirect(url_for('login'))
-
-        bot = app.bot
-        analytics_data = {}
-
-        try:
-            if bot and bot.is_ready():
-                # Create sample command statistics (will be real data later)
-                command_stats = [
-                    {'command': 'help', 'count': 45},
-                    {'command': 'ping', 'count': 32},
-                    {'command': 'info', 'count': 28},
-                    {'command': 'weather', 'count': 15},
-                    {'command': '8ball', 'count': 12},
-                    {'command': 'joke', 'count': 10},
-                    {'command': 'crypto', 'count': 8},
-                    {'command': 'roll', 'count': 6},
-                    {'command': 'say', 'count': 4},
-                    {'command': 'settings', 'count': 2}
-                ]
-
-                # Get real guild data
-                guild_data = []
-                for guild in bot.guilds:
-                    guild_data.append({
-                        'id': guild.id,
-                        'name': guild.name,
-                        'members': guild.member_count,
-                        'commands_used': 0,  # Will be real data when analytics system is implemented
-                        'owner': str(guild.owner) if guild.owner else "Unknown"
-                    })
-
-                analytics_data = {
-                    'total_guilds': len(bot.guilds),
-                    'total_users': len(bot.users),
-                    'total_commands': len(bot.commands),
-                    'bot_latency': round(bot.latency * 1000),
-                    'uptime': str(datetime.now() - bot.start_time).split('.')[0],
-                    'loaded_cogs': len(bot.cogs),
-                    'command_stats': command_stats,
-                    'guild_data': guild_data
-                }
-            else:
-                analytics_data = {
-                    'total_guilds': 0,
-                    'total_users': 0,
-                    'total_commands': 0,
-                    'bot_latency': 0,
-                    'uptime': 'Starting...',
-                    'loaded_cogs': 0,
-                    'command_stats': [],
-                    'guild_data': []
-                }
-        except Exception as e:
-            logger.error(f"Error getting analytics data: {e}")
-            analytics_data = {
-                'total_guilds': 0,
-                'total_users': 0,
-                'total_commands': 0,
-                'bot_latency': 0,
-                'uptime': 'Error',
-                'loaded_cogs': 0,
-                'command_stats': [],
-                'guild_data': []
-            }
-
-        return render_template('analytics.html',
-                             analytics=analytics_data,
-                             user=session.get('user'))
+            return render_template('dashboard.html',
+                                 stats=fallback_stats,
+                                 bot_stats=fallback_stats,
+                                 user=session.get('user'),
+                                 error_message="Error loading dashboard")
 
     @app.route('/settings')
     def settings():
-        """Basic settings page - redirect to advanced settings"""
-        return redirect(url_for('advanced_settings'))
+        """Basic settings page"""
+        if not require_auth():
+            return redirect(url_for('login'))
 
-    @app.route('/settings/advanced')
+        stats = get_bot_stats()
+        return render_template('settings.html', stats=stats, user=session.get('user'))
+
+    @app.route('/advanced-settings')
     def advanced_settings():
-        """Advanced settings configuration page"""
-        if 'user' not in session:
-            flash('Please log in to access settings', 'warning')
+        """Advanced settings page"""
+        if not require_auth():
             return redirect(url_for('login'))
 
         bot = app.bot
+        if not bot:
+            flash('Bot not available', 'error')
+            return redirect(url_for('dashboard'))
 
-        # Get all guilds user has access to
+        # Get user's guilds that the bot is in
         user_guilds = []
         try:
-            for guild in bot.guilds:
-                # Check if user is admin in this guild
-                member = guild.get_member(int(session['user_id']))
-                if member and (member.guild_permissions.administrator or
-                              int(session['user_id']) in bot.config.admin_ids):
-                    user_guilds.append({
-                        'id': guild.id,
-                        'name': guild.name,
-                        'icon': guild.icon.url if guild.icon else None,
-                        'member_count': guild.member_count,
-                        'owner': str(guild.owner) if guild.owner else "Unknown"
-                    })
+            if hasattr(bot, 'guilds'):
+                for guild in bot.guilds:
+                    member = guild.get_member(int(session['user_id']))
+                    if member and member.guild_permissions.administrator:
+                        user_guilds.append({
+                            'id': guild.id,
+                            'name': guild.name,
+                            'icon': guild.icon.url if guild.icon else None,
+                            'member_count': guild.member_count
+                        })
         except Exception as e:
             logger.error(f"Error getting user guilds: {e}")
 
-        # Check if user is bot admin
-        is_bot_admin = int(session['user_id']) in bot.config.admin_ids
-
+        stats = get_bot_stats()
         return render_template('advanced_settings.html',
+                             stats=stats,
                              user=session.get('user'),
-                             guilds=user_guilds,
-                             is_bot_admin=is_bot_admin)
+                             guilds=user_guilds)
 
-    @app.route('/settings/guild/<int:guild_id>')
+    @app.route('/guild/<int:guild_id>/settings')
     def guild_settings(guild_id):
-        """Guild-specific settings page with fallback handling"""
-        if 'user' not in session:
-            flash('Please log in to access settings', 'warning')
+        """Guild-specific settings page"""
+        if not require_auth():
             return redirect(url_for('login'))
 
-        bot = app.bot
+        if not require_admin(guild_id):
+            flash('You need administrator permissions for this server', 'error')
+            return redirect(url_for('advanced_settings'))
 
-        # Verify user has permission for this guild
+        bot = app.bot
+        if not bot:
+            flash('Bot not available', 'error')
+            return redirect(url_for('dashboard'))
+
         guild = bot.get_guild(guild_id)
         if not guild:
-            flash('Guild not found', 'error')
+            flash('Server not found or bot not in server', 'error')
             return redirect(url_for('advanced_settings'))
 
-        member = guild.get_member(int(session['user_id']))
-        if not member or not (member.guild_permissions.administrator or
-                             int(session['user_id']) in bot.config.admin_ids):
-            flash('You do not have permission to manage this server', 'error')
-            return redirect(url_for('advanced_settings'))
-
-        # Get current settings with robust fallback handling
+        # Get current settings
+        current_settings = {}
         try:
-            # Try to use settings manager if available
-            if hasattr(bot, 'settings_manager') and bot.settings_manager:
-                current_settings = bot.settings_manager.load_guild_settings(guild_id)
-                commands = bot.settings_manager.get_all_commands()
-                roles = bot.settings_manager.get_guild_roles(guild_id)
-            else:
-                # Fallback: create basic settings and get data directly from bot
-                current_settings = {
-                    'prefix': getattr(bot.config, 'prefix', 'l.'),
-                    'embed_color': '#4e73df',
-                    'command_cooldown': 3,
-                    'autoresponses': False,
-                    'welcome_messages': True,
-                    'moderation_enabled': True,
-                    'spam_protection': True,
-                    'nsfw_filter': True,
-                    'logging_enabled': True,
-                    'auto_delete_commands': False,
-                    'disabled_commands': [],
-                    'admin_roles': [],
-                    'moderator_roles': []
+            if hasattr(bot, 'get_setting'):
+                default_settings = {
+                    'ping': True, 'help': True, 'info': True, 'say': True,
+                    'weather': True, 'crypto': True, 'reddit': True, 'eightball': True,
+                    'jokes': True, 'ascii_art': True, 'games': True, 'dinosaurs': True,
+                    'bible': True, 'converter': True, 'roll': True, 'feedback': True,
+                    'tools': True, 'minesweeper': True, 'autoresponses': False
                 }
 
-                # Get commands directly from bot
-                commands = []
-                for command in bot.commands:
-                    commands.append({
-                        'name': command.name,
-                        'description': command.help or 'No description available',
-                        'category': getattr(command.cog, 'qualified_name', 'General') if command.cog else 'General',
-                        'aliases': list(command.aliases) if command.aliases else []
-                    })
-                commands = sorted(commands, key=lambda x: x['category'])
-
-                # Get roles directly from guild
-                roles = []
-                for role in guild.roles:
-                    if role.name != "@everyone":
-                        roles.append({
-                            'id': role.id,
-                            'name': role.name,
-                            'color': str(role.color),
-                            'permissions': role.permissions.value,
-                            'mentionable': role.mentionable
-                        })
-                roles = sorted(roles, key=lambda x: x['name'])
-
+                for setting in default_settings:
+                    current_settings[setting] = bot.get_setting(guild_id, setting)
+            else:
+                logger.warning("Bot has no get_setting method")
         except Exception as e:
-            logger.error(f"Error loading settings for guild {guild_id}: {e}")
-            # Ultimate fallback with minimal settings
-            current_settings = {
-                'prefix': 'l.',
-                'embed_color': '#4e73df',
-                'command_cooldown': 3,
-                'autoresponses': False,
-                'welcome_messages': True,
-                'moderation_enabled': True,
-                'spam_protection': True
-            }
-            commands = []
-            roles = []
+            logger.error(f"Error loading guild settings: {e}")
 
         return render_template('guild_settings.html',
-                             user=session.get('user'),
                              guild={
                                  'id': guild.id,
                                  'name': guild.name,
                                  'icon': guild.icon.url if guild.icon else None,
-                                 'member_count': guild.member_count,
-                                 'owner': str(guild.owner) if guild.owner else "Unknown"
+                                 'member_count': guild.member_count
                              },
                              current_settings=current_settings,
-                             commands=commands,
-                             roles=roles)
+                             user=session.get('user'))
 
-    @app.route('/about')
-    def about():
-        """About page"""
-        return render_template('about.html', user=session.get('user'))
+    @app.route('/analytics')
+    def analytics():
+        """Analytics page"""
+        if not require_auth():
+            return redirect(url_for('login'))
+
+        stats = get_bot_stats()
+        return render_template('analytics.html', stats=stats, user=session.get('user'))
 
     # ===== API ROUTES =====
 
-    @app.route('/api/stats')
-    def api_stats():
-        """API endpoint for real-time stats"""
-        bot = app.bot
+    @app.route('/api/bot/stats')
+    def api_bot_stats():
+        """API endpoint for bot statistics"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
 
-        try:
-            if bot and bot.is_ready():
-                stats = {
-                    'guilds': len(bot.guilds),
-                    'users': len(bot.users),
-                    'commands': len(bot.commands),
-                    'latency': round(bot.latency * 1000),
-                    'uptime': str(datetime.now() - bot.start_time).split('.')[0],
-                    'loaded_cogs': len(bot.cogs),
-                    'status': 'online',
-                    'bot_ready': True
-                }
-            else:
-                stats = {
-                    'guilds': 0,
-                    'users': 0,
-                    'commands': 0,
-                    'latency': 0,
-                    'uptime': 'Starting...',
-                    'loaded_cogs': 0,
-                    'status': 'starting',
-                    'bot_ready': False
-                }
-        except Exception as e:
-            logger.error(f"Error in API stats: {e}")
-            stats = {
-                'error': str(e),
-                'status': 'error',
-                'bot_ready': False
-            }
-
+        stats = get_bot_stats()
         return jsonify(stats)
 
-    @app.route('/api/analytics')
-    def api_analytics():
-        """API endpoint for analytics data"""
-        bot = app.bot
-
-        try:
-            if bot and bot.is_ready():
-                # Sample command usage data
-                command_usage = [
-                    {'name': 'help', 'count': 45},
-                    {'name': 'ping', 'count': 32},
-                    {'name': 'info', 'count': 28},
-                    {'name': 'weather', 'count': 15},
-                    {'name': '8ball', 'count': 12}
-                ]
-
-                # Guild data
-                guilds = []
-                for guild in bot.guilds:
-                    guilds.append({
-                        'id': guild.id,
-                        'name': guild.name,
-                        'members': guild.member_count
-                    })
-
-                return jsonify({
-                    'command_usage': command_usage,
-                    'guilds': guilds,
-                    'total_commands': sum(cmd['count'] for cmd in command_usage),
-                    'timestamp': datetime.now().isoformat()
-                })
-            else:
-                return jsonify({'error': 'Bot not ready'}), 503
-
-        except Exception as e:
-            logger.error(f"Error in API analytics: {e}")
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/api/settings/guild/<int:guild_id>', methods=['GET', 'POST'])
+    @app.route('/api/guild/<int:guild_id>/settings', methods=['GET', 'POST'])
     def api_guild_settings(guild_id):
-        """Get or save guild settings via API with fallback handling"""
-        if 'user' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
+        """API endpoint for guild settings"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        if not require_admin(guild_id):
+            return jsonify({'error': 'Admin permissions required'}), 403
 
         bot = app.bot
-
-        # Verify permission
-        guild = bot.get_guild(guild_id)
-        if not guild:
-            return jsonify({'error': 'Guild not found'}), 404
-
-        member = guild.get_member(int(session['user_id']))
-        if not member or not (member.guild_permissions.administrator or
-                             int(session['user_id']) in bot.config.admin_ids):
-            return jsonify({'error': 'Insufficient permissions'}), 403
+        if not bot:
+            return jsonify({'error': 'Bot not available'}), 503
 
         if request.method == 'GET':
-            # Return current guild settings with fallback
+            # Get current settings
             try:
-                if hasattr(bot, 'settings_manager') and bot.settings_manager:
-                    settings = bot.settings_manager.load_guild_settings(guild_id)
-                else:
-                    # Fallback settings
-                    settings = {
-                        'prefix': 'l.',
-                        'embed_color': '#4e73df',
-                        'command_cooldown': 3,
-                        'autoresponses': False,
-                        'welcome_messages': True,
-                        'moderation_enabled': True,
-                        'spam_protection': True
+                settings = {}
+                if hasattr(bot, 'get_setting'):
+                    default_settings = {
+                        'ping': True, 'help': True, 'info': True, 'say': True,
+                        'weather': True, 'crypto': True, 'reddit': True, 'eightball': True,
+                        'jokes': True, 'ascii_art': True, 'games': True, 'dinosaurs': True,
+                        'bible': True, 'converter': True, 'roll': True, 'feedback': True,
+                        'tools': True, 'minesweeper': True, 'autoresponses': False
                     }
-                return jsonify(settings)
+
+                    for setting in default_settings:
+                        settings[setting] = bot.get_setting(guild_id, setting)
+
+                return jsonify({'success': True, 'settings': settings})
             except Exception as e:
-                logger.error(f"Error loading guild {guild_id} settings: {e}")
-                return jsonify({'error': str(e)}), 500
+                return jsonify({'error': f'Failed to get settings: {str(e)}'}), 500
 
         elif request.method == 'POST':
-            # Save new guild settings with fallback
+            # Update settings
             try:
-                new_settings = request.json
-                if not new_settings:
-                    return jsonify({'error': 'No settings data provided'}), 400
+                data = request.get_json()
+                setting = data.get('setting')
+                value = data.get('value')
 
-                # Try to save using settings manager
-                if hasattr(bot, 'settings_manager') and bot.settings_manager:
-                    if bot.settings_manager.apply_guild_settings(guild_id, new_settings):
-                        return jsonify({
-                            'success': True,
-                            'message': 'Settings saved successfully',
-                            'timestamp': datetime.now().isoformat()
-                        })
+                if not setting:
+                    return jsonify({'error': 'Setting name required'}), 400
+
+                # Save setting using multiple methods for compatibility
+                success = False
+
+                if hasattr(bot, 'set_setting'):
+                    try:
+                        bot.set_setting(guild_id, setting, value)
+                        success = True
+                    except Exception as e:
+                        logger.debug(f"set_setting failed: {e}")
+
+                # Try updating cache
+                if hasattr(bot, 'settings_cache'):
+                    try:
+                        if guild_id not in bot.settings_cache:
+                            bot.settings_cache[guild_id] = {}
+                        bot.settings_cache[guild_id][setting] = value
+                        success = True
+                    except Exception as e:
+                        logger.debug(f"cache update failed: {e}")
+
+                # Try file save
+                try:
+                    data_dir = getattr(bot, 'data_manager', None)
+                    if data_dir and hasattr(data_dir, 'data_dir'):
+                        settings_file = data_dir.data_dir / f"guild_settings_{guild_id}.json"
                     else:
-                        return jsonify({'error': 'Failed to save settings'}), 500
+                        settings_file = Path("data") / f"guild_settings_{guild_id}.json"
+
+                    # Load existing settings
+                    settings_data = {}
+                    if settings_file.exists():
+                        with open(settings_file, 'r') as f:
+                            settings_data = json.load(f)
+
+                    # Update setting
+                    settings_data[setting] = value
+
+                    # Save back to file
+                    with open(settings_file, 'w') as f:
+                        json.dump(settings_data, f, indent=2)
+                    success = True
+                except Exception as e:
+                    logger.debug(f"file save failed: {e}")
+
+                if success:
+                    return jsonify({'success': True, 'message': f'Setting {setting} updated'})
                 else:
-                    # Fallback: just return success for now
-                    logger.info(f"Settings would be saved for guild {guild_id}: {new_settings}")
-                    return jsonify({
-                        'success': True,
-                        'message': 'Settings saved successfully (basic mode)',
-                        'timestamp': datetime.now().isoformat()
-                    })
+                    return jsonify({'error': 'Failed to save setting'}), 500
 
             except Exception as e:
-                logger.error(f"Error saving guild {guild_id} settings: {e}")
-                return jsonify({'error': str(e)}), 500
+                logger.error(f"Error updating guild setting: {e}")
+                return jsonify({'error': f'Failed to update setting: {str(e)}'}), 500
 
-    @app.route('/api/settings/global', methods=['GET', 'POST'])
-    def api_global_settings():
-        """Get or update global bot settings with fallback"""
-        if 'user' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
+    @app.route('/api/guild/<int:guild_id>/reset-defaults', methods=['POST'])
+    def api_reset_guild_defaults(guild_id):
+        """Reset guild settings to defaults"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
 
-        # Check if user is bot admin
-        if int(session['user_id']) not in app.bot.config.admin_ids:
-            return jsonify({'error': 'Bot admin access required'}), 403
+        if not require_admin(guild_id):
+            return jsonify({'error': 'Admin permissions required'}), 403
 
         bot = app.bot
+        if not bot:
+            return jsonify({'error': 'Bot not available'}), 503
 
-        if request.method == 'GET':
+        try:
+            # Default settings (matching your bot's DEFAULT_SETTINGS)
+            default_settings = {
+                'ping': True,
+                'help': True,
+                'info': True,
+                'say': True,
+                'weather': True,
+                'crypto': True,
+                'reddit': True,
+                'eightball': True,
+                'cmd_8ball': True,
+                'jokes': True,
+                'ascii_art': True,
+                'games': True,
+                'dinosaurs': True,
+                'bible': True,
+                'converter': True,
+                'roll': True,
+                'feedback': True,
+                'tools': True,
+                'minesweeper': True,
+                'autoresponses': False,
+            }
+
+            # Reset settings using multiple methods for compatibility
+            reset_count = 0
+
+            # Method 1: Try bot's set_setting method
+            if hasattr(bot, 'set_setting'):
+                for setting, value in default_settings.items():
+                    try:
+                        bot.set_setting(guild_id, setting, value)
+                        reset_count += 1
+                    except Exception as e:
+                        logger.debug(f"set_setting failed for {setting}: {e}")
+
+            # Method 2: Update settings cache
+            if hasattr(bot, 'settings_cache'):
+                if guild_id not in bot.settings_cache:
+                    bot.settings_cache[guild_id] = {}
+
+                for setting, value in default_settings.items():
+                    bot.settings_cache[guild_id][setting] = value
+
+            # Method 3: Direct file save
             try:
-                if hasattr(bot, 'settings_manager') and bot.settings_manager:
-                    return jsonify(bot.settings_manager.global_settings)
+                data_dir = getattr(bot, 'data_manager', None)
+                if data_dir and hasattr(data_dir, 'data_dir'):
+                    settings_file = data_dir.data_dir / f"guild_settings_{guild_id}.json"
                 else:
-                    # Fallback global settings
-                    fallback_settings = {
-                        'bot_name': 'Ladbot',
-                        'default_prefix': 'l.',
-                        'max_command_cooldown': 5,
-                        'error_logging': True,
-                        'analytics_enabled': True,
-                        'auto_backup': False,
-                        'maintenance_mode': False,
-                        'welcome_message_enabled': True,
-                        'default_embed_color': '#4e73df'
-                    }
-                    return jsonify(fallback_settings)
-            except Exception as e:
-                logger.error(f"Error getting global settings: {e}")
-                return jsonify({'error': str(e)}), 500
+                    settings_file = Path("data") / f"guild_settings_{guild_id}.json"
 
-        elif request.method == 'POST':
-            try:
-                new_settings = request.json
-                if not new_settings:
-                    return jsonify({'error': 'No settings data provided'}), 400
-
-                if hasattr(bot, 'settings_manager') and bot.settings_manager:
-                    bot.settings_manager.global_settings.update(new_settings)
-                    if bot.settings_manager.save_global_settings():
-                        return jsonify({
-                            'success': True,
-                            'message': 'Global settings updated successfully'
-                        })
-                    else:
-                        return jsonify({'error': 'Failed to save global settings'}), 500
-                else:
-                    # Fallback: just log the attempt
-                    logger.info(f"Global settings would be updated: {new_settings}")
-                    return jsonify({
-                        'success': True,
-                        'message': 'Global settings updated successfully (basic mode)'
-                    })
+                # Save default settings to file
+                with open(settings_file, 'w') as f:
+                    json.dump(default_settings, f, indent=2)
 
             except Exception as e:
-                logger.error(f"Error updating global settings: {e}")
-                return jsonify({'error': str(e)}), 500
+                logger.error(f"Failed to save default settings to file: {e}")
 
-    @app.route('/api/guild/<int:guild_id>/commands')
-    def api_guild_commands(guild_id):
-        """Get available commands for a guild"""
-        if 'user' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
+            logger.info(f"Reset {len(default_settings)} settings to defaults for guild {guild_id} by user {session['user_id']}")
 
-        bot = app.bot
-
-        # Verify permission
-        guild = bot.get_guild(guild_id)
-        if not guild:
-            return jsonify({'error': 'Guild not found'}), 404
-
-        member = guild.get_member(int(session['user_id']))
-        if not member or not (member.guild_permissions.administrator or
-                             int(session['user_id']) in bot.config.admin_ids):
-            return jsonify({'error': 'Insufficient permissions'}), 403
-
-        try:
-            # Get commands from bot directly
-            commands = []
-            for command in bot.commands:
-                commands.append({
-                    'name': command.name,
-                    'description': command.help or 'No description available',
-                    'category': getattr(command.cog, 'qualified_name', 'General') if command.cog else 'General',
-                    'aliases': list(command.aliases) if command.aliases else []
-                })
-
-            return jsonify(sorted(commands, key=lambda x: x['category']))
-
-        except Exception as e:
-            logger.error(f"Error getting commands for guild {guild_id}: {e}")
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/api/guild/<int:guild_id>/roles')
-    def api_guild_roles(guild_id):
-        """Get roles for a guild"""
-        if 'user' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-
-        bot = app.bot
-
-        # Verify permission
-        guild = bot.get_guild(guild_id)
-        if not guild:
-            return jsonify({'error': 'Guild not found'}), 404
-
-        member = guild.get_member(int(session['user_id']))
-        if not member or not (member.guild_permissions.administrator or
-                             int(session['user_id']) in bot.config.admin_ids):
-            return jsonify({'error': 'Insufficient permissions'}), 403
-
-        try:
-            # Get roles directly from guild
-            roles = []
-            for role in guild.roles:
-                if role.name != "@everyone":
-                    roles.append({
-                        'id': role.id,
-                        'name': role.name,
-                        'color': str(role.color),
-                        'permissions': role.permissions.value,
-                        'mentionable': role.mentionable
-                    })
-
-            return jsonify(sorted(roles, key=lambda x: x['name']))
-
-        except Exception as e:
-            logger.error(f"Error getting roles for guild {guild_id}: {e}")
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/health')
-    def health():
-        """Health check endpoint for Render"""
-        bot = app.bot
-
-        try:
-            if bot and bot.is_ready():
-                return jsonify({
-                    'status': 'healthy',
-                    'bot_status': 'online',
-                    'guilds': len(bot.guilds),
-                    'timestamp': datetime.now().isoformat(),
-                    'version': '2.0.0'
-                })
-            else:
-                return jsonify({
-                    'status': 'starting',
-                    'bot_status': 'connecting',
-                    'timestamp': datetime.now().isoformat(),
-                    'version': '2.0.0'
-                }), 503
-        except Exception as e:
-            logger.error(f"Health check error: {e}")
             return jsonify({
-                'status': 'error',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            }), 500
+                'success': True,
+                'message': f'Successfully reset {len(default_settings)} settings to defaults',
+                'settings_reset': len(default_settings),
+                'default_settings': default_settings
+            })
 
-    # ===== AUTHENTICATION ROUTES =====
+        except Exception as e:
+            logger.error(f"Error resetting guild settings: {e}")
+            return jsonify({'error': f'Failed to reset settings: {str(e)}'}), 500
+
+    # ===== DEMO/DEV ROUTES =====
 
     @app.route('/demo-login')
     def demo_login():
-        """Demo login for testing (development only)"""
-        if app.debug or app.config.get('DEVELOPMENT'):
-            session['user'] = {
-                'id': '123456789',
-                'username': 'Demo User',
-                'discriminator': '0001',
-                'avatar': None
-            }
-            session['user_id'] = '123456789'
-            flash('Demo login successful!', 'success')
-            return redirect(url_for('dashboard'))
-        else:
+        """Demo login for development"""
+        if app.config.get('ENV') == 'production':
             return "Demo login disabled in production", 403
+
+        # Create fake user session for demo
+        session['user_id'] = '123456789'
+        session['user'] = {
+            'id': '123456789',
+            'username': 'Demo User',
+            'discriminator': '0001',
+            'avatar': None
+        }
+
+        flash('Demo login successful!', 'success')
+        return redirect(url_for('dashboard'))
 
     @app.route('/logout')
     def logout():
         """Logout and clear session"""
         session.clear()
         flash('You have been logged out.', 'info')
-        return redirect(url_for('login'))
+        return redirect(url_for('index'))
 
     # ===== ERROR HANDLERS =====
 
@@ -713,7 +493,6 @@ def register_routes(app):
         if request.path.startswith('/api/'):
             return jsonify({'error': 'Endpoint not found', 'status': 404}), 404
         else:
-            # Return dashboard with error message
             fallback_stats = {
                 'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
                 'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,
@@ -732,7 +511,6 @@ def register_routes(app):
         if request.path.startswith('/api/'):
             return jsonify({'error': 'Internal server error', 'status': 500}), 500
         else:
-            # Return dashboard with error message
             fallback_stats = {
                 'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
                 'uptime': 'Error', 'loaded_cogs': 0, 'commands_today': 0, 'error_count': 0,

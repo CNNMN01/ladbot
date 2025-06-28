@@ -7,71 +7,87 @@
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h3><i class="fas fa-cogs text-primary"></i> Advanced Settings</h3>
-            <p class="text-muted">Configure bot settings for your servers</p>
+            <h1 class="display-4">
+                <i class="fas fa-cogs text-primary"></i> Advanced Settings
+            </h1>
+            <p class="lead text-muted">Manage bot configuration and server settings</p>
         </div>
     </div>
 
-    <!-- Global Settings Card -->
+    <!-- Bot Status Overview -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-globe"></i> Global Bot Settings
+                        <i class="fas fa-robot"></i> Bot Status Overview
                     </h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">
-                        These settings apply to the entire bot across all servers.
-                        <span class="badge badge-warning">Bot Admin Only</span>
-                    </p>
-                    <button class="btn btn-primary" onclick="openGlobalSettings()">
-                        <i class="fas fa-edit"></i> Manage Global Settings
-                    </button>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="stat-card bg-primary">
+                                <h5>Servers</h5>
+                                <h2>{{ stats.guilds or 0 }}</h2>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card bg-success">
+                                <h5>Users</h5>
+                                <h2>{{ stats.users or 0 }}</h2>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card bg-info">
+                                <h5>Commands</h5>
+                                <h2>{{ stats.commands or 0 }}</h2>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card bg-warning">
+                                <h5>Uptime</h5>
+                                <h6>{{ stats.uptime or 'Unknown' }}</h6>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Server Settings -->
-    <div class="row">
+    <!-- Server Management -->
+    <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="fas fa-server"></i> Server Settings
+                        <i class="fas fa-server"></i> Server Management
                     </h5>
+                    <p class="text-muted mb-0">Configure settings for servers where you have admin permissions</p>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted mb-4">
-                        Configure bot behavior for individual servers you manage.
-                    </p>
-                    
                     {% if guilds %}
                         <div class="row">
                             {% for guild in guilds %}
-                            <div class="col-lg-4 col-md-6 mb-4">
-                                <div class="card border-left-primary h-100">
-                                    <div class="card-body">
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card h-100 border-primary">
+                                    <div class="card-body d-flex flex-column">
                                         <div class="d-flex align-items-center mb-3">
                                             {% if guild.icon %}
                                                 <img src="{{ guild.icon }}" class="rounded-circle me-3" width="50" height="50">
                                             {% else %}
-                                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                                                    {{ guild.name[0] }}
+                                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                                                    <i class="fas fa-server text-white"></i>
                                                 </div>
                                             {% endif %}
                                             <div>
-                                                <h6 class="mb-0">{{ guild.name }}</h6>
+                                                <h6 class="card-title mb-1">{{ guild.name }}</h6>
                                                 <small class="text-muted">{{ guild.member_count }} members</small>
                                             </div>
                                         </div>
-                                        
-                                        <div class="d-grid">
-                                            <a href="{{ url_for('guild_settings', guild_id=guild.id) }}" 
-                                               class="btn btn-outline-primary">
-                                                <i class="fas fa-cog"></i> Configure Settings
+                                        <div class="mt-auto">
+                                            <a href="{{ url_for('guild_settings', guild_id=guild.id) }}" class="btn btn-primary btn-sm w-100">
+                                                <i class="fas fa-cog"></i> Manage Settings
                                             </a>
                                         </div>
                                     </div>
@@ -80,12 +96,10 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div class="text-center py-5">
-                            <i class="fas fa-server fa-3x text-muted mb-3"></i>
-                            <h5 class="text-muted">No Servers Available</h5>
-                            <p class="text-muted">
-                                You need administrator permissions in a server to configure its bot settings.
-                            </p>
+                        <div class="text-center py-4">
+                            <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
+                            <h5>No Servers Available</h5>
+                            <p class="text-muted">You need administrator permissions in a server where Ladbot is present to manage settings.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -105,22 +119,22 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3 mb-2">
-                            <button class="btn btn-success btn-block" onclick="backupSettings()">
+                            <button class="btn btn-success btn-block w-100" onclick="backupSettings()">
                                 <i class="fas fa-download"></i> Backup Settings
                             </button>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <button class="btn btn-warning btn-block" onclick="resetToDefaults()">
+                            <button class="btn btn-warning btn-block w-100" onclick="resetToDefaults()" id="resetDefaultsBtn">
                                 <i class="fas fa-undo"></i> Reset to Defaults
                             </button>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <button class="btn btn-info btn-block" onclick="importSettings()">
+                            <button class="btn btn-info btn-block w-100" onclick="importSettings()">
                                 <i class="fas fa-upload"></i> Import Settings
                             </button>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{{ url_for('analytics') }}" class="btn btn-secondary btn-block">
+                            <a href="{{ url_for('analytics') }}" class="btn btn-secondary btn-block w-100">
                                 <i class="fas fa-chart-line"></i> View Analytics
                             </a>
                         </div>
@@ -129,206 +143,335 @@
             </div>
         </div>
     </div>
+
+    <!-- Global Settings -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-globe"></i> Global Bot Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Bot Statistics</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Status:</strong>
+                                    {% if stats.bot_status == 'online' %}
+                                        <span class="badge bg-success">Online</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Offline</span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Latency:</strong> {{ stats.latency or 0 }}ms</li>
+                                <li><strong>Loaded Cogs:</strong> {{ stats.loaded_cogs or 0 }}</li>
+                                <li><strong>Commands Today:</strong> {{ stats.commands_today or 0 }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>System Information</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Version:</strong> Ladbot v2.0</li>
+                                <li><strong>Framework:</strong> Discord.py</li>
+                                <li><strong>Errors Today:</strong> {{ stats.error_count or 0 }}</li>
+                                <li><strong>Last Updated:</strong> {{ moment().format('YYYY-MM-DD') if moment else 'Unknown' }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Global Settings Modal -->
-<div class="modal fade" id="globalSettingsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<!-- Toast for notifications -->
+<div class="toast position-fixed top-0 end-0 m-3" id="actionToast" style="z-index: 9999;">
+    <div class="toast-header">
+        <strong class="me-auto">Ladbot Dashboard</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body"></div>
+</div>
+
+<!-- Reset Confirmation Modal -->
+<div class="modal fade" id="resetConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-warning">
                 <h5 class="modal-title">
-                    <i class="fas fa-globe"></i> Global Bot Settings
+                    <i class="fas fa-exclamation-triangle"></i> Reset All Settings
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="globalSettingsForm">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Bot Name</label>
-                                <input type="text" class="form-control" name="bot_name" value="Ladbot">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Default Prefix</label>
-                                <input type="text" class="form-control" name="default_prefix" value="l.">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Default Embed Color</label>
-                                <input type="color" class="form-control" name="default_embed_color" value="#4e73df">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Max Command Cooldown</label>
-                                <input type="number" class="form-control" name="max_command_cooldown" value="5" min="0" max="60">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" name="error_logging" checked>
-                                <label class="form-check-label">Error Logging</label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" name="analytics_enabled" checked>
-                                <label class="form-check-label">Analytics</label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" name="maintenance_mode">
-                                <label class="form-check-label">Maintenance Mode</label>
-                            </div>
-                        </div>
-                    </div>
-                </form>
+                <div class="alert alert-warning">
+                    <strong>⚠️ WARNING:</strong> This action will reset ALL bot settings to their default values for ALL servers where you have admin permissions.
+                </div>
+                <p>This action cannot be undone. Are you absolutely sure you want to continue?</p>
+                <div class="form-group mt-3">
+                    <label for="confirmationInput">To confirm, please type <strong>RESET</strong> in the box below:</label>
+                    <input type="text" class="form-control" id="confirmationInput" placeholder="Type RESET to confirm">
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveGlobalSettings()">
-                    <i class="fas fa-save"></i> Save Settings
+                <button type="button" class="btn btn-danger" id="confirmResetBtn" onclick="executeReset()">
+                    <i class="fas fa-undo"></i> Reset All Settings
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-.border-left-primary {
-    border-left: 0.25rem solid #4e73df !important;
-}
-</style>
-
 <script>
-function openGlobalSettings() {
-    // Load current global settings
-    fetch('/api/settings/global')
-        .then(response => response.json())
-        .then(data => {
-            // Populate form with current values
-            const form = document.getElementById('globalSettingsForm');
-            Object.keys(data).forEach(key => {
-                const input = form.querySelector(`[name="${key}"]`);
-                if (input) {
-                    if (input.type === 'checkbox') {
-                        input.checked = data[key];
-                    } else {
-                        input.value = data[key];
-                    }
-                }
-            });
-            
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('globalSettingsModal'));
-            modal.show();
-        })
-        .catch(error => {
-            console.error('Error loading global settings:', error);
-            alert('Failed to load global settings');
-        });
-}
-
-function saveGlobalSettings() {
-    const form = document.getElementById('globalSettingsForm');
-    const formData = new FormData(form);
-    const settings = {};
-    
-    // Convert form data to object
-    for (let [key, value] of formData.entries()) {
-        const input = form.querySelector(`[name="${key}"]`);
-        if (input.type === 'checkbox') {
-            settings[key] = input.checked;
-        } else if (input.type === 'number') {
-            settings[key] = parseInt(value);
-        } else {
-            settings[key] = value;
-        }
-    }
-    
-    // Include unchecked checkboxes as false
-    form.querySelectorAll('input[type="checkbox"]').forEach(input => {
-        if (!settings.hasOwnProperty(input.name)) {
-            settings[input.name] = false;
-        }
-    });
-    
-    // Save settings
-    fetch('/api/settings/global', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Global settings saved successfully!');
-            bootstrap.Modal.getInstance(document.getElementById('globalSettingsModal')).hide();
-        } else {
-            alert('Error: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error saving settings:', error);
-        alert('Failed to save settings');
-    });
-}
-
+// Global functions for quick actions
 function backupSettings() {
-    // Download settings as JSON
-    fetch('/api/settings/global')
-        .then(response => response.json())
-        .then(data => {
-            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ladbot-settings-${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        });
-}
-
-function resetToDefaults() {
-    if (confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
-        // Implementation would go here
-        alert('Reset functionality would be implemented here');
-    }
+    showToast('Backup feature coming soon!', 'info');
 }
 
 function importSettings() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const settings = JSON.parse(e.target.result);
-                // Validate and import settings
-                console.log('Importing settings:', settings);
-                alert('Import functionality would be implemented here');
-            } catch (error) {
-                alert('Invalid settings file');
-            }
-        };
-        reader.readAsText(file);
-    };
-    input.click();
+    showToast('Import feature coming soon!', 'info');
 }
+
+function resetToDefaults() {
+    // Show confirmation modal
+    const modal = new bootstrap.Modal(document.getElementById('resetConfirmModal'));
+    modal.show();
+
+    // Reset confirmation input
+    document.getElementById('confirmationInput').value = '';
+    updateResetButton();
+}
+
+function updateResetButton() {
+    const input = document.getElementById('confirmationInput');
+    const button = document.getElementById('confirmResetBtn');
+
+    if (input.value === 'RESET') {
+        button.disabled = false;
+        button.classList.remove('btn-secondary');
+        button.classList.add('btn-danger');
+    } else {
+        button.disabled = true;
+        button.classList.remove('btn-danger');
+        button.classList.add('btn-secondary');
+    }
+}
+
+function executeReset() {
+    const input = document.getElementById('confirmationInput');
+    if (input.value !== 'RESET') {
+        showToast('You must type "RESET" to confirm this action.', 'error');
+        return;
+    }
+
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('resetConfirmModal'));
+    modal.hide();
+
+    // Show loading state
+    const resetBtn = document.getElementById('resetDefaultsBtn');
+    const originalText = resetBtn.innerHTML;
+    resetBtn.disabled = true;
+    resetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...';
+
+    // Get all guilds that user has admin access to
+    const guilds = {{ guilds | tojson if guilds else '[]' }};
+
+    if (!guilds || guilds.length === 0) {
+        showToast('No servers found where you have admin permissions.', 'error');
+        resetBtn.disabled = false;
+        resetBtn.innerHTML = originalText;
+        return;
+    }
+
+    // Reset settings for each guild
+    let completedResets = 0;
+    let totalResets = guilds.length;
+    let errors = [];
+
+    guilds.forEach(guild => {
+        fetch(`/api/guild/${guild.id}/reset-defaults`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            completedResets++;
+
+            if (!data.success) {
+                errors.push(`${guild.name}: ${data.error || 'Unknown error'}`);
+            }
+
+            // Check if all resets completed
+            if (completedResets === totalResets) {
+                if (errors.length === 0) {
+                    showToast(`✅ Successfully reset settings for all ${totalResets} servers!`, 'success');
+                } else {
+                    showToast(`⚠️ Reset completed with ${errors.length} errors. Check console for details.`, 'warning');
+                    console.error('Reset errors:', errors);
+                }
+
+                // Refresh page after delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        })
+        .catch(error => {
+            completedResets++;
+            errors.push(`${guild.name}: ${error.message}`);
+            console.error(`Error resetting ${guild.name}:`, error);
+
+            if (completedResets === totalResets) {
+                showToast(`❌ Reset failed for ${errors.length} servers. Check console for details.`, 'error');
+                console.error('Reset errors:', errors);
+            }
+        })
+        .finally(() => {
+            if (completedResets === totalResets) {
+                resetBtn.disabled = false;
+                resetBtn.innerHTML = originalText;
+            }
+        });
+    });
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('actionToast');
+    const toastBody = toast.querySelector('.toast-body');
+
+    toastBody.textContent = message;
+
+    // Change color based on type
+    toast.className = `toast position-fixed top-0 end-0 m-3 ${type === 'error' ? 'bg-danger text-white' : type === 'info' ? 'bg-info text-white' : type === 'warning' ? 'bg-warning' : 'bg-success text-white'}`;
+
+    const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+    bsToast.show();
+}
+
+// Add event listener for confirmation input
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmationInput = document.getElementById('confirmationInput');
+    if (confirmationInput) {
+        confirmationInput.addEventListener('input', updateResetButton);
+
+        // Also listen for paste events
+        confirmationInput.addEventListener('paste', function() {
+            setTimeout(updateResetButton, 10);
+        });
+    }
+
+    // Initialize reset button state
+    updateResetButton();
+});
+
+// Refresh bot stats every 30 seconds
+setInterval(function() {
+    fetch('/api/bot/stats')
+        .then(response => response.json())
+        .then(data => {
+            // Update stats display if needed
+            console.log('Stats updated:', data);
+        })
+        .catch(error => {
+            console.warn('Failed to update stats:', error);
+        });
+}, 30000);
 </script>
+
+<style>
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-card h2 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 0;
+}
+
+.stat-card h5 {
+    opacity: 0.9;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.stat-card h6 {
+    font-size: 1.1rem;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 15px 15px 0 0 !important;
+}
+
+.btn {
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.bg-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; }
+.bg-success { background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%) !important; }
+.bg-info { background: linear-gradient(135deg, #3494e6 0%, #ec6ead 100%) !important; }
+.bg-warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important; }
+
+.border-primary {
+    border: 2px solid #667eea !important;
+}
+
+.border-primary:hover {
+    border-color: #764ba2 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.modal-header.bg-warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+    color: white;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+#confirmationInput:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.toast {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+</style>
 {% endblock %}
