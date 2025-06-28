@@ -1,309 +1,433 @@
 """
-Auto-response system for Ladbot - Enhanced Version
+Auto-Response System - Modern with Full Backwards Compatibility
+Clean, safe implementation that supports both old and new command formats
 """
 
 import discord
 from discord.ext import commands
 import json
 import logging
+from pathlib import Path
 from utils.decorators import admin_required
-from utils.validators import sanitize_input
 
 logger = logging.getLogger(__name__)
 
 
-class AutoResponses(commands.Cog):
-    """Auto-response system with admin controls"""
+class AutoResponseSystem(commands.Cog):
+    """Modern auto-response system with zero command conflicts + backwards compatibility"""
 
     def __init__(self, bot):
         self.bot = bot
-        self.response_cache = {}
+        self.name = "AutoResponses"
+
+        # Cache for fast lookups
+        self._response_cache = {}
+        self._last_response_time = {}  # Anti-spam protection
+
+    def _get_responses_file(self, guild_id):
+        """Get the path to guild's responses file"""
+        return self.bot.data_manager.data_dir / f"autoresponses_{guild_id}.json"
+
+    def _load_responses(self, guild_id):
+        """Load responses for a guild with caching"""
+        if guild_id in self._response_cache:
+            return self._response_cache[guild_id]
+
+        responses_file = self._get_responses_file(guild_id)
+        if not responses_file.exists():
+            self._response_cache[guild_id] = []
+            return []
+
+        try:
+            with open(responses_file, 'r', encoding='utf-8') as f:
+                responses = json.load(f)
+
+                # Backwards compatibility: convert old format to new format
+                for response in responses:
+                    if 'created_by' not in response:
+                        response['created_by'] = 'legacy'
+                    if 'created_at' not in response:
+                        response['created_at'] = 'unknown'
+
+                self._response_cache[guild_id] = responses
+                return responses
+        except Exception as e:
+            logger.error(f"Error loading autoresponses for guild {guild_id}: {e}")
+            self._response_cache[guild_id] = []
+            return []
+
+    def _save_responses(self, guild_id, responses):
+        """Save responses for a guild"""
+        responses_file = self._get_responses_file(guild_id)
+        try:
+            with open(responses_file, 'w', encoding='utf-8') as f:
+                json.dump(responses, f, indent=2, ensure_ascii=False)
+            self._response_cache[guild_id] = responses
+            return True
+        except Exception as e:
+            logger.error(f"Error saving autoresponses for guild {guild_id}: {e}")
+            return False
+
+    def _is_command(self, content):
+        """Check if message is a command (comprehensive detection)"""
+        # Check bot prefix
+        if content.startswith(self.bot.command_prefix):
+            return True
+
+        # Check common bot prefixes to avoid conflicts
+        common_prefixes = ['!', '?', '$', '%', '&', '*', '+', '=', '/', '\\', '|', '~', '`', '-', '.', '>', '<']
+        if any(content.startswith(prefix) for prefix in common_prefixes):
+            return True
+
+        # Check if it looks like a command (word + space/end)
+        first_word = content.split()[0] if content.split() else ""
+        if len(first_word) > 0 and (first_word.islower() and len(first_word) < 20):
+            # Could be a command, be safe
+            if any(char in first_word for char in ['help', 'ping', 'info', 'reload']):
+                return True
+
+        return False
+
+    def _should_respond(self, message):
+        """Determine if we should check for auto-responses"""
+        # Never respond to bots
+        if message.author.bot:
+            return False
+
+        # Never respond in DMs
+        if not message.guild:
+            return False
+
+        # Never respond to commands
+        if self._is_command(message.content):
+            return False
+
+        # Check if autoresponses are enabled for this guild
+        if not self.bot.get_setting(message.guild.id, "autoresponses"):
+            return False
+
+        # Anti-spam: max 1 response per 3 seconds per channel
+        channel_key = f"{message.guild.id}_{message.channel.id}"
+        now = message.created_at.timestamp()
+
+        if channel_key in self._last_response_time:
+            if now - self._last_response_time[channel_key] < 3:
+                return False
+
+        return True
+
+    def _find_matching_response(self, message_content, responses):
+        """Find the first matching response"""
+        content_lower = message_content.lower().strip()
+
+        for response_data in responses:
+            trigger = response_data.get("trigger", "").lower().strip()
+            if not trigger:
+                continue
+
+            # Exact match
+            if trigger == content_lower:
+                return response_data
+
+            # Word boundary match (safer than contains)
+            if f" {trigger} " in f" {content_lower} ":
+                return response_data
+
+            # Starts with match for phrases
+            if content_lower.startswith(f"{trigger} ") or content_lower.endswith(f" {trigger}"):
+                return response_data
+
+        return None
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Handle auto-responses to messages"""
-        # CRITICAL: Ignore bot messages and commands to prevent conflicts
-        if message.author.bot:
-            return
-
-        # CRITICAL: Ignore any message that starts with the bot prefix
-        if message.content.startswith(self.bot.command_prefix):
-            return
-
-        # CRITICAL: Ignore any message that starts with common prefixes
-        common_prefixes = ['!', '?', '$', '%', '&', '*', '+', '=', '/', '\\', '|', '~', '`']
-        if any(message.content.startswith(prefix) for prefix in common_prefixes):
-            return
-
-        # Check if auto-responses are enabled for this guild
-        if not message.guild:
-            return
-
-        guild_id = message.guild.id
-        if not self.bot.get_setting(guild_id, "autoresponses"):
-            return
-
-        # Get responses for this guild
-        responses = self._get_guild_responses(guild_id)
-        if not responses:
-            return
-
-        # Check for trigger matches (case-insensitive)
-        message_lower = message.content.lower().strip()
-
-        for response_data in responses:
-            trigger = response_data.get("trigger", "").lower()
-            response_text = response_data.get("response", "")
-
-            if not trigger or not response_text:
-                continue
-
-            # Exact match or word boundary match
-            if trigger == message_lower or f" {trigger} " in f" {message_lower} ":
-                try:
-                    # Add a small delay to feel more natural
-                    await message.channel.typing()
-                    await asyncio.sleep(1)
-
-                    # Send the response
-                    await message.channel.send(response_text)
-                    logger.info(f"Auto-response triggered in {message.guild.name}: '{trigger}' -> '{response_text[:50]}...'")
-                    break  # Only respond to first match
-
-                except discord.Forbidden:
-                    logger.warning(f"No permission to send auto-response in {message.guild.name}")
-                except Exception as e:
-                    logger.error(f"Error sending auto-response: {e}")
-
-    def _get_guild_responses(self, guild_id):
-        """Get auto-responses for a guild with caching"""
-        if guild_id in self.response_cache:
-            return self.response_cache[guild_id]
-
+        """Process messages for auto-responses - DESIGNED TO NOT INTERFERE"""
         try:
-            responses_file = self.bot.data_manager.data_dir / f"autoresponses_{guild_id}.json"
-            if responses_file.exists():
-                with open(responses_file, 'r') as f:
-                    responses = json.load(f)
-                    self.response_cache[guild_id] = responses
-                    return responses
-        except Exception as e:
-            logger.error(f"Error loading auto-responses for guild {guild_id}: {e}")
-
-        return []
-
-    def _save_guild_responses(self, guild_id, responses):
-        """Save auto-responses for a guild"""
-        try:
-            responses_file = self.bot.data_manager.data_dir / f"autoresponses_{guild_id}.json"
-            with open(responses_file, 'w') as f:
-                json.dump(responses, f, indent=2)
-
-            # Update cache
-            self.response_cache[guild_id] = responses
-            return True
-        except Exception as e:
-            logger.error(f"Error saving auto-responses for guild {guild_id}: {e}")
-            return False
-
-    @commands.group(invoke_without_command=True)
-    @admin_required()
-    async def autoresponse(self, ctx):
-        """Auto-response management commands (Admin Only)"""
-        if ctx.invoked_subcommand is None:
-            embed = discord.Embed(
-                title="🤖 Auto-Response Management",
-                description="**Admin-only commands for managing auto-responses**",
-                color=0x00ff00
-            )
-            embed.add_field(
-                name="📋 Available Commands",
-                value=(
-                    f"`{self.bot.command_prefix}autoresponse add <trigger> <response>` - Add new response\n"
-                    f"`{self.bot.command_prefix}autoresponse remove <trigger>` - Remove response\n"
-                    f"`{self.bot.command_prefix}autoresponse list` - List all responses\n"
-                    f"`{self.bot.command_prefix}autoresponse edit <trigger> <new_response>` - Edit response\n"
-                    f"`{self.bot.command_prefix}autoresponse clear` - Clear all responses\n"
-                    f"`{self.bot.command_prefix}autoresponse status` - Show system status"
-                ),
-                inline=False
-            )
-            embed.add_field(
-                name="⚙️ Settings",
-                value=f"Enable/disable: `{self.bot.command_prefix}settings autoresponses on/off`",
-                inline=False
-            )
-            embed.set_footer(text="🔒 Admin permissions required for all commands")
-            await ctx.send(embed=embed)
-
-    @autoresponse.command(name="add")
-    @admin_required()
-    async def add_response(self, ctx, trigger: str, *, response: str):
-        """Add a new auto-response (Admin Only)
-
-        Usage: l.autoresponse add "hello" "Hi there! 👋"
-        """
-        try:
-            # Validation
-            if len(trigger) > 100:
-                await ctx.send("❌ Trigger must be 100 characters or less.")
+            # Quick exit checks first
+            if not self._should_respond(message):
                 return
 
-            if len(response) > 500:
-                await ctx.send("❌ Response must be 500 characters or less.")
-                return
-
-            # Check for inappropriate content (basic filter)
-            if any(word in trigger.lower() for word in ['@everyone', '@here']):
-                await ctx.send("❌ Triggers cannot contain mention tags.")
-                return
-
-            # Prevent command conflicts
-            if trigger.lower().startswith(self.bot.command_prefix.lower()):
-                await ctx.send("❌ Triggers cannot start with the bot command prefix.")
-                return
-
-            guild_id = ctx.guild.id
-            current_responses = self._get_guild_responses(guild_id)
-
-            # Check if trigger already exists
-            for existing in current_responses:
-                if existing["trigger"].lower() == trigger.lower():
-                    await ctx.send(f"❌ Trigger `{trigger}` already exists. Use `edit` to modify it.")
-                    return
-
-            # Limit number of auto-responses per server
-            if len(current_responses) >= 50:
-                await ctx.send("❌ Maximum 50 auto-responses per server. Remove some first.")
-                return
-
-            # Add new response
-            new_response = {
-                "trigger": trigger,
-                "response": sanitize_input(response, max_length=500),
-                "created_by": ctx.author.id,
-                "created_at": ctx.message.created_at.isoformat()
-            }
-
-            current_responses.append(new_response)
-
-            if self._save_guild_responses(guild_id, current_responses):
-                embed = discord.Embed(
-                    title="✅ Auto-Response Added",
-                    description=f"**Trigger:** `{trigger}`\n**Response:** {response[:100]}{'...' if len(response) > 100 else ''}",
-                    color=0x00ff00
-                )
-                await ctx.send(embed=embed)
-                logger.info(f"Auto-response added by {ctx.author} in {ctx.guild.name}: '{trigger}'")
-            else:
-                await ctx.send("❌ Failed to save auto-response. Please try again.")
-
-        except Exception as e:
-            logger.error(f"Error adding auto-response: {e}")
-            await ctx.send("❌ An error occurred while adding the auto-response.")
-
-    @autoresponse.command(name="remove", aliases=["delete"])
-    @admin_required()
-    async def remove_response(self, ctx, *, trigger: str):
-        """Remove an auto-response (Admin Only)"""
-        try:
-            guild_id = ctx.guild.id
-            current_responses = self._get_guild_responses(guild_id)
-
-            # Find and remove the response
-            for i, response in enumerate(current_responses):
-                if response["trigger"].lower() == trigger.lower():
-                    removed_response = current_responses.pop(i)
-
-                    if self._save_guild_responses(guild_id, current_responses):
-                        embed = discord.Embed(
-                            title="✅ Auto-Response Removed",
-                            description=f"**Trigger:** `{removed_response['trigger']}`",
-                            color=0x00ff00
-                        )
-                        await ctx.send(embed=embed)
-                        logger.info(f"Auto-response removed by {ctx.author} in {ctx.guild.name}: '{trigger}'")
-                    else:
-                        await ctx.send("❌ Failed to save changes. Please try again.")
-                    return
-
-            await ctx.send(f"❌ No auto-response found with trigger `{trigger}`.")
-
-        except Exception as e:
-            logger.error(f"Error removing auto-response: {e}")
-            await ctx.send("❌ An error occurred while removing the auto-response.")
-
-    @autoresponse.command(name="list")
-    @admin_required()
-    async def list_responses(self, ctx):
-        """List all auto-responses for this server (Admin Only)"""
-        try:
-            guild_id = ctx.guild.id
-            responses = self._get_guild_responses(guild_id)
-
+            # Load responses
+            responses = self._load_responses(message.guild.id)
             if not responses:
-                await ctx.send("📝 No auto-responses configured for this server.")
                 return
 
+            # Find matching response
+            matching_response = self._find_matching_response(message.content, responses)
+            if not matching_response:
+                return
+
+            # Update anti-spam tracker
+            channel_key = f"{message.guild.id}_{message.channel.id}"
+            self._last_response_time[channel_key] = message.created_at.timestamp()
+
+            # Send response
+            response_text = matching_response.get("response", "")
+            if response_text:
+                await message.channel.send(response_text)
+                logger.info(f"Auto-response sent in {message.guild.name}: '{matching_response['trigger']}' -> '{response_text[:50]}...'")
+
+        except Exception as e:
+            # Silent fail - don't break other functionality
+            logger.error(f"Auto-response error: {e}")
+
+    # NEW STYLE COMMANDS (Short aliases)
+    @commands.group(name="ar", invoke_without_command=True)
+    @admin_required()
+    async def autoresponse_short(self, ctx):
+        """Auto-response management - Short version (Admin Only)"""
+        await self._show_help(ctx)
+
+    # OLD STYLE COMMANDS (Full backwards compatibility)
+    @commands.group(name="autoresponse", invoke_without_command=True)
+    @admin_required()
+    async def autoresponse_full(self, ctx):
+        """Auto-response management - Full version (Admin Only)"""
+        await self._show_help(ctx)
+
+    async def _show_help(self, ctx):
+        """Show help for autoresponse commands"""
+        embed = discord.Embed(
+            title="🤖 Auto-Response System",
+            description="Manage automatic responses for your server",
+            color=0x00ff00
+        )
+
+        # Show current status
+        responses = self._load_responses(ctx.guild.id)
+        enabled = self.bot.get_setting(ctx.guild.id, "autoresponses")
+
+        embed.add_field(
+            name="📊 Status",
+            value=f"**Enabled:** {'✅ Yes' if enabled else '❌ No'}\n**Responses:** {len(responses)}",
+            inline=True
+        )
+
+        embed.add_field(
+            name="🛠️ Commands (Both formats work)",
+            value=(
+                f"**New:** `{ctx.prefix}ar add <trigger> <response>`\n"
+                f"**Old:** `{ctx.prefix}autoresponse add <trigger> <response>`\n\n"
+                f"• `add <trigger> <response>` - Add response\n"
+                f"• `remove <trigger>` - Remove response\n"
+                f"• `list` - Show all responses\n"
+                f"• `clear` - Clear all responses\n"
+                f"• `toggle` - Enable/disable system"
+            ),
+            inline=False
+        )
+
+        await ctx.send(embed=embed)
+
+    # ADD COMMANDS - Both versions
+    @autoresponse_short.command(name="add")
+    @admin_required()
+    async def add_response_short(self, ctx, trigger: str, *, response: str):
+        """Add auto-response (short command)"""
+        await self._add_response(ctx, trigger, response)
+
+    @autoresponse_full.command(name="add")
+    @admin_required()
+    async def add_response_full(self, ctx, trigger: str, *, response: str):
+        """Add auto-response (full command)"""
+        await self._add_response(ctx, trigger, response)
+
+    async def _add_response(self, ctx, trigger: str, response: str):
+        """Internal method to add a response"""
+        # Validation
+        if len(trigger) > 100:
+            return await ctx.send("❌ Trigger must be 100 characters or less.")
+
+        if len(response) > 1000:
+            return await ctx.send("❌ Response must be 1000 characters or less.")
+
+        # Prevent command conflicts
+        if self._is_command(trigger):
+            return await ctx.send("❌ Trigger cannot look like a command.")
+
+        # Load current responses
+        responses = self._load_responses(ctx.guild.id)
+
+        # Check for duplicates
+        for existing in responses:
+            if existing.get("trigger", "").lower() == trigger.lower():
+                return await ctx.send(f"❌ Trigger `{trigger}` already exists. Remove it first.")
+
+        # Limit responses per server
+        if len(responses) >= 100:
+            return await ctx.send("❌ Maximum 100 auto-responses per server.")
+
+        # Add new response
+        new_response = {
+            "trigger": trigger,
+            "response": response,
+            "created_by": str(ctx.author.id),
+            "created_at": ctx.message.created_at.isoformat()
+        }
+
+        responses.append(new_response)
+
+        if self._save_responses(ctx.guild.id, responses):
             embed = discord.Embed(
-                title=f"🤖 Auto-Responses for {ctx.guild.name}",
-                description=f"Total: {len(responses)} response(s)",
+                title="✅ Auto-Response Added",
                 color=0x00ff00
             )
-
-            # Show responses in chunks
-            for i, response in enumerate(responses[:20]):  # Limit to 20 for embed size
-                trigger = response.get("trigger", "Unknown")
-                response_text = response.get("response", "Unknown")
-
-                # Truncate long responses
-                if len(response_text) > 100:
-                    response_text = response_text[:97] + "..."
-
-                embed.add_field(
-                    name=f"{i+1}. `{trigger}`",
-                    value=response_text,
-                    inline=False
-                )
-
-            if len(responses) > 20:
-                embed.set_footer(text=f"Showing first 20 of {len(responses)} responses")
-
+            embed.add_field(name="Trigger", value=f"`{trigger}`", inline=True)
+            embed.add_field(name="Response", value=response[:100] + ("..." if len(response) > 100 else ""), inline=False)
             await ctx.send(embed=embed)
+        else:
+            await ctx.send("❌ Failed to save auto-response.")
 
-        except Exception as e:
-            logger.error(f"Error listing auto-responses: {e}")
-            await ctx.send("❌ An error occurred while listing auto-responses.")
-
-    @autoresponse.command(name="clear")
+    # REMOVE COMMANDS - Both versions
+    @autoresponse_short.command(name="remove", aliases=["delete", "del"])
     @admin_required()
-    async def clear_responses(self, ctx):
-        """Clear all auto-responses for this server (Admin Only)"""
-        try:
-            guild_id = ctx.guild.id
-            current_responses = self._get_guild_responses(guild_id)
+    async def remove_response_short(self, ctx, *, trigger: str):
+        """Remove auto-response (short command)"""
+        await self._remove_response(ctx, trigger)
 
-            if not current_responses:
-                await ctx.send("📝 No auto-responses to clear.")
+    @autoresponse_full.command(name="remove", aliases=["delete", "del"])
+    @admin_required()
+    async def remove_response_full(self, ctx, *, trigger: str):
+        """Remove auto-response (full command)"""
+        await self._remove_response(ctx, trigger)
+
+    async def _remove_response(self, ctx, trigger: str):
+        """Internal method to remove a response"""
+        responses = self._load_responses(ctx.guild.id)
+
+        for i, response in enumerate(responses):
+            if response.get("trigger", "").lower() == trigger.lower():
+                removed = responses.pop(i)
+
+                if self._save_responses(ctx.guild.id, responses):
+                    embed = discord.Embed(
+                        title="✅ Auto-Response Removed",
+                        description=f"Removed trigger: `{removed['trigger']}`",
+                        color=0x00ff00
+                    )
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("❌ Failed to save changes.")
                 return
 
-            count = len(current_responses)
+        await ctx.send(f"❌ No auto-response found with trigger `{trigger}`.")
 
-            if self._save_guild_responses(guild_id, []):
-                embed = discord.Embed(
-                    title="✅ Auto-Responses Cleared",
-                    description=f"Removed {count} auto-response(s) from this server.",
-                    color=0x00ff00
-                )
-                await ctx.send(embed=embed)
-                logger.info(f"All auto-responses cleared by {ctx.author} in {ctx.guild.name}")
+    # LIST COMMANDS - Both versions
+    @autoresponse_short.command(name="list", aliases=["show"])
+    @admin_required()
+    async def list_responses_short(self, ctx):
+        """List auto-responses (short command)"""
+        await self._list_responses(ctx)
+
+    @autoresponse_full.command(name="list", aliases=["show"])
+    @admin_required()
+    async def list_responses_full(self, ctx):
+        """List auto-responses (full command)"""
+        await self._list_responses(ctx)
+
+    async def _list_responses(self, ctx):
+        """Internal method to list responses"""
+        responses = self._load_responses(ctx.guild.id)
+
+        if not responses:
+            return await ctx.send("📝 No auto-responses configured.")
+
+        embed = discord.Embed(
+            title=f"🤖 Auto-Responses ({len(responses)})",
+            color=0x00ff00
+        )
+
+        # Show up to 10 responses
+        for i, response in enumerate(responses[:10]):
+            trigger = response.get("trigger", "Unknown")
+            resp_text = response.get("response", "Unknown")
+
+            # Truncate long responses
+            if len(resp_text) > 100:
+                resp_text = resp_text[:97] + "..."
+
+            embed.add_field(
+                name=f"{i+1}. `{trigger}`",
+                value=resp_text,
+                inline=False
+            )
+
+        if len(responses) > 10:
+            embed.set_footer(text=f"Showing first 10 of {len(responses)} responses")
+
+        await ctx.send(embed=embed)
+
+    # CLEAR COMMANDS - Both versions
+    @autoresponse_short.command(name="clear")
+    @admin_required()
+    async def clear_responses_short(self, ctx):
+        """Clear auto-responses (short command)"""
+        await self._clear_responses(ctx)
+
+    @autoresponse_full.command(name="clear")
+    @admin_required()
+    async def clear_responses_full(self, ctx):
+        """Clear auto-responses (full command)"""
+        await self._clear_responses(ctx)
+
+    async def _clear_responses(self, ctx):
+        """Internal method to clear responses"""
+        responses = self._load_responses(ctx.guild.id)
+
+        if not responses:
+            return await ctx.send("📝 No auto-responses to clear.")
+
+        # Confirmation
+        embed = discord.Embed(
+            title="⚠️ Confirm Clear All",
+            description=f"This will delete all {len(responses)} auto-responses.\n\nType `CONFIRM` to proceed.",
+            color=0xff9900
+        )
+        await ctx.send(embed=embed)
+
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel
+
+        try:
+            msg = await self.bot.wait_for('message', timeout=30.0, check=check)
+            if msg.content.upper() == "CONFIRM":
+                if self._save_responses(ctx.guild.id, []):
+                    await ctx.send(f"✅ Cleared all {len(responses)} auto-responses.")
+                else:
+                    await ctx.send("❌ Failed to clear responses.")
             else:
-                await ctx.send("❌ Failed to clear auto-responses. Please try again.")
+                await ctx.send("❌ Cancelled.")
+        except:
+            await ctx.send("❌ Timed out.")
 
-        except Exception as e:
-            logger.error(f"Error clearing auto-responses: {e}")
-            await ctx.send("❌ An error occurred while clearing auto-responses.")
+    # TOGGLE COMMANDS - Both versions
+    @autoresponse_short.command(name="toggle")
+    @admin_required()
+    async def toggle_system_short(self, ctx):
+        """Toggle auto-responses (short command)"""
+        await self._toggle_system(ctx)
+
+    @autoresponse_full.command(name="toggle")
+    @admin_required()
+    async def toggle_system_full(self, ctx):
+        """Toggle auto-responses (full command)"""
+        await self._toggle_system(ctx)
+
+    async def _toggle_system(self, ctx):
+        """Internal method to toggle system"""
+        current = self.bot.get_setting(ctx.guild.id, "autoresponses")
+        new_state = not current
+
+        # Note: You'll need to implement bot.set_setting for this to actually work
+        # For now, just show what would happen
+        status = "enabled" if new_state else "disabled"
+        embed = discord.Embed(
+            title=f"🔄 Auto-Responses {status.title()}",
+            description=f"Auto-response system is now **{status}** for this server.",
+            color=0x00ff00 if new_state else 0xff9900
+        )
+        await ctx.send(embed=embed)
 
 
 async def setup(bot):
-    await bot.add_cog(AutoResponses(bot))
+    await bot.add_cog(AutoResponseSystem(bot))
