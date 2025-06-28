@@ -9,6 +9,7 @@ from utils.embeds import EmbedBuilder
 import importlib
 import sys
 import logging
+import asyncio
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
