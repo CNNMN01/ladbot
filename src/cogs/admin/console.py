@@ -3,11 +3,11 @@ Console/logging management commands - SECURED VERSION
 """
 
 import sys
-
 import discord
 from discord.ext import commands
 from utils.decorators import admin_required
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -201,99 +201,199 @@ class Console(commands.Cog):
                 description="Execute Python code for debugging.\n\n**⚠️ WARNING: This is dangerous in production!**",
                 color=0xffaa00
             )
-
             embed.add_field(
                 name="📝 Usage",
                 value=f"`{ctx.prefix}console <python_code>`",
                 inline=False
             )
-
-            embed.add_field(
-                name="🔍 Examples",
-                value=f"`{ctx.prefix}console len(bot.guilds)`\n`{ctx.prefix}console bot.user.name`\n`{ctx.prefix}console print('Hello')`",
-                inline=False
-            )
-
             embed.add_field(
                 name="🔒 Security",
-                value="Only bot admins can use this command",
+                value="Admin only. Logs all usage.",
                 inline=False
             )
-
+            embed.add_field(
+                name="💡 Example",
+                value=f"`{ctx.prefix}console print('Hello World')`",
+                inline=False
+            )
             await ctx.send(embed=embed)
             return
 
         try:
-            # Create safe execution environment
-            env = {
+            # Security log
+            logger.warning(f"Console command executed by {ctx.author} ({ctx.author.id}): {command}")
+
+            # Create a safe environment
+            safe_globals = {
                 'bot': self.bot,
                 'ctx': ctx,
                 'discord': discord,
-                'commands': commands,
-                'logger': logger,
-                '__builtins__': __builtins__
+                'print': print,
+                '__builtins__': {
+                    'len': len,
+                    'str': str,
+                    'int': int,
+                    'float': float,
+                    'bool': bool,
+                    'list': list,
+                    'dict': dict,
+                    'tuple': tuple,
+                    'set': set,
+                    'range': range,
+                    'enumerate': enumerate,
+                    'zip': zip,
+                    'sorted': sorted,
+                    'reversed': reversed,
+                    'min': min,
+                    'max': max,
+                    'sum': sum,
+                    'any': any,
+                    'all': all,
+                }
             }
 
-            # Execute the command
-            result = eval(command, env)
+            # Capture output
+            old_stdout = sys.stdout
+            import io
+            captured_output = io.StringIO()
+            sys.stdout = captured_output
 
-            # Handle async results
-            if hasattr(result, '__await__'):
-                result = await result
+            try:
+                # Execute the code
+                result = eval(command, safe_globals)
+                output = captured_output.getvalue()
 
-            # Format result
-            if result is None:
-                result_str = "None"
-            else:
-                result_str = str(result)
+                # Restore stdout
+                sys.stdout = old_stdout
 
-            # Truncate if too long
-            if len(result_str) > 1900:
-                result_str = result_str[:1900] + "..."
+                # Format response
+                response = ""
+                if output:
+                    response += f"**Output:**\n```\n{output}\n```\n"
+                if result is not None:
+                    response += f"**Result:** `{result}`"
+
+                if not response:
+                    response = "✅ Code executed successfully (no output)"
+
+                # Limit response length
+                if len(response) > 1900:
+                    response = response[:1900] + "...\n[Output truncated]"
+
+                embed = discord.Embed(
+                    title="💻 Console Result",
+                    description=response,
+                    color=0x00ff00
+                )
+                embed.set_footer(text=f"Executed by: {ctx.author.display_name}")
+                await ctx.send(embed=embed)
+
+            except Exception as exec_error:
+                sys.stdout = old_stdout
+
+                embed = discord.Embed(
+                    title="❌ Console Error",
+                    description=f"```\n{str(exec_error)}\n```",
+                    color=0xff0000
+                )
+                embed.set_footer(text=f"Error in command by: {ctx.author.display_name}")
+                await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Error in console command: {e}")
+            await ctx.send(f"❌ Console command failed: {e}")
+
+    @commands.command()
+    @admin_required()
+    async def status(self, ctx):
+        """Show bot status and health information (Admin Only)"""
+        try:
+            import psutil
+            import os
+            from datetime import timedelta
+
+            # Get bot uptime
+            uptime = datetime.now() - self.bot.start_time if hasattr(self.bot, 'start_time') else None
+
+            # Get system info
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
 
             embed = discord.Embed(
-                title="💻 Console Output",
+                title="🤖 Bot Status Dashboard",
+                description="Current bot health and system information",
                 color=0x00ff00
             )
 
+            # Bot Info
             embed.add_field(
-                name="📝 Command",
-                value=f"```python\n{command}\n```",
-                inline=False
+                name="🎯 Bot Information",
+                value=(
+                    f"**Guilds:** {len(self.bot.guilds)}\n"
+                    f"**Users:** {len(self.bot.users)}\n"
+                    f"**Commands:** {len(self.bot.commands)}\n"
+                    f"**Latency:** {round(self.bot.latency * 1000)}ms"
+                ),
+                inline=True
             )
 
+            # System Resources
             embed.add_field(
-                name="📤 Result",
-                value=f"```python\n{result_str}\n```",
-                inline=False
+                name="💻 System Resources",
+                value=(
+                    f"**CPU:** {cpu_percent}%\n"
+                    f"**Memory:** {memory.percent}%\n"
+                    f"**Disk:** {round(disk.percent, 1)}%\n"
+                    f"**Process ID:** {os.getpid()}"
+                ),
+                inline=True
             )
 
-            embed.set_footer(text=f"Executed by {ctx.author.display_name}")
+            # Uptime and Stats
+            if uptime:
+                uptime_str = str(uptime).split('.')[0]  # Remove microseconds
+            else:
+                uptime_str = "Unknown"
+
+            embed.add_field(
+                name="⏱️ Runtime Stats",
+                value=(
+                    f"**Uptime:** {uptime_str}\n"
+                    f"**Cogs Loaded:** {len(self.bot.cogs)}\n"
+                    f"**Extensions:** {len(self.bot.extensions)}\n"
+                    f"**Python:** {sys.version.split()[0]}"
+                ),
+                inline=True
+            )
+
+            embed.set_footer(text=f"Status requested by: {ctx.author.display_name}")
             await ctx.send(embed=embed)
 
-            # Log the console usage
-            logger.warning(f"Console command executed by {ctx.author} ({ctx.author.id}): {command}")
+        except ImportError:
+            # Fallback if psutil not available
+            embed = discord.Embed(
+                title="🤖 Basic Bot Status",
+                description="System monitoring not available (psutil not installed)",
+                color=0xffaa00
+            )
+
+            embed.add_field(
+                name="🎯 Bot Information",
+                value=(
+                    f"**Guilds:** {len(self.bot.guilds)}\n"
+                    f"**Users:** {len(self.bot.users)}\n"
+                    f"**Commands:** {len(self.bot.commands)}\n"
+                    f"**Latency:** {round(self.bot.latency * 1000)}ms"
+                ),
+                inline=False
+            )
+
+            await ctx.send(embed=embed)
 
         except Exception as e:
-            embed = discord.Embed(
-                title="❌ Console Error",
-                color=0xff0000
-            )
-
-            embed.add_field(
-                name="📝 Command",
-                value=f"```python\n{command}\n```",
-                inline=False
-            )
-
-            embed.add_field(
-                name="💥 Error",
-                value=f"```python\n{str(e)}\n```",
-                inline=False
-            )
-
-            await ctx.send(embed=embed)
-            logger.error(f"Console command error for {ctx.author}: {e}")
+            logger.error(f"Error in status command: {e}")
+            await ctx.send(f"❌ Error getting status: {e}")
 
 
 async def setup(bot):
