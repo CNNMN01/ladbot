@@ -231,54 +231,23 @@ class AsciiArt(commands.Cog):
             )
 
         embed.add_field(
-            name="🛠️ How to Upgrade",
-            value="Run: `pip install art`\nThen restart the bot",
-            inline=True
-        )
-
-        embed.add_field(
-            name="🎯 Recommendations",
-            value="• Use `auto` for best results\n• Try `built_block` for large text\n• Use `mini` for compact art",
+            name="📋 Basic Usage",
+            value=f"`{ctx.prefix}ascii <text>` - Auto-select font\n`{ctx.prefix}ascii <font> <text>` - Specific font",
             inline=False
         )
 
-        await ctx.send(embed=embed)
-
-    @ascii_art.command(name="preview")
-    async def preview_fonts(self, ctx, *, text: str = None):
-        """Preview multiple fonts with the same text"""
-        if not text:
-            text = "DEMO"
-
-        if len(text) > 6:
-            await ctx.send("❌ Preview text must be 6 characters or less!")
-            return
-
-        embed = discord.Embed(
-            title=f"🎨 Font Preview: '{text}'",
-            color=0x00ff00
+        embed.add_field(
+            name="🎯 Quick Commands",
+            value=f"`{ctx.prefix}ascii fonts` - List fonts\n`{ctx.prefix}ascii status` - System info\n`{ctx.prefix}ascii random <text>` - Random font",
+            inline=False
         )
 
-        # Preview fonts (mix of art library and built-in)
-        preview_fonts = []
-
-        if self.has_art_library:
-            preview_fonts.extend(['standard', 'big', 'slant'])
-
-        preview_fonts.extend(['built_block', 'mini', 'simple'])
-
-        for font in preview_fonts[:4]:  # Limit to 4 to avoid embed size issues
-            result = await self._try_generate_font(text, font)
-            if result and len(result) < 300:
-                source = "Art Library" if font in self.art_fonts else "Built-in"
-                embed.add_field(
-                    name=f"📝 {font.title()} ({source})",
-                    value=self.create_code_block(result),
-                    inline=False
-                )
-
-        if not embed.fields:
-            embed.description = "No previews available for this text."
+        if not self.has_art_library:
+            embed.add_field(
+                name="🚀 Want More Fonts?",
+                value="Install art library: `pip install art`\nThen restart bot for 20+ premium fonts!",
+                inline=False
+            )
 
         await ctx.send(embed=embed)
 
@@ -298,7 +267,7 @@ class AsciiArt(commands.Cog):
         await self._generate_ascii(ctx, text, font, is_random=True)
 
     async def _generate_ascii(self, ctx, text: str, font: str, is_random: bool = False):
-        """Generate ASCII art with intelligent font selection"""
+        """Generate ASCII art with intelligent font selection - Clean user output"""
 
         # Auto-select best font
         if font == "auto":
@@ -309,23 +278,21 @@ class AsciiArt(commands.Cog):
 
         # Try to generate with requested font
         result = await self._try_generate_font(text, font)
-        source = self._get_font_source(font)
 
         if not result:
             # Fallback to built-in block style
             result = self._generate_block_ascii(text.upper())
-            font = "built_block"
-            source = "Built-in (Fallback)"
 
         # Check result size
         if len(result) > 1900:
             await ctx.send("❌ Generated ASCII art is too large for Discord!")
             return
 
-        # Create embed
-        title = f"🎨 ASCII Art - {font.title()}"
+        # Create clean embed without developer info
         if is_random:
-            title = f"🎲 Random ASCII - {font.title()}"
+            title = f"🎲 Random ASCII Art"
+        else:
+            title = f"🎨 ASCII Art"
 
         embed = discord.Embed(
             title=title,
@@ -333,12 +300,12 @@ class AsciiArt(commands.Cog):
             color=0x00ff00
         )
 
+        # Only show the text that was converted (clean and simple)
         embed.add_field(name="📝 Text", value=f"`{text}`", inline=True)
-        embed.add_field(name="🎨 Font", value=f"`{font}`", inline=True)
-        embed.add_field(name="🔧 Source", value=source, inline=True)
 
-        if not self.has_art_library and font in self.art_fonts:
-            embed.set_footer(text="💡 Install 'art' library for more fonts: pip install art")
+        # Add helpful footer only if using built-in fallback and art library not available
+        if not self.has_art_library and font in self.builtin_styles:
+            embed.set_footer(text="💡 Install 'art' library for more fonts and better quality")
 
         await ctx.send(embed=embed)
 
@@ -365,74 +332,66 @@ class AsciiArt(commands.Cog):
 
         return None
 
-    def _get_font_source(self, font: str) -> str:
-        """Get the source of a font (Art Library or Built-in)"""
-        if font in self.art_fonts and self.has_art_library:
-            return "Art Library"
-        elif font in self.builtin_styles:
-            return "Built-in"
-        else:
-            return "Unknown"
-
     # Built-in ASCII generation methods
     def _generate_block_ascii(self, text: str) -> str:
-        """Generate block-style ASCII art using built-in patterns"""
+        """Generate block-style ASCII using patterns"""
+        text = text.upper()
         if not text:
-            return "No text provided"
+            return "Empty text"
 
-        valid_chars = []
-        for char in text.upper():
-            if char in self.ascii_patterns:
-                valid_chars.append(char)
-            elif char.isspace():
-                valid_chars.append(' ')
-
-        if not valid_chars:
-            return self._simple_box(text)
-
+        # Create lines for each row of the ASCII pattern
         lines = ["", "", "", "", "", ""]
-        for char in valid_chars:
+
+        for char in text:
             if char in self.ascii_patterns:
                 pattern = self.ascii_patterns[char]
                 for i in range(6):
                     lines[i] += pattern[i] + " "
+            else:
+                # Unknown character, use space pattern
+                for i in range(6):
+                    lines[i] += "      " + " "
 
-        return "\n".join(lines)
+        return '\n'.join(lines)
 
     def _simple_box(self, text: str) -> str:
-        """Simple box-style ASCII art"""
+        """Simple box around text"""
         text = text.upper()
         width = len(text) + 4
-        border = "=" * width
-        return f"{border}\n| {text} |\n{border}"
+        top_bottom = "+" + "-" * (width - 2) + "+"
+        middle = f"| {text} |"
+        return f"{top_bottom}\n{middle}\n{top_bottom}"
 
     def _double_box(self, text: str) -> str:
-        """Double-line box style"""
+        """Double-line box around text"""
         text = text.upper()
         width = len(text) + 4
-        top_border = "╔" + "═" * (width - 2) + "╗"
-        bottom_border = "╚" + "═" * (width - 2) + "╝"
-        return f"{top_border}\n║ {text} ║\n{bottom_border}"
+        top = "╔" + "═" * (width - 2) + "╗"
+        middle = f"║ {text} ║"
+        bottom = "╚" + "═" * (width - 2) + "╝"
+        return f"{top}\n{middle}\n{bottom}"
 
     def _star_box(self, text: str) -> str:
-        """Star-decorated style"""
+        """Star box around text"""
         text = text.upper()
-        width = len(text) + 6
-        border = "*" * width
-        return f"{border}\n** {text} **\n{border}"
+        width = len(text) + 4
+        star_line = "*" * width
+        middle = f"* {text} *"
+        return f"{star_line}\n{middle}\n{star_line}"
 
     def _fancy_box(self, text: str) -> str:
-        """Fancy decorated style"""
+        """Fancy decorated box"""
         text = text.upper()
-        width = len(text) + 8
-        top = "▄" * width
-        bottom = "▀" * width
-        return f"{top}\n█▓▒░ {text} ░▒▓█\n{bottom}"
+        width = len(text) + 6
+        top = "┌" + "─" * (width - 2) + "┐"
+        middle = f"│ ★ {text} ★ │"
+        bottom = "└" + "─" * (width - 2) + "┘"
+        return f"{top}\n{middle}\n{bottom}"
 
     def _mini_ascii(self, text: str) -> str:
-        """Compact 3-line ASCII"""
+        """Mini 3-line ASCII"""
         mini_patterns = {
-            'A': ['█▀█', '█▀█', '▀ █'], 'B': ['█▀▄', '█▀▄', '█▄▀'], 'C': ['▄▀█', '█▄▄', '▀▀▀'],
+            'A': ['▄▀█', '█▀█', '█ █'], 'B': ['█▀▄', '█▀▄', '█▄▀'], 'C': ['▄▀▀', '█  ', '▀▀▀'],
             'D': ['█▀▄', '█ █', '█▄▀'], 'E': ['█▀▀', '█▀▀', '▀▀▀'], 'F': ['█▀▀', '█▀▀', '█  '],
             'G': ['▄▀█', '█▄█', '▀▀▀'], 'H': ['█ █', '█▀█', '█ █'], 'I': ['▀█▀', ' █ ', '▀▀▀'],
             'J': ['  █', '  █', '▀▀▀'], 'K': ['█ █', '██ ', '█ █'], 'L': ['█  ', '█  ', '▀▀▀'],
