@@ -1,261 +1,237 @@
+#!/usr/bin/env python3
 """
-Cog reloading commands for administrators - BULLETPROOF VERSION
+Ladbot Enhanced - Main Entry Point (Render Compatible)
 """
-
-import discord
-from discord.ext import commands
-from utils.decorators import admin_required, owner_only
-from utils.embeds import EmbedBuilder
-import importlib
-import sys
-import logging
 import asyncio
+import logging
+import sys
+import os
+import threading
+from pathlib import Path
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+# Add src to Python path
+src_path = str(Path(__file__).parent / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+project_root = str(Path(__file__).parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 
-class Reload(commands.Cog):
-    """Cog management commands - BULLETPROOF"""
+def setup_logging():
+    """Setup logging configuration for Render"""
+    try:
+        from config.settings import settings
 
-    def __init__(self, bot):
-        self.bot = bot
-        self.embed_builder = EmbedBuilder()
+        # Create logs directory if it doesn't exist
+        settings.LOGS_DIR.mkdir(exist_ok=True)
 
-    @commands.command()
-    @admin_required()
-    @commands.cooldown(1, 10, commands.BucketType.user)
-    async def reload(self, ctx, cog_name: str = None):
-        """Reload cogs with proper cache clearing (Admin Only)
+        # Configure logging
+        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-        Usage:
-        l.reload - Reload all cogs
-        l.reload <cog_name> - Reload specific cog
-        """
-        # CRITICAL: Single execution protection
-        if hasattr(ctx.bot, '_reload_in_progress') and ctx.bot._reload_in_progress:
-            return await ctx.send("🔄 Reload already in progress, please wait...")
+        # Always log to stdout for Render
+        handlers = [logging.StreamHandler(sys.stdout)]
 
-        ctx.bot._reload_in_progress = True
+        # Also log to file if possible
+        try:
+            handlers.append(logging.FileHandler(settings.LOGS_DIR / "bot.log"))
+        except (PermissionError, OSError):
+            # If file logging fails, just use stdout
+            pass
+
+        logging.basicConfig(
+            level=getattr(logging, settings.LOG_LEVEL),
+            format=log_format,
+            handlers=handlers
+        )
+
+        # Reduce Discord.py noise
+        logging.getLogger('discord').setLevel(logging.WARNING)
+        logging.getLogger('discord.http').setLevel(logging.WARNING)
+
+    except Exception as e:
+        print(f"❌ Failed to setup logging: {e}")
+        # Fallback to basic logging
+        logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+
+def get_port():
+    """Get port from environment (Render sets this automatically)"""
+    return int(os.environ.get('PORT', 8080))
+
+
+def get_host():
+    """Get host for web server"""
+    return '0.0.0.0'
+
+
+async def start_render_web_server(bot):
+    """Start web server for Render port detection and health checks"""
+    try:
+        port = get_port()
+        host = get_host()
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"🌐 Starting web server for Render on {host}:{port}")
 
         try:
-            if cog_name:
-                await self._reload_single_cog(ctx, cog_name)
-            else:
-                await self._reload_all_cogs(ctx)
-        except Exception as e:
-            logger.error(f"Unexpected error in reload command: {e}")
+            # Try to import full web dashboard
+            from web.app import create_app
+            app = create_app(bot)
+            logger.info("✅ Full web dashboard loaded")
+        except ImportError:
+            # Fallback to simple Flask app for port detection
+            logger.warning("⚠️ Full web dashboard not available, using simple health server")
+            from flask import Flask, jsonify
+            app = Flask(__name__)
+
+            @app.route('/')
+            def health_check():
+                return "Ladbot is running!", 200
+
+            @app.route('/health')
+            def health():
+                return jsonify({
+                    "status": "healthy",
+                    "bot_name": "Ladbot",
+                    "guilds": len(bot.guilds) if hasattr(bot, 'guilds') else 0,
+                    "timestamp": datetime.now().isoformat()
+                }), 200
+
+        def run_flask():
+            """Run Flask in background thread"""
             try:
-                embed = discord.Embed(
-                    title="❌ Reload Error",
-                    description=f"An error occurred: {str(e)[:100]}...",
-                    color=0xff0000
+                logger.info(f"🌐 Web server binding to {host}:{port}")
+                app.run(
+                    host=host,
+                    port=port,
+                    debug=False,
+                    use_reloader=False,
+                    threaded=True
                 )
-                await ctx.send(embed=embed)
-            except:
-                await ctx.send("❌ Reload failed with an error.")
-        finally:
-            ctx.bot._reload_in_progress = False
-
-    async def _reload_single_cog(self, ctx, cog_name: str):
-        """Reload a single cog with cache clearing"""
-        # Try to find the cog in loaded cogs
-        full_cog_name = None
-        for loaded_cog in self.bot.cog_loader.loaded_cogs:
-            if cog_name.lower() in loaded_cog.lower():
-                full_cog_name = loaded_cog
-                break
-
-        if not full_cog_name:
-            return await ctx.send(f"❌ Cog `{cog_name}` not found in loaded cogs.")
-
-        try:
-            # Step 1: Unload the extension
-            if full_cog_name in self.bot.extensions:
-                await self.bot.unload_extension(full_cog_name)
-
-            # Step 2: Clear and reload Python module
-            if full_cog_name in sys.modules:
-                importlib.reload(sys.modules[full_cog_name])
-                logger.info(f"Cleared cache for module: {full_cog_name}")
-
-            # Step 3: Load the extension again
-            await self.bot.load_extension(full_cog_name)
-
-            embed = discord.Embed(
-                title="✅ Single Cog Reloaded",
-                description=f"Successfully reloaded `{full_cog_name}` with cache clearing",
-                color=0x00ff00
-            )
-            await ctx.send(embed=embed)
-
-        except Exception as e:
-            logger.error(f"Failed to reload {full_cog_name}: {e}")
-            embed = discord.Embed(
-                title="❌ Reload Failed",
-                description=f"Failed to reload `{full_cog_name}`: {str(e)[:100]}...",
-                color=0xff0000
-            )
-            await ctx.send(embed=embed)
-
-    async def _reload_all_cogs(self, ctx):
-        """Reload all cogs with progress updates and cache clearing"""
-        embed = discord.Embed(
-            title="🔄 Reloading All Cogs",
-            description="Clearing Python cache and reloading extensions...",
-            color=0x00ff00
-        )
-
-        message = None
-        try:
-            message = await ctx.send(embed=embed)
-        except Exception as e:
-            logger.error(f"Failed to send initial reload message: {e}")
-            # Fallback to simple message
-            await ctx.send("🔄 Reloading all cogs...")
-
-        # Step 1: Clear all cog modules from Python cache
-        cog_modules = [name for name in sys.modules.keys() if name.startswith('cogs.')]
-        cleared_modules = 0
-
-        for module_name in cog_modules:
-            try:
-                if module_name in sys.modules:
-                    importlib.reload(sys.modules[module_name])
-                    cleared_modules += 1
             except Exception as e:
-                logger.warning(f"Could not clear cache for {module_name}: {e}")
+                logger.error(f"❌ Flask server error: {e}")
 
-        logger.info(f"Admin {ctx.author} cleared cache for {cleared_modules} cog modules")
+        # Start Flask in daemon thread
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
 
-        # Step 2: Reload all extensions
-        cogs_to_reload = list(self.bot.cog_loader.loaded_cogs)
-        total_cogs = len(cogs_to_reload)
-        reloaded_count = 0
-        failed_cogs = []
+        # Give server time to bind to port
+        await asyncio.sleep(2)
 
-        for i, cog_name in enumerate(cogs_to_reload, 1):
-            # Update progress every 5 cogs to reduce rate limits
-            if i % 5 == 0 or i == total_cogs:
-                if message:  # Only update if we have a message
-                    embed.description = f"Reloading extensions... ({i}/{total_cogs})\n`{cog_name}`"
-                    try:
-                        await message.edit(embed=embed)
-                        # Small delay to prevent rate limits
-                        await asyncio.sleep(0.3)
-                    except (discord.NotFound, discord.HTTPException, discord.Forbidden) as e:
-                        logger.warning(f"Could not update progress message: {e}")
-                        # Don't break, just continue without updates
-                        message = None
+        logger.info(f"✅ Web server should be accessible on port {port}")
 
-            try:
-                # Reload the extension
-                await self.bot.reload_extension(cog_name)
-                reloaded_count += 1
-                logger.info(f"Reloaded: {cog_name}")
-            except Exception as e:
-                failed_cogs.append(cog_name)
-                logger.error(f"Failed to reload {cog_name}: {e}")
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"❌ Failed to start web server: {e}")
 
-        # Final status
-        final_embed = discord.Embed(
-            title="✅ Cog Reload Complete",
-            description=(
-                f"**Cache cleared:** {cleared_modules} modules\n"
-                f"**Successfully reloaded:** {reloaded_count}/{total_cogs}\n"
-                f"**Failed:** {len(failed_cogs)}"
-            ),
-            color=0x00ff00 if not failed_cogs else 0xffaa00
-        )
-
-        if failed_cogs:
-            failed_list = "\n".join(f"• {cog}" for cog in failed_cogs[:10])
-            final_embed.add_field(
-                name="Failed Cogs",
-                value=failed_list,
-                inline=False
-            )
-
-        # Try to edit the original message, fallback to new message
+        # Create minimal fallback server for Render port detection
         try:
-            if message:
-                await message.edit(embed=final_embed)
-            else:
-                await ctx.send(embed=final_embed)
-        except (discord.NotFound, discord.HTTPException, discord.Forbidden) as e:
-            logger.warning(f"Could not send final status: {e}")
-            # Fallback to simple text message
-            try:
-                status_text = f"✅ Reload complete: {reloaded_count}/{total_cogs} cogs reloaded"
-                if failed_cogs:
-                    status_text += f", {len(failed_cogs)} failed"
-                await ctx.send(status_text)
-            except Exception as final_e:
-                logger.error(f"Complete failure to send reload status: {final_e}")
+            import http.server
+            import socketserver
 
-    @commands.command()
-    @admin_required()
-    async def status(self, ctx):
-        """Show bot status and statistics (Admin Only)"""
+            class HealthHandler(http.server.SimpleHTTPRequestHandler):
+                def do_GET(self):
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(b"Ladbot Health Check OK")
+
+                def log_message(self, format, *args):
+                    pass  # Suppress logs
+
+            def run_fallback():
+                port = get_port()
+                with socketserver.TCPServer(("", port), HealthHandler) as httpd:
+                    logger.info(f"🔧 Fallback health server on port {port}")
+                    httpd.serve_forever()
+
+            fallback_thread = threading.Thread(target=run_fallback, daemon=True)
+            fallback_thread.start()
+            await asyncio.sleep(1)
+
+        except Exception as fallback_error:
+            logger.error(f"❌ Even fallback server failed: {fallback_error}")
+
+
+async def main():
+    """Main application entry point"""
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info("🚀 Starting Ladbot Enhanced...")
+        logger.info(f"📅 Started at: {datetime.now()}")
+        logger.info(f"🌍 Environment: {'PRODUCTION' if os.getenv('RENDER') else 'DEVELOPMENT'}")
+
+        # Load environment variables
         try:
-            # Basic stats
-            cog_count = len(ctx.bot.cogs)
-            command_count = len(list(ctx.bot.walk_commands()))
-            guild_count = len(ctx.bot.guilds)
+            from dotenv import load_dotenv
+            load_dotenv()
+            logger.info("✅ Environment loaded")
+        except ImportError:
+            logger.warning("python-dotenv not installed, using system environment")
 
-            # Calculate total users
-            user_count = sum(guild.member_count or 0 for guild in ctx.bot.guilds)
+        setup_logging()
 
-            embed = discord.Embed(
-                title="🤖 Ladbot Status",
-                description="Current bot status and statistics",
-                color=0x00ff00
-            )
+        # Validate configuration
+        from config.settings import settings
+        logger.info("✅ Configuration validated")
 
-            embed.add_field(
-                name="📊 Statistics",
-                value=f"**Guilds:** {guild_count}\n**Users:** {user_count:,}\n**Commands:** {command_count}\n**Cogs:** {cog_count}",
-                inline=True
-            )
+        # Log deployment info
+        port = get_port()
+        host = get_host()
+        logger.info(f"🌐 Web server will run on {host}:{port}")
 
-            embed.add_field(
-                name="⚡ Performance",
-                value=f"**Latency:** {round(ctx.bot.latency * 1000)}ms\n**Uptime:** {self._get_uptime(ctx.bot)}",
-                inline=True
-            )
+        if os.getenv('RENDER'):
+            logger.info(f"🔗 Render deployment detected")
+            logger.info(f"🌍 Public URL will be available once deployed")
 
-            embed.add_field(
-                name="🔧 System",
-                value=f"**Admin Count:** {len(ctx.bot.settings.ADMIN_IDS)}\n**Requested by:** {ctx.author.mention}",
-                inline=True
-            )
+        # Import and start bot
+        from bot.ladbot import LadBot
 
-            embed.set_footer(text="🔒 Admin-only information")
-            await ctx.send(embed=embed)
+        logger.info("🤖 Starting Discord bot...")
+        bot = LadBot()
 
-        except Exception as e:
-            logger.error(f"Error in status command: {e}")
-            # Fallback status
-            try:
-                await ctx.send(
-                    f"🤖 **Bot Status:** Online | **Cogs:** {len(ctx.bot.cogs)} | **Commands:** {len(list(ctx.bot.walk_commands()))}")
-            except Exception as final_e:
-                logger.error(f"Complete failure in status command: {final_e}")
+        # Configure for Render
+        bot.web_port = port
+        bot.web_host = host
 
-    def _get_uptime(self, bot):
-        """Calculate bot uptime"""
-        try:
-            if hasattr(bot, 'start_time'):
-                uptime = datetime.now() - bot.start_time
-                days = uptime.days
-                hours, remainder = divmod(uptime.seconds, 3600)
-                minutes, _ = divmod(remainder, 60)
-                return f"{days}d {hours}h {minutes}m"
-            return "Unknown"
-        except Exception as e:
-            logger.warning(f"Error calculating uptime: {e}")
-            return "Error"
+        # Set production URL if on Render
+        if os.getenv('RENDER_EXTERNAL_URL'):
+            bot.web_url = os.getenv('RENDER_EXTERNAL_URL')
+        elif os.getenv('RENDER_SERVICE_NAME'):
+            # Construct Render URL
+            service_name = os.getenv('RENDER_SERVICE_NAME')
+            bot.web_url = f"https://{service_name}.onrender.com"
+
+        # CRITICAL FOR RENDER: Start web server FIRST for port detection
+        if os.getenv('RENDER'):
+            logger.info("🔧 Starting web server for Render port detection...")
+            asyncio.create_task(start_render_web_server(bot))
+            await asyncio.sleep(3)  # Give web server time to bind to port
+            logger.info("✅ Web server should be running for Render health checks")
+
+        # Start the Discord bot
+        async with bot:
+            await bot.start(settings.BOT_TOKEN)
+
+    except KeyboardInterrupt:
+        logger.info("👋 Bot shutdown requested")
+    except Exception as e:
+        logger.error(f"❌ Fatal error: {e}")
+        logger.exception("Full traceback:")
+        sys.exit(1)
+    finally:
+        logger.info("👋 Bot shutdown complete")
 
 
-async def setup(bot):
-    await bot.add_cog(Reload(bot))
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
+    except Exception as e:
+        print(f"❌ Critical error: {e}")
+        sys.exit(1)

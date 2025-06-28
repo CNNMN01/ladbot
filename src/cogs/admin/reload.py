@@ -1,5 +1,5 @@
 """
-Cog reloading commands for administrators - CLEANED VERSION
+Cog reloading commands for administrators - BULLETPROOF VERSION
 """
 
 import discord
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Reload(commands.Cog):
-    """Cog management commands - CLEANED"""
+    """Cog management commands - BULLETPROOF"""
 
     def __init__(self, bot):
         self.bot = bot
@@ -43,6 +43,17 @@ class Reload(commands.Cog):
                 await self._reload_single_cog(ctx, cog_name)
             else:
                 await self._reload_all_cogs(ctx)
+        except Exception as e:
+            logger.error(f"Unexpected error in reload command: {e}")
+            try:
+                embed = discord.Embed(
+                    title="❌ Reload Error",
+                    description=f"An error occurred: {str(e)[:100]}...",
+                    color=0xff0000
+                )
+                await ctx.send(embed=embed)
+            except:
+                await ctx.send("❌ Reload failed with an error.")
         finally:
             ctx.bot._reload_in_progress = False
 
@@ -94,7 +105,14 @@ class Reload(commands.Cog):
             description="Clearing Python cache and reloading extensions...",
             color=0x00ff00
         )
-        message = await ctx.send(embed=embed)
+
+        message = None
+        try:
+            message = await ctx.send(embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send initial reload message: {e}")
+            # Fallback to simple message
+            await ctx.send("🔄 Reloading all cogs...")
 
         # Step 1: Clear all cog modules from Python cache
         cog_modules = [name for name in sys.modules.keys() if name.startswith('cogs.')]
@@ -119,13 +137,16 @@ class Reload(commands.Cog):
         for i, cog_name in enumerate(cogs_to_reload, 1):
             # Update progress every 5 cogs to reduce rate limits
             if i % 5 == 0 or i == total_cogs:
-                embed.description = f"Reloading extensions... ({i}/{total_cogs})\n`{cog_name}`"
-                try:
-                    await message.edit(embed=embed)
-                    # Small delay to prevent rate limits
-                    await asyncio.sleep(0.5)
-                except discord.NotFound:
-                    break
+                if message:  # Only update if we have a message
+                    embed.description = f"Reloading extensions... ({i}/{total_cogs})\n`{cog_name}`"
+                    try:
+                        await message.edit(embed=embed)
+                        # Small delay to prevent rate limits
+                        await asyncio.sleep(0.3)
+                    except (discord.NotFound, discord.HTTPException, discord.Forbidden) as e:
+                        logger.warning(f"Could not update progress message: {e}")
+                        # Don't break, just continue without updates
+                        message = None
 
             try:
                 # Reload the extension
@@ -137,75 +158,102 @@ class Reload(commands.Cog):
                 logger.error(f"Failed to reload {cog_name}: {e}")
 
         # Final status
-        embed.title = "✅ Cog Reload Complete"
-        embed.description = (
-            f"**Cache cleared:** {cleared_modules} modules\n"
-            f"**Successfully reloaded:** {reloaded_count}/{total_cogs}\n"
-            f"**Failed:** {len(failed_cogs)}"
+        final_embed = discord.Embed(
+            title="✅ Cog Reload Complete",
+            description=(
+                f"**Cache cleared:** {cleared_modules} modules\n"
+                f"**Successfully reloaded:** {reloaded_count}/{total_cogs}\n"
+                f"**Failed:** {len(failed_cogs)}"
+            ),
+            color=0x00ff00 if not failed_cogs else 0xffaa00
         )
 
         if failed_cogs:
-            embed.add_field(
+            failed_list = "\n".join(f"• {cog}" for cog in failed_cogs[:10])
+            final_embed.add_field(
                 name="Failed Cogs",
-                value="\n".join(f"• {cog}" for cog in failed_cogs[:10]),
+                value=failed_list,
                 inline=False
             )
 
-        embed.color = 0x00ff00 if not failed_cogs else 0xffaa00
-
+        # Try to edit the original message, fallback to new message
         try:
-            await message.edit(embed=embed)
-        except discord.NotFound:
-            await ctx.send(embed=embed)
+            if message:
+                await message.edit(embed=final_embed)
+            else:
+                await ctx.send(embed=final_embed)
+        except (discord.NotFound, discord.HTTPException, discord.Forbidden) as e:
+            logger.warning(f"Could not send final status: {e}")
+            # Fallback to simple text message
+            try:
+                status_text = f"✅ Reload complete: {reloaded_count}/{total_cogs} cogs reloaded"
+                if failed_cogs:
+                    status_text += f", {len(failed_cogs)} failed"
+                await ctx.send(status_text)
+            except Exception as final_e:
+                logger.error(f"Complete failure to send reload status: {final_e}")
 
     @commands.command()
     @admin_required()
     async def status(self, ctx):
         """Show bot status and statistics (Admin Only)"""
-        # Basic stats
-        cog_count = len(ctx.bot.cogs)
-        command_count = len(list(ctx.bot.walk_commands()))
-        guild_count = len(ctx.bot.guilds)
+        try:
+            # Basic stats
+            cog_count = len(ctx.bot.cogs)
+            command_count = len(list(ctx.bot.walk_commands()))
+            guild_count = len(ctx.bot.guilds)
 
-        # Calculate total users
-        user_count = sum(guild.member_count or 0 for guild in ctx.bot.guilds)
+            # Calculate total users
+            user_count = sum(guild.member_count or 0 for guild in ctx.bot.guilds)
 
-        embed = discord.Embed(
-            title="🤖 Ladbot Status",
-            description="Current bot status and statistics",
-            color=0x00ff00
-        )
+            embed = discord.Embed(
+                title="🤖 Ladbot Status",
+                description="Current bot status and statistics",
+                color=0x00ff00
+            )
 
-        embed.add_field(
-            name="📊 Statistics",
-            value=f"**Guilds:** {guild_count}\n**Users:** {user_count:,}\n**Commands:** {command_count}\n**Cogs:** {cog_count}",
-            inline=True
-        )
+            embed.add_field(
+                name="📊 Statistics",
+                value=f"**Guilds:** {guild_count}\n**Users:** {user_count:,}\n**Commands:** {command_count}\n**Cogs:** {cog_count}",
+                inline=True
+            )
 
-        embed.add_field(
-            name="⚡ Performance",
-            value=f"**Latency:** {round(ctx.bot.latency * 1000)}ms\n**Uptime:** {self._get_uptime(ctx.bot)}",
-            inline=True
-        )
+            embed.add_field(
+                name="⚡ Performance",
+                value=f"**Latency:** {round(ctx.bot.latency * 1000)}ms\n**Uptime:** {self._get_uptime(ctx.bot)}",
+                inline=True
+            )
 
-        embed.add_field(
-            name="🔧 System",
-            value=f"**Admin Count:** {len(ctx.bot.settings.ADMIN_IDS)}\n**Requested by:** {ctx.author.mention}",
-            inline=True
-        )
+            embed.add_field(
+                name="🔧 System",
+                value=f"**Admin Count:** {len(ctx.bot.settings.ADMIN_IDS)}\n**Requested by:** {ctx.author.mention}",
+                inline=True
+            )
 
-        embed.set_footer(text="🔒 Admin-only information")
-        await ctx.send(embed=embed)
+            embed.set_footer(text="🔒 Admin-only information")
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Error in status command: {e}")
+            # Fallback status
+            try:
+                await ctx.send(f"🤖 **Bot Status:** Online | **Cogs:** {len(ctx.bot.cogs)} | **Commands:** {len(list(ctx.bot.walk_commands()))}")
+            except Exception as final_e:
+                logger.error(f"Complete failure in status command: {final_e}")
 
     def _get_uptime(self, bot):
         """Calculate bot uptime"""
-        if hasattr(bot, 'start_time'):
-            uptime = datetime.now() - bot.start_time
-            days = uptime.days
-            hours, remainder = divmod(uptime.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
-            return f"{days}d {hours}h {minutes}m"
-        return "Unknown"
+        try:
+            if hasattr(bot, 'start_time'):
+                uptime = datetime.now() - bot.start_time
+                days = uptime.days
+                hours, remainder = divmod(uptime.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                return f"{days}d {hours}h {minutes}m"
+            return "Unknown"
+        except Exception as e:
+            logger.warning(f"Error calculating uptime: {e}")
+            return "Error"
 
 
 async def setup(bot):
