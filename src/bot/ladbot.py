@@ -56,7 +56,7 @@ class SimpleDataManager:
 
 
 class SimpleCogLoader:
-    """Simple cog loader for compatibility"""
+    """Simple cog loader for compatibility with proper tracking"""
 
     def __init__(self, bot):
         self.bot = bot
@@ -71,6 +71,11 @@ class SimpleCogLoader:
         except Exception as e:
             logger.error(f"❌ Failed to reload {cog_name}: {e}")
             return False
+
+    def update_loaded_cogs(self):
+        """Update the loaded_cogs set with currently loaded extensions"""
+        self.loaded_cogs = set(self.bot.extensions.keys())
+        logger.debug(f"Updated loaded_cogs: {len(self.loaded_cogs)} cogs tracked")
 
 
 # Default settings for various features
@@ -218,6 +223,9 @@ class LadBot(commands.Bot):
                             logger.error(f"❌ Failed to load {cog_name}: {e}")
                             failed += 1
 
+        # Update the cog loader with currently loaded cogs - CRITICAL FIX
+        self.cog_loader.update_loaded_cogs()
+
         logger.info(f"🎮 Cog loading complete: {loaded} loaded, {failed} failed")
 
     async def start_web_dashboard(self):
@@ -258,6 +266,9 @@ class LadBot(commands.Bot):
             name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
         )
         await self.change_presence(activity=activity)
+
+        # Update cog loader tracking after bot is ready - ADDITIONAL FIX
+        self.cog_loader.update_loaded_cogs()
 
         # Log startup summary
         if not os.getenv('RENDER'):
