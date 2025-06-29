@@ -750,100 +750,100 @@ class ClassicGames(commands.Cog):
            inline=True
        )
 
-           embed.add_field(
-               name="🧠 Strategy Tips",
-               value="• **Start with corners and edges** - fewer adjacent cells\n"
-                     "• **Look for patterns** - numbers tell you exactly how many mines are nearby\n"
-                     "• **Use flags wisely** - mark certain mines to avoid accidents\n"
-                     "• **Question marks** - use for uncertain cells\n"
-                     "• **First click is always safe** - the game ensures this",
-               inline=False
-           )
+       embed.add_field(
+           name="🧠 Strategy Tips",
+           value="• **Start with corners and edges** - fewer adjacent cells\n"
+                 "• **Look for patterns** - numbers tell you exactly how many mines are nearby\n"
+                 "• **Use flags wisely** - mark certain mines to avoid accidents\n"
+                 "• **Question marks** - use for uncertain cells\n"
+                 "• **First click is always safe** - the game ensures this",
+           inline=False
+       )
 
-           embed.add_field(
-               name="🏆 Difficulty Levels",
-               value="**Beginner:** 9×9, 10 mines (good for learning)\n"
-                     "**Intermediate:** 16×16, 40 mines (moderate challenge)\n"
-                     "**Expert:** 30×16, 99 mines (for experienced players)\n"
-                     "**Custom:** Design your own board",
-               inline=False
-           )
+       embed.add_field(
+           name="🏆 Difficulty Levels",
+           value="**Beginner:** 9×9, 10 mines (good for learning)\n"
+                 "**Intermediate:** 16×16, 40 mines (moderate challenge)\n"
+                 "**Expert:** 30×16, 99 mines (for experienced players)\n"
+                 "**Custom:** Design your own board",
+           inline=False
+       )
 
-           embed.add_field(
-               name="📚 Commands",
-               value=f"`{ctx.prefix}minesweeper` - Start new game\n"
-                     f"`{ctx.prefix}mines-continue` - Resume current game\n"
-                     f"`{ctx.prefix}mines-stats` - View game statistics\n"
-                     f"`{ctx.prefix}mines-quit` - End current game",
-               inline=False
-           )
+       embed.add_field(
+           name="📚 Commands",
+           value=f"`{ctx.prefix}minesweeper` - Start new game\n"
+                 f"`{ctx.prefix}mines-continue` - Resume current game\n"
+                 f"`{ctx.prefix}mines-stats` - View game statistics\n"
+                 f"`{ctx.prefix}mines-quit` - End current game",
+           inline=False
+       )
 
-           embed.set_footer(text="💡 Pro tip: The numbers are your best friend - they never lie!")
-           await ctx.send(embed=embed)
+       embed.set_footer(text="💡 Pro tip: The numbers are your best friend - they never lie!")
+       await ctx.send(embed=embed)
 
-       async def _show_custom_help(self, ctx):
-           """Show help for custom game creation"""
-           embed = discord.Embed(
-               title="⚙️ Custom Minesweeper Game",
-               description="Create your own Minesweeper challenge!",
-               color=0x00ff00
-           )
+   async def _show_custom_help(self, ctx):
+       """Show help for custom game creation"""
+       embed = discord.Embed(
+           title="⚙️ Custom Minesweeper Game",
+           description="Create your own Minesweeper challenge!",
+           color=0x00ff00
+       )
 
-           embed.add_field(
-               name="📐 Usage",
-               value=f"`{ctx.prefix}minesweeper custom <width> <height> <mines>`",
-               inline=False
-           )
+       embed.add_field(
+           name="📐 Usage",
+           value=f"`{ctx.prefix}minesweeper custom <width> <height> <mines>`",
+           inline=False
+       )
 
-           embed.add_field(
-               name="📏 Limits",
-               value="**Width:** 5-30 cells\n**Height:** 5-24 cells\n**Mines:** 1 to (width×height-9)",
-               inline=True
-           )
+       embed.add_field(
+           name="📏 Limits",
+           value="**Width:** 5-30 cells\n**Height:** 5-24 cells\n**Mines:** 1 to (width×height-9)",
+           inline=True
+       )
 
-           embed.add_field(
-               name="💡 Examples",
-               value=f"`{ctx.prefix}minesweeper custom 12 12 20`\n"
-                     f"`{ctx.prefix}minesweeper custom 20 10 35`\n"
-                     f"`{ctx.prefix}minesweeper custom 8 8 12`",
-               inline=True
-           )
+       embed.add_field(
+           name="💡 Examples",
+           value=f"`{ctx.prefix}minesweeper custom 12 12 20`\n"
+                 f"`{ctx.prefix}minesweeper custom 20 10 35`\n"
+                 f"`{ctx.prefix}minesweeper custom 8 8 12`",
+           inline=True
+       )
 
-           embed.add_field(
-               name="⚖️ Balance Tips",
-               value="• **10-15%** mine density = Easy\n"
-                     "• **15-20%** mine density = Medium\n"
-                     "• **20%+** mine density = Hard\n"
-                     "• Leave at least 9 safe cells for solvability",
-               inline=False
-           )
+       embed.add_field(
+           name="⚖️ Balance Tips",
+           value="• **10-15%** mine density = Easy\n"
+                 "• **15-20%** mine density = Medium\n"
+                 "• **20%+** mine density = Hard\n"
+                 "• Leave at least 9 safe cells for solvability",
+           inline=False
+       )
 
-           await ctx.send(embed=embed)
+       await ctx.send(embed=embed)
 
-       async def _show_invalid_difficulty(self, ctx):
-           """Show error for invalid difficulty"""
-           embed = discord.Embed(
-               title="❌ Invalid Difficulty",
-               description="That's not a valid difficulty level.",
-               color=0xff0000
-           )
+   async def _show_invalid_difficulty(self, ctx):
+       """Show error for invalid difficulty"""
+       embed = discord.Embed(
+           title="❌ Invalid Difficulty",
+           description="That's not a valid difficulty level.",
+           color=0xff0000
+       )
 
-           valid_difficulties = list(ClassicMinesweeperGame.DIFFICULTY_LEVELS.keys())
-           embed.add_field(
-               name="✅ Valid Options",
-               value=", ".join(valid_difficulties),
-               inline=False
-           )
+       valid_difficulties = list(ClassicMinesweeperGame.DIFFICULTY_LEVELS.keys())
+       embed.add_field(
+           name="✅ Valid Options",
+           value=", ".join(valid_difficulties),
+           inline=False
+       )
 
-           embed.add_field(
-               name="💡 Try Instead",
-               value=f"`{ctx.prefix}minesweeper` - See all options\n"
-                     f"`{ctx.prefix}minesweeper beginner` - Start easy game",
-               inline=False
-           )
+       embed.add_field(
+           name="💡 Try Instead",
+           value=f"`{ctx.prefix}minesweeper` - See all options\n"
+                 f"`{ctx.prefix}minesweeper beginner` - Start easy game",
+           inline=False
+       )
 
-           await ctx.send(embed=embed)
+       await ctx.send(embed=embed)
 
 
-    async def setup(bot):
-       await bot.add_cog(ClassicGames(bot))
+async def setup(bot):
+   await bot.add_cog(ClassicGames(bot))
