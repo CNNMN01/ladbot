@@ -784,7 +784,7 @@ class ClassicGames(commands.Cog):
     await ctx.send(embed=embed)
 
 
-async def _show_custom_help(self, ctx):
+        async def _show_custom_help(self, ctx):
     """Show help for custom game creation"""
     embed = discord.Embed(
         title="⚙️ Custom Minesweeper Game",
