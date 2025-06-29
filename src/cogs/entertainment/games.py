@@ -163,7 +163,7 @@ class ClassicMinesweeperGame:
 
         # Check win condition
         revealed_safe_cells = len([cell for cell in self.revealed
-                                 if self.board[cell[1]][cell[0]] != -1])
+                                   if self.board[cell[1]][cell[0]] != -1])
         if revealed_safe_cells == self.cells_remaining:
             self.won = True
             self.game_over = True
@@ -195,7 +195,7 @@ class ClassicMinesweeperGame:
 
                     # Skip if out of bounds or already revealed
                     if (not (0 <= nx < self.width and 0 <= ny < self.height) or
-                        (nx, ny) in self.revealed or (nx, ny) in self.flagged):
+                            (nx, ny) in self.revealed or (nx, ny) in self.flagged):
                         continue
 
                     # Reveal the cell
@@ -270,7 +270,7 @@ class ClassicMinesweeperGame:
         start_y = max(0, self.cursor_y - view_radius)
         end_y = min(self.height, self.cursor_y + view_radius + 1)
 
-        result = f"**View: ({start_x+1}-{end_x}, {start_y+1}-{end_y}) of ({self.width}x{self.height})**\n"
+        result = f"**View: ({start_x + 1}-{end_x}, {start_y + 1}-{end_y}) of ({self.width}x{self.height})**\n"
 
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
@@ -314,7 +314,8 @@ class ClassicMinesweeperGame:
         return {
             "mines_total": self.mines,
             "flags_remaining": self.flags_remaining,
-            "cells_remaining": self.cells_remaining - len([c for c in self.revealed if self.board and self.board[c[1]][c[0]] != -1]),
+            "cells_remaining": self.cells_remaining - len(
+                [c for c in self.revealed if self.board and self.board[c[1]][c[0]] != -1]),
             "time_elapsed": elapsed,
             "difficulty": self.difficulty,
             "board_size": f"{self.width}×{self.height}"
@@ -374,7 +375,7 @@ class ClassicGames(commands.Cog):
         elif difficulty.lower() in ClassicMinesweeperGame.DIFFICULTY_LEVELS:
             level = ClassicMinesweeperGame.DIFFICULTY_LEVELS[difficulty.lower()]
             game = ClassicMinesweeperGame(level["width"], level["height"], level["mines"],
-                                        ctx.author.id, difficulty.lower())
+                                          ctx.author.id, difficulty.lower())
         else:
             await self._show_invalid_difficulty(ctx)
             return
@@ -494,10 +495,11 @@ class ClassicGames(commands.Cog):
 
     async def _handle_game_reactions(self, ctx, game):
         """Handle reaction-based game controls"""
+
         def check(reaction, user):
             return (user.id == game.player_id and
-                   reaction.message.id == game.message.id and
-                   not user.bot)
+                    reaction.message.id == game.message.id and
+                    not user.bot)
 
         while not game.game_over:
             try:
@@ -746,104 +748,330 @@ class ClassicGames(commands.Cog):
                   "**🚩** Flagged (suspected mine)\n"
                   "**❓** Question mark (uncertain)\n"
                   "**1️⃣-8️⃣** Number of adjacent mines\n"
-                 "**💣** Mine (game over!)",
-           inline=True
-       )
+                  "**💣** Mine (game over!)",
+            inline=True
+        )
 
-       embed.add_field(
-           name="🧠 Strategy Tips",
-           value="• **Start with corners and edges** - fewer adjacent cells\n"
-                 "• **Look for patterns** - numbers tell you exactly how many mines are nearby\n"
-                 "• **Use flags wisely** - mark certain mines to avoid accidents\n"
-                 "• **Question marks** - use for uncertain cells\n"
-                 "• **First click is always safe** - the game ensures this",
-           inline=False
-       )
+        embed.add_field(
+            name="🧠 Strategy Tips",
+            value="• **Start with corners and edges** - fewer adjacent cells\n"
+                  "• **Look for patterns** - numbers tell you exactly how many mines are nearby\n"
+                  "• **Use flags wisely** - mark certain mines to avoid accidents\n"
+                  "• **Question marks** - use for uncertain cells\n"
+                  "• **First click is always safe** - the game ensures this",
+            inline=False
+        )
 
-       embed.add_field(
-           name="🏆 Difficulty Levels",
-           value="**Beginner:** 9×9, 10 mines (good for learning)\n"
-                 "**Intermediate:** 16×16, 40 mines (moderate challenge)\n"
-                 "**Expert:** 30×16, 99 mines (for experienced players)\n"
-                 "**Custom:** Design your own board",
-           inline=False
-       )
+    embed.add_field(
+        name="🏆 Difficulty Levels",
+        value="**Beginner:** 9×9, 10 mines (good for learning)\n"
+              "**Intermediate:** 16×16, 40 mines (moderate challenge)\n"
+              "**Expert:** 30×16, 99 mines (for experienced players)\n"
+              "**Custom:** Design your own board",
+        inline=False
+    )
 
-       embed.add_field(
-           name="📚 Commands",
-           value=f"`{ctx.prefix}minesweeper` - Start new game\n"
-                 f"`{ctx.prefix}mines-continue` - Resume current game\n"
-                 f"`{ctx.prefix}mines-stats` - View game statistics\n"
-                 f"`{ctx.prefix}mines-quit` - End current game",
-           inline=False
-       )
+    embed.add_field(
+        name="📚 Commands",
+        value=f"`{ctx.prefix}minesweeper` - Start new game\n"
+              f"`{ctx.prefix}mines-continue` - Resume current game\n"
+              f"`{ctx.prefix}mines-stats` - View game statistics\n"
+              f"`{ctx.prefix}mines-quit` - End current game",
+        inline=False
+    )
 
-       embed.set_footer(text="💡 Pro tip: The numbers are your best friend - they never lie!")
-       await ctx.send(embed=embed)
+    embed.set_footer(text="💡 Pro tip: The numbers are your best friend - they never lie!")
+    await ctx.send(embed=embed)
 
-   async def _show_custom_help(self, ctx):
-       """Show help for custom game creation"""
-       embed = discord.Embed(
-           title="⚙️ Custom Minesweeper Game",
-           description="Create your own Minesweeper challenge!",
-           color=0x00ff00
-       )
 
-       embed.add_field(
-           name="📐 Usage",
-           value=f"`{ctx.prefix}minesweeper custom <width> <height> <mines>`",
-           inline=False
-       )
+async def _show_custom_help(self, ctx):
+    """Show help for custom game creation"""
+    embed = discord.Embed(
+        title="⚙️ Custom Minesweeper Game",
+        description="Create your own Minesweeper challenge!",
+        color=0x00ff00
+    )
 
-       embed.add_field(
-           name="📏 Limits",
-           value="**Width:** 5-30 cells\n**Height:** 5-24 cells\n**Mines:** 1 to (width×height-9)",
-           inline=True
-       )
+    embed.add_field(
+        name="📐 Usage",
+        value=f"`{ctx.prefix}minesweeper custom <width> <height> <mines>`",
+        inline=False
+    )
 
-       embed.add_field(
-           name="💡 Examples",
-           value=f"`{ctx.prefix}minesweeper custom 12 12 20`\n"
-                 f"`{ctx.prefix}minesweeper custom 20 10 35`\n"
-                 f"`{ctx.prefix}minesweeper custom 8 8 12`",
-           inline=True
-       )
+    embed.add_field(
+        name="📏 Limits",
+        value="**Width:** 5-30 cells\n**Height:** 5-24 cells\n**Mines:** 1 to (width×height-9)",
+        inline=True
+    )
 
-       embed.add_field(
-           name="⚖️ Balance Tips",
-           value="• **10-15%** mine density = Easy\n"
-                 "• **15-20%** mine density = Medium\n"
-                 "• **20%+** mine density = Hard\n"
-                 "• Leave at least 9 safe cells for solvability",
-           inline=False
-       )
+    embed.add_field(
+        name="💡 Examples",
+        value=f"`{ctx.prefix}minesweeper custom 12 12 20`\n"
+              f"`{ctx.prefix}minesweeper custom 20 10 35`\n"
+              f"`{ctx.prefix}minesweeper custom 8 8 12`",
+        inline=True
+    )
 
-       await ctx.send(embed=embed)
+    embed.add_field(
+        name="⚖️ Balance Tips",
+        value="• **10-15%** mine density = Easy\n"
+              "• **15-20%** mine density = Medium\n"
+              "• **20%+** mine density = Hard\n"
+              "• Leave at least 9 safe cells for solvability",
+        inline=False
+    )
 
-   async def _show_invalid_difficulty(self, ctx):
-       """Show error for invalid difficulty"""
-       embed = discord.Embed(
-           title="❌ Invalid Difficulty",
-           description="That's not a valid difficulty level.",
-           color=0xff0000
-       )
+    await ctx.send(embed=embed)
 
-       valid_difficulties = list(ClassicMinesweeperGame.DIFFICULTY_LEVELS.keys())
-       embed.add_field(
-           name="✅ Valid Options",
-           value=", ".join(valid_difficulties),
-           inline=False
-       )
 
-       embed.add_field(
-           name="💡 Try Instead",
-           value=f"`{ctx.prefix}minesweeper` - See all options\n"
-                 f"`{ctx.prefix}minesweeper beginner` - Start easy game",
-           inline=False
-       )
+async def _show_invalid_difficulty(self, ctx):
+    """Show error for invalid difficulty"""
+    embed = discord.Embed(
+        title="❌ Invalid Difficulty",
+        description="That's not a valid difficulty level.",
+        color=0xff0000
+    )
 
-       await ctx.send(embed=embed)
+    valid_difficulties = list(ClassicMinesweeperGame.DIFFICULTY_LEVELS.keys())
+    embed.add_field(
+        name="✅ Valid Options",
+        value=", ".join(valid_difficulties),
+        inline=False
+    )
+
+    embed.add_field(
+        name="💡 Try Instead",
+        value=f"`{ctx.prefix}minesweeper` - See all options\n"
+              f"`{ctx.prefix}minesweeper beginner` - Start easy game",
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
+
+    # Legacy text commands for backward compatibility
+
+
+@commands.command()
+async def minreveal(self, ctx, x: int = None, y: int = None):
+    """Reveal a cell in your minesweeper game using coordinates"""
+    if ctx.author.id not in self.active_games:
+        await ctx.send("❌ You don't have an active Minesweeper game! Use `l.minesweeper` to start one.")
+        return
+
+    if x is None or y is None:
+        await ctx.send(f"❌ Please specify coordinates! Usage: `{ctx.prefix}minreveal <x> <y>`")
+        return
+
+    game = self.active_games[ctx.author.id]
+
+    # Convert to 0-based coordinates
+    x -= 1
+    y -= 1
+
+    if not (0 <= x < game.width and 0 <= y < game.height):
+        await ctx.send(f"❌ Invalid coordinates! Use 1-{game.width} for x and 1-{game.height} for y.")
+        return
+
+    if game.game_over:
+        await ctx.send("❌ Game is already over! Use `l.minesweeper` to start a new game.")
+        return
+
+    # Reveal the cell
+    continue_game = game.reveal_cell(x, y)
+
+    if game.won or not continue_game:
+        await self._end_game_display(game)
+    else:
+        await self._update_game_display(game)
+        await ctx.send("✅ Cell revealed! Check the game board above.", delete_after=3)
+
+
+@commands.command()
+async def minflag(self, ctx, x: int = None, y: int = None):
+    """Toggle a flag on a cell using coordinates"""
+    if ctx.author.id not in self.active_games:
+        await ctx.send("❌ You don't have an active Minesweeper game!")
+        return
+
+    if x is None or y is None:
+        await ctx.send(f"❌ Please specify coordinates! Usage: `{ctx.prefix}minflag <x> <y>`")
+        return
+
+    game = self.active_games[ctx.author.id]
+    x -= 1
+    y -= 1
+
+    if not (0 <= x < game.width and 0 <= y < game.height):
+        await ctx.send(f"❌ Invalid coordinates! Use 1-{game.width} for x and 1-{game.height} for y.")
+        return
+
+    if game.game_over:
+        await ctx.send("❌ Game is already over!")
+        return
+
+    game.toggle_flag(x, y)
+    await self._update_game_display(game)
+
+    if (x, y) in game.flagged:
+        action = "Flag placed"
+    elif (x, y) in game.questioned:
+        action = "Question mark placed"
+    else:
+        action = "Mark removed"
+
+    await ctx.send(f"🚩 {action}! Check the game board above.", delete_after=3)
+
+
+@commands.command()
+async def mingame(self, ctx):
+    """Show your current minesweeper game"""
+    if ctx.author.id not in self.active_games:
+        await ctx.send("❌ You don't have an active Minesweeper game!")
+        return
+
+    game = self.active_games[ctx.author.id]
+    await self._update_game_display(game)
+    await ctx.send("🔄 Game board refreshed! Use reactions to play.", delete_after=3)
+
+
+@commands.command()
+async def minquit(self, ctx):
+    """Quit your current minesweeper game"""
+    if ctx.author.id not in self.active_games:
+        await ctx.send("❌ You don't have an active Minesweeper game!")
+        return
+
+    game = self.active_games[ctx.author.id]
+    await self._quit_game(game)
+
+
+@commands.command(aliases=["minhelp"])
+async def minehelp(self, ctx):
+    """Get help with minesweeper commands"""
+    embed = discord.Embed(
+        title="💣 Minesweeper Command Help",
+        description="All available Minesweeper commands and controls",
+        color=0x00ff00
+    )
+
+    embed.add_field(
+        name="🎮 Main Commands",
+        value=f"`{ctx.prefix}minesweeper` - Start new game\n"
+              f"`{ctx.prefix}minesweeper beginner` - Start beginner game\n"
+              f"`{ctx.prefix}minesweeper intermediate` - Start intermediate game\n"
+              f"`{ctx.prefix}minesweeper expert` - Start expert game\n"
+              f"`{ctx.prefix}minesweeper custom 12 12 20` - Custom game",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎯 Game Controls",
+        value=f"`{ctx.prefix}mingame` - Show current game\n"
+              f"`{ctx.prefix}minreveal <x> <y>` - Reveal cell at coordinates\n"
+              f"`{ctx.prefix}minflag <x> <y>` - Toggle flag at coordinates\n"
+              f"`{ctx.prefix}minquit` - Quit current game",
+        inline=False
+    )
+
+    embed.add_field(
+        name="📊 Game Management",
+        value=f"`{ctx.prefix}mines-continue` - Resume current game\n"
+              f"`{ctx.prefix}mines-stats` - View game statistics\n"
+              f"`{ctx.prefix}mines-help` - Detailed help and strategy",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎮 Reaction Controls",
+        value="⬅️➡️⬆️⬇️ Move cursor around\n💥 Reveal selected cell\n🚩 Flag/unflag selected cell\n❌ Quit game",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🗺️ Reading the Board",
+        value="🟨 Your current selection\n⬛ Hidden cell\n🚩 Flagged cell (suspected mine)\n❓ Question mark (uncertain)\n⬜ Empty safe cell\n1️⃣-8️⃣ Number of adjacent mines\n💣 Mine (game over!)",
+        inline=True
+    )
+
+    embed.add_field(
+        name="🏆 How to Win",
+        value="Reveal all safe cells without hitting any mines! Use the numbers to figure out where mines are located. The first click is always safe.",
+        inline=True
+    )
+
+    embed.set_footer(text="💡 Tip: Use reaction controls for the best experience!")
+    await ctx.send(embed=embed)
+
+
+# Advanced features
+@commands.command(aliases=["mines-leaderboard", "mineleaders"])
+async def mines_leaderboard(self, ctx):
+    """Show minesweeper leaderboard (future feature)"""
+    embed = discord.Embed(
+        title="🏆 Minesweeper Leaderboard",
+        description="Coming soon! Track your best times and win rates.",
+        color=0x00ff00
+    )
+
+    embed.add_field(
+        name="📈 Future Features",
+        value="• Best completion times per difficulty\n"
+              "• Win/loss ratios\n"
+              "• Total games played\n"
+              "• Achievement system\n"
+              "• Daily challenges",
+        inline=False
+    )
+
+    embed.set_footer(text="Stay tuned for competitive features!")
+    await ctx.send(embed=embed)
+
+
+@commands.command(aliases=["mines-tutorial"])
+async def mines_tutorial(self, ctx):
+    """Interactive minesweeper tutorial"""
+    embed = discord.Embed(
+        title="🎓 Minesweeper Tutorial",
+        description="Learn how to play step by step!",
+        color=0x00ff00
+    )
+
+    embed.add_field(
+        name="Step 1: Understanding the Goal",
+        value="Your objective is to reveal all safe cells without clicking on any mines. The board contains hidden mines, and you must use logic to find them.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Step 2: Reading Numbers",
+        value="When you reveal a cell, it shows a number (1-8) indicating how many mines are in the 8 adjacent cells. Use this information to deduce mine locations.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Step 3: Using Flags",
+        value="Right-click (or use 🚩 reaction) to mark cells you think contain mines. This prevents accidental clicks and helps you keep track.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Step 4: Advanced Strategy",
+        value="• Start with corners and edges (fewer adjacent cells)\n"
+              "• Look for patterns (e.g., if a '1' touches one flag, other adjacent cells are safe)\n"
+              "• Use process of elimination\n"
+              "• When unsure, use question marks (❓)",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎮 Ready to Practice?",
+        value=f"Start with: `{ctx.prefix}minesweeper beginner`\n"
+              f"Need help during game: `{ctx.prefix}mines-help`",
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
 
 
 async def setup(bot):
-   await bot.add_cog(ClassicGames(bot))
+    await bot.add_cog(ClassicGames(bot))
