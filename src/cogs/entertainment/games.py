@@ -1027,5 +1027,5 @@ class ClassicGames(commands.Cog):
                 except:
                     await ctx.send("❌ Cleanup failed. Contact an admin if issues persist.")
 
-    async def setup(bot):
-        await bot.add_cog(ClassicGames(bot))
+async def setup(bot):
+    await bot.add_cog(ClassicGames(bot))
