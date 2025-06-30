@@ -7,7 +7,7 @@ import os
 
 import discord
 from discord.ext import commands
-from utils.decorators import admin_required
+from utils.decorators import admin_required, guild_setting_enabled  # ← ADDED guild_setting_enabled
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,7 @@ class Feedback(commands.Cog):
         return None
 
     @commands.command()
+    @guild_setting_enabled("feedback")  # ← ADDED DECORATOR
     async def feedback(self, ctx, *, message: str = None):
         """Send feedback to the bot developers
 

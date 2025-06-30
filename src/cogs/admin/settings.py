@@ -27,7 +27,7 @@ class Settings(commands.Cog):
             'help': 'Help command - Show command list',
             'feedback': 'Feedback command - Send feedback to developers',
             'say': 'Say command - Make bot repeat text',
-            'info': 'Info command - Show bot information',
+            # ❌ REMOVED 'info': 'Info command - Show bot information', (NOT A REAL COMMAND)
 
             # Entertainment Commands - VERIFIED REAL COMMANDS
             '8ball': '8-Ball command - Magic 8-ball responses',
@@ -97,10 +97,10 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize settings by category - ONLY REAL COMMANDS
+            # Organize settings by category - ONLY REAL COMMANDS (removed info)
             categories = {
                 '🎮 Entertainment': ['8ball', 'jokes', 'laugh', 'ascii', 'minesweeper', 'knockknock'],
-                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'info', 'weather', 'convert', 'roll'],
+                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'weather', 'convert', 'roll'],  # ← REMOVED info
                 '📊 Information': ['crypto', 'reddit', 'bible', 'dino'],
                 '👑 Admin': ['autoresponse']
             }
@@ -309,7 +309,7 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize by category - ONLY REAL COMMANDS
+            # Organize by category - ONLY REAL COMMANDS (removed info)
             categories = {
                 '🎮 Entertainment Commands': {
                     '8ball': '8-Ball magic responses',
@@ -326,8 +326,8 @@ class Settings(commands.Cog):
                     'convert': 'Unit conversion',
                     'roll': 'Dice rolling',
                     'feedback': 'Send feedback',
-                    'say': 'Text repeating',
-                    'info': 'Bot information'
+                    'say': 'Text repeating'
+                    # ❌ REMOVED 'info': 'Bot information'
                 },
                 '📊 Information Commands': {
                     'crypto': 'Cryptocurrency data',

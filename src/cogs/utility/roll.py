@@ -4,9 +4,9 @@ Dice rolling command
 
 import sys
 
-
 import discord
 from discord.ext import commands
+from utils.decorators import guild_setting_enabled  # ← ADDED IMPORT
 import random
 import re
 
@@ -18,6 +18,7 @@ class Roll(commands.Cog):
         self.bot = bot
 
     @commands.command()
+    @guild_setting_enabled("roll")  # ← ADDED DECORATOR
     async def roll(self, ctx, dice: str = "1d6"):
         """Roll dice using D&D notation
 

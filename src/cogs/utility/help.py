@@ -6,6 +6,7 @@ import sys
 
 import discord
 from discord.ext import commands
+from utils.decorators import guild_setting_enabled  # ← ADDED IMPORT
 from utils.pagination import PaginatedEmbed
 import logging
 
@@ -55,6 +56,7 @@ class Help(commands.Cog):
         return True
 
     @commands.command(name="help", aliases=["h", "commands"])
+    @guild_setting_enabled("help")  # ← ADDED DECORATOR
     async def help_command(self, ctx, *, command_name: str = None):
         """Show help information
 
@@ -430,6 +432,7 @@ class Help(commands.Cog):
         return category_emojis.get(category_name, '📁')
 
     @commands.command(name="cmdlist", aliases=["commandlist"])
+    @guild_setting_enabled("help")  # ← ADDED DECORATOR (same setting as help)
     async def command_list(self, ctx):
         """Show a simple list of all available commands"""
         all_commands = []
