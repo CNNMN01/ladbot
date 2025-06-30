@@ -125,7 +125,7 @@ class Settings(commands.Cog):
                 value=(
                     f"`{ctx.prefix}settings ping off` - Disable ping command\n"
                     f"`{ctx.prefix}settings 8ball on` - Enable 8ball command\n"
-                    f"`{ctx.prefix}settings reset` - Reset all to defaults"
+                    f"`{ctx.prefix}settings ping` - Check ping command status"
                 ),
                 inline=False
             )
