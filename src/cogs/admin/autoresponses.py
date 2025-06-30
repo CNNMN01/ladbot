@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoResponseSystem(commands.Cog):
-    """Modern auto-response system with zero command conflicts + backwards compatibility"""
+    """Auto-response system"""
 
     def __init__(self, bot):
         self.bot = bot
