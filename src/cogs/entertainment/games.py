@@ -333,7 +333,7 @@ class ClassicGames(commands.Cog):
     @commands.command(aliases=["mines", "sweeper", "classic-mines"])
     @guild_setting_enabled("minesweeper")
     async def minesweeper(self, ctx, difficulty: str = None, width: int = None, height: int = None, mines: int = None):
-        """Start a classic Minesweeper game following Microsoft standards"""
+        """Start a classic Minesweeper game"""
         try:
             if difficulty is None:
                 await self._show_difficulty_menu(ctx)
@@ -462,7 +462,7 @@ class ClassicGames(commands.Cog):
                 inline=False
             )
 
-            embed.set_footer(text=f"Good luck, {ctx.author.display_name}! Follow Microsoft Minesweeper rules.")
+            embed.set_footer(text=f"Good luck, {ctx.author.display_name}!")
 
             message = await ctx.send(embed=embed)
             game.message = message
@@ -695,7 +695,7 @@ class ClassicGames(commands.Cog):
 
     @commands.command(aliases=["mines-continue", "mines-show"])
     async def mines_continue(self, ctx):
-        """Continue current game with error handling"""
+        """Continue current game"""
         try:
             if ctx.author.id not in self.active_games:
                 await ctx.send("❌ You don't have an active Minesweeper game! Use `l.minesweeper` to start one.")
@@ -716,7 +716,7 @@ class ClassicGames(commands.Cog):
 
     @commands.command(aliases=["mines-quit", "mines-end", "minquit"])
     async def mines_quit(self, ctx):
-        """Quit current game with comprehensive error handling"""
+        """Quit current game"""
         try:
             if ctx.author.id not in self.active_games:
                 await ctx.send("❌ You don't have an active Minesweeper game!")
