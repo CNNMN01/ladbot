@@ -81,23 +81,34 @@ class LadBot(commands.Bot):
         logger.info("🔧 Setting up bot components with enhanced error prevention...")
 
     def _create_cog_loader(self):
-        """Create a cog loader for reload command compatibility"""
+        """Create a cog loader for reload command compatibility - FIXED VERSION"""
         class CogLoader:
             def __init__(self, bot):
                 self.bot = bot
+                self._loaded_cogs_cache = set()
+
+            @property
+            def loaded_cogs(self):
+                """Get loaded cog names as a set (what reload command expects)"""
+                return set(self.bot.extensions.keys())
+
+            @loaded_cogs.setter
+            def loaded_cogs(self, value):
+                """Setter for compatibility"""
+                self._loaded_cogs_cache = set(value) if value else set()
 
             def get_loaded_cogs(self):
                 """Get list of loaded cog names"""
-                return list(self.bot.cogs.keys())
+                return list(self.bot.extensions.keys())
 
             def get_failed_cogs(self):
                 """Get list of failed cog names (placeholder)"""
                 return []
 
-            def reload_cog(self, cog_name):
+            async def reload_cog(self, cog_name):
                 """Reload a specific cog"""
                 try:
-                    # The actual reloading is handled by the reload command
+                    await self.bot.reload_extension(cog_name)
                     return True
                 except Exception as e:
                     logger.error(f"Error in cog loader reload: {e}")
@@ -106,9 +117,9 @@ class LadBot(commands.Bot):
             def get_cog_status(self):
                 """Get overall cog status"""
                 return {
-                    'loaded': len(self.bot.cogs),
+                    'loaded': len(self.bot.extensions),
                     'failed': 0,
-                    'total': len(self.bot.cogs)
+                    'total': len(self.bot.extensions)
                 }
 
         return CogLoader(self)
@@ -131,147 +142,171 @@ class LadBot(commands.Bot):
                     (self.data_dir / "guild_settings").mkdir(exist_ok=True)
                     (self.data_dir / "autoresponses").mkdir(exist_ok=True)
                     (self.data_dir / "analytics").mkdir(exist_ok=True)
-
-                except (PermissionError, OSError) as e:
+                    (self.data_dir / "backups").mkdir(exist_ok=True)
+                    (self.data_dir / "cache").mkdir(exist_ok=True)
+                except Exception as e:
                     logger.warning(f"Could not create data directories: {e}")
 
-                logger.info(f"📂 Data manager initialized - Data: {self.data_dir}, Logs: {self.logs_dir}")
+                # Initialize cache system
+                self.guild_cache = {}
+                self.autoresponse_cache = {}
+                self.last_cache_clear = datetime.now()
 
             def get_guild_setting(self, guild_id, setting_name, default=True):
-                """Get a guild-specific setting with multiple fallback methods"""
+                """Get a guild-specific setting with caching"""
                 try:
-                    # Method 1: Check cache first for performance
-                    if guild_id in self.bot.settings_cache:
-                        if setting_name in self.bot.settings_cache[guild_id]:
-                            return self.bot.settings_cache[guild_id][setting_name]
+                    # Check cache first
+                    cache_key = f"{guild_id}_{setting_name}"
+                    if cache_key in self.guild_cache:
+                        return self.guild_cache[cache_key]
 
-                    # Method 2: Load from individual guild file
-                    settings_file = self.data_dir / f"guild_settings_{guild_id}.json"
-                    if settings_file.exists():
-                        with open(settings_file, 'r') as f:
-                            settings_data = json.load(f)
+                    guild_settings_file = self.data_dir / "guild_settings" / f"{guild_id}.json"
+                    if guild_settings_file.exists():
+                        with open(guild_settings_file, 'r') as f:
+                            settings = json.load(f)
+                            value = settings.get(setting_name, default)
+                            # Cache the result
+                            self.guild_cache[cache_key] = value
+                            return value
 
-                        # Update cache
-                        if guild_id not in self.bot.settings_cache:
-                            self.bot.settings_cache[guild_id] = {}
-                        self.bot.settings_cache[guild_id].update(settings_data)
-
-                        return settings_data.get(setting_name, default)
-
-                    # Method 3: Check default options file
-                    options_file = self.data_dir / "json" / "options.json"
-                    if options_file.exists():
-                        try:
-                            with open(options_file, 'r') as f:
-                                options = json.load(f)
-                            if setting_name in options:
-                                return options[setting_name].get('default', default)
-                        except Exception as e:
-                            logger.debug(f"Error loading options file: {e}")
-
-                    # Method 4: Return default
+                    # Cache the default
+                    self.guild_cache[cache_key] = default
                     return default
-
                 except Exception as e:
-                    logger.error(f"Error loading guild setting {setting_name} for guild {guild_id}: {e}")
+                    logger.error(f"Error getting guild setting: {e}")
                     return default
 
             def set_guild_setting(self, guild_id, setting_name, value):
-                """Set a guild-specific setting with comprehensive error handling"""
+                """Set a guild-specific setting with caching"""
                 try:
-                    # Update cache immediately
-                    if guild_id not in self.bot.settings_cache:
-                        self.bot.settings_cache[guild_id] = {}
-                    self.bot.settings_cache[guild_id][setting_name] = value
+                    guild_settings_file = self.data_dir / "guild_settings" / f"{guild_id}.json"
+                    settings = {}
 
-                    # Load existing settings from file
-                    settings_file = self.data_dir / f"guild_settings_{guild_id}.json"
-                    settings_data = {}
+                    if guild_settings_file.exists():
+                        with open(guild_settings_file, 'r') as f:
+                            settings = json.load(f)
 
-                    if settings_file.exists():
-                        try:
-                            with open(settings_file, 'r') as f:
-                                settings_data = json.load(f)
-                        except json.JSONDecodeError:
-                            logger.warning(f"Corrupted settings file for guild {guild_id}, starting fresh")
-                            settings_data = {}
+                    settings[setting_name] = value
+                    settings['last_updated'] = datetime.now().isoformat()
 
-                    # Update setting
-                    settings_data[setting_name] = value
-                    settings_data['last_updated'] = datetime.now().isoformat()
-                    settings_data['updated_by'] = 'bot_system'
+                    with open(guild_settings_file, 'w') as f:
+                        json.dump(settings, f, indent=2)
 
-                    # Save to file with atomic write
-                    temp_file = settings_file.with_suffix('.tmp')
-                    try:
-                        with open(temp_file, 'w') as f:
-                            json.dump(settings_data, f, indent=2)
+                    # Update cache
+                    cache_key = f"{guild_id}_{setting_name}"
+                    self.guild_cache[cache_key] = value
 
-                        # Atomic move
-                        temp_file.replace(settings_file)
-
-                        logger.info(f"✅ Updated setting {setting_name} = {value} for guild {guild_id}")
-                        return True
-
-                    except Exception as e:
-                        logger.error(f"Error writing settings file: {e}")
-                        # Clean up temp file
-                        if temp_file.exists():
-                            temp_file.unlink()
-                        return False
-
-                except Exception as e:
-                    logger.error(f"Error saving guild setting {setting_name} for guild {guild_id}: {e}")
-                    return False
-
-            def get_autoresponses(self, guild_id):
-                """Get autoresponses for a guild"""
-                try:
-                    responses_file = self.data_dir / f"autoresponses_{guild_id}.json"
-                    if responses_file.exists():
-                        with open(responses_file, 'r', encoding='utf-8') as f:
-                            return json.load(f)
-                    return []
-                except Exception as e:
-                    logger.error(f"Error loading autoresponses for guild {guild_id}: {e}")
-                    return []
-
-            def save_autoresponses(self, guild_id, responses):
-                """Save autoresponses for a guild"""
-                try:
-                    responses_file = self.data_dir / f"autoresponses_{guild_id}.json"
-                    with open(responses_file, 'w', encoding='utf-8') as f:
-                        json.dump(responses, f, indent=2, ensure_ascii=False)
                     return True
                 except Exception as e:
-                    logger.error(f"Error saving autoresponses for guild {guild_id}: {e}")
+                    logger.error(f"Error setting guild setting: {e}")
                     return False
 
-            def clear_cache(self, guild_id=None):
-                """Clear settings cache for a guild or all guilds"""
-                if guild_id:
-                    self.bot.settings_cache.pop(guild_id, None)
-                    logger.info(f"🗑️ Cleared cache for guild {guild_id}")
-                else:
-                    self.bot.settings_cache.clear()
-                    logger.info("🗑️ Cleared all settings cache")
+            def load_autoresponses(self, guild_id):
+                """Load autoresponses for a guild with caching"""
+                try:
+                    # Check cache first
+                    if guild_id in self.autoresponse_cache:
+                        return self.autoresponse_cache[guild_id]
+
+                    autoresponses_file = self.data_dir / "autoresponses" / f"{guild_id}.json"
+                    if autoresponses_file.exists():
+                        with open(autoresponses_file, 'r') as f:
+                            responses = json.load(f)
+                            # Cache the result
+                            self.autoresponse_cache[guild_id] = responses
+                            return responses
+
+                    # Cache empty result
+                    self.autoresponse_cache[guild_id] = {}
+                    return {}
+                except Exception as e:
+                    logger.error(f"Error loading autoresponses: {e}")
+                    return {}
+
+            def save_autoresponses(self, guild_id, autoresponses):
+                """Save autoresponses for a guild with caching"""
+                try:
+                    autoresponses_file = self.data_dir / "autoresponses" / f"{guild_id}.json"
+                    autoresponses['last_updated'] = datetime.now().isoformat()
+
+                    with open(autoresponses_file, 'w') as f:
+                        json.dump(autoresponses, f, indent=2)
+
+                    # Update cache
+                    self.autoresponse_cache[guild_id] = autoresponses
+                    return True
+                except Exception as e:
+                    logger.error(f"Error saving autoresponses: {e}")
+                    return False
+
+            def clear_cache(self):
+                """Clear all caches"""
+                self.guild_cache.clear()
+                self.autoresponse_cache.clear()
+                self.last_cache_clear = datetime.now()
+                logger.info("🗑️ Data manager cache cleared")
 
             def backup_settings(self):
                 """Create a backup of all settings"""
                 try:
-                    backup_dir = self.data_dir / "backups" / datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_dir.mkdir(parents=True, exist_ok=True)
+                    backup_dir = self.data_dir / "backups"
+                    backup_file = backup_dir / f"settings_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-                    # Copy all guild settings
-                    for settings_file in self.data_dir.glob("guild_settings_*.json"):
-                        backup_file = backup_dir / settings_file.name
-                        backup_file.write_text(settings_file.read_text())
+                    backup_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'guild_settings': {},
+                        'autoresponses': {}
+                    }
 
-                    logger.info(f"📦 Settings backup created: {backup_dir}")
-                    return str(backup_dir)
+                    # Backup guild settings
+                    guild_settings_dir = self.data_dir / "guild_settings"
+                    if guild_settings_dir.exists():
+                        for file in guild_settings_dir.glob("*.json"):
+                            guild_id = file.stem
+                            with open(file, 'r') as f:
+                                backup_data['guild_settings'][guild_id] = json.load(f)
+
+                    # Backup autoresponses
+                    autoresponses_dir = self.data_dir / "autoresponses"
+                    if autoresponses_dir.exists():
+                        for file in autoresponses_dir.glob("*.json"):
+                            guild_id = file.stem
+                            with open(file, 'r') as f:
+                                backup_data['autoresponses'][guild_id] = json.load(f)
+
+                    with open(backup_file, 'w') as f:
+                        json.dump(backup_data, f, indent=2)
+
+                    logger.info(f"📦 Settings backup created: {backup_file}")
+                    return backup_file
                 except Exception as e:
                     logger.error(f"Error creating settings backup: {e}")
                     return None
+
+            def get_analytics_data(self):
+                """Get analytics data for web dashboard"""
+                try:
+                    analytics_file = self.data_dir / "analytics" / "bot_analytics.json"
+                    if analytics_file.exists():
+                        with open(analytics_file, 'r') as f:
+                            return json.load(f)
+                    return {}
+                except Exception as e:
+                    logger.error(f"Error loading analytics: {e}")
+                    return {}
+
+            def save_analytics_data(self, data):
+                """Save analytics data"""
+                try:
+                    analytics_file = self.data_dir / "analytics" / "bot_analytics.json"
+                    data['last_updated'] = datetime.now().isoformat()
+
+                    with open(analytics_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+                    return True
+                except Exception as e:
+                    logger.error(f"Error saving analytics: {e}")
+                    return False
 
         return EnhancedDataManager(self.settings, self)
 
@@ -295,6 +330,12 @@ class LadBot(commands.Bot):
     def set_guild_setting(self, guild_id, setting_name, value):
         """Alternative method name for compatibility"""
         return self.set_setting(guild_id, setting_name, value)
+
+    # 🔧 CRITICAL FIX 6: Add prefix property for autoresponses.py
+    @property
+    def prefix(self):
+        """Bot prefix for compatibility with autoresponses.py"""
+        return self.command_prefix
 
     async def setup_hook(self):
         """Called when the bot is starting up"""
@@ -358,220 +399,141 @@ class LadBot(commands.Bot):
         # Log comprehensive startup info
         logger.info(f"🤖 {self.user.name} (ID: {self.user.id}) is online!")
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
-        logger.info(f"👥 Serving {len(self.users)} users")
-        logger.info(f"🎮 Loaded {len(self.cogs)} cogs")
-        logger.info(f"🔧 {len(self.commands)} commands available")
-        logger.info(f"📈 Command stats: {self.total_commands_used} total, {self.commands_used_today} today")
-        logger.info(f"📊 Unique commands used: {len(self.command_usage)}")
-        logger.info(f"🕐 Start time recorded: {self.start_time}")
-        logger.info(f"📡 Initial latency: {round(self.latency * 1000)}ms")
+        logger.info(f"📈 Serving {sum(guild.member_count for guild in self.guilds)} users with {len(self.commands)} commands")
 
-        # Set activity status
-        activity = discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
-        )
-        await self.change_presence(activity=activity)
-
-        # Initialize settings cache for all guilds
-        await self._initialize_guild_settings()
-
-    async def _initialize_guild_settings(self):
-        """Initialize settings cache for all connected guilds"""
-        try:
-            for guild in self.guilds:
-                # Pre-load settings for each guild to cache
-                self.get_setting(guild.id, "autoresponses", False)
-                logger.debug(f"Initialized settings for guild {guild.name} ({guild.id})")
-
-            logger.info(f"📋 Settings cache initialized for {len(self.guilds)} guilds")
-        except Exception as e:
-            logger.error(f"Error initializing guild settings: {e}")
+        # Start background tasks
+        self.loop.create_task(self.update_stats_task())
+        self.loop.create_task(self.cleanup_task())
 
     async def load_command_stats(self):
-        """Load command statistics from persistent storage with enhanced error handling"""
+        """Load command statistics from file"""
         try:
-            data_dir = Path("data")
-            data_dir.mkdir(exist_ok=True)
-
-            stats_file = data_dir / "command_stats.json"
-
-            if not stats_file.exists():
-                # Initialize empty stats
-                self.command_usage = {}
-                self.commands_used_today = 0
-                self.total_commands_used = 0
-                self.session_commands = 0
-                self.error_count = 0
-                self.last_reset_date = date.today().isoformat()
-                logger.info("📊 No existing command stats found, starting fresh")
-                await self.save_command_stats()  # Create initial file
-                return
-
-            # Load existing stats with error recovery
-            try:
+            stats_file = self.data_manager.data_dir / "analytics" / "command_stats.json"
+            if stats_file.exists():
                 with open(stats_file, 'r') as f:
-                    stats_data = json.load(f)
-            except json.JSONDecodeError:
-                logger.warning("Command stats file corrupted, starting fresh")
-                self.command_usage = {}
-                self.commands_used_today = 0
-                self.total_commands_used = 0
-                self.session_commands = 0
-                self.error_count = 0
-                self.last_reset_date = date.today().isoformat()
-                await self.save_command_stats()
-                return
-
-            self.command_usage = stats_data.get('command_usage', {})
-            self.commands_used_today = stats_data.get('commands_used_today', 0)
-            self.total_commands_used = stats_data.get('total_commands_used', 0)
-            self.session_commands = 0  # Always reset session commands
-            self.error_count = stats_data.get('error_count', 0)
-            self.last_reset_date = stats_data.get('last_reset_date', date.today().isoformat())
-
-            # Check if we need to reset daily count
-            if self.last_reset_date != date.today().isoformat():
-                logger.info("📅 New day detected - resetting daily command count")
-                self.commands_used_today = 0
-                self.last_reset_date = date.today().isoformat()
-                await self.save_command_stats()
-
-            logger.info(f"📊 Command stats loaded: {self.total_commands_used} total, {self.commands_used_today} today")
-
+                    data = json.load(f)
+                    self.command_usage = data.get('command_usage', {})
+                    self.total_commands_used = data.get('total_commands_used', 0)
+                    self.commands_used_today = data.get('commands_used_today', 0)
+                    self.last_reset_date = data.get('last_reset_date', date.today().isoformat())
         except Exception as e:
             logger.error(f"Error loading command stats: {e}")
-            # Initialize with defaults on error
-            self.command_usage = {}
-            self.commands_used_today = 0
-            self.total_commands_used = 0
-            self.session_commands = 0
-            self.error_count = 0
-            self.last_reset_date = date.today().isoformat()
 
     async def save_command_stats(self):
-        """Save command statistics to persistent storage with atomic writes"""
+        """Save command statistics to file"""
         try:
-            data_dir = Path("data")
-            data_dir.mkdir(exist_ok=True)
-
-            stats_data = {
+            stats_file = self.data_manager.data_dir / "analytics" / "command_stats.json"
+            data = {
                 'command_usage': self.command_usage,
-                'commands_used_today': self.commands_used_today,
                 'total_commands_used': self.total_commands_used,
-                'error_count': self.error_count,
+                'commands_used_today': self.commands_used_today,
                 'last_reset_date': self.last_reset_date,
-                'last_saved': datetime.now().isoformat(),
-                'unique_commands_used': len(self.command_usage),
-                'session_commands': self.session_commands
+                'last_updated': datetime.now().isoformat()
             }
-
-            stats_file = data_dir / "command_stats.json"
-            temp_file = stats_file.with_suffix('.tmp')
-
-            # Atomic write
-            with open(temp_file, 'w') as f:
-                json.dump(stats_data, f, indent=2)
-            temp_file.replace(stats_file)
-
+            with open(stats_file, 'w') as f:
+                json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"Error saving command stats: {e}")
 
     async def on_command_completion(self, ctx):
-        """Called when a command completes successfully - Enhanced tracking"""
-        try:
-            command_name = ctx.command.name if ctx.command else 'unknown'
+        """Track command usage"""
+        command_name = ctx.command.name
 
-            # Update command usage statistics
-            if command_name not in self.command_usage:
-                self.command_usage[command_name] = 0
-            self.command_usage[command_name] += 1
+        # Update command usage
+        self.command_usage[command_name] = self.command_usage.get(command_name, 0) + 1
+        self.total_commands_used += 1
+        self.commands_used_today += 1
+        self.session_commands += 1
 
-            # Update counters
-            self.commands_used_today += 1
-            self.total_commands_used += 1
-            self.session_commands += 1
-            self.unique_commands_used = len(self.command_usage)
-            self.total_tracked_commands = self.total_commands_used
+        # Check if we need to reset daily stats
+        today = date.today().isoformat()
+        if self.last_reset_date != today:
+            self.commands_used_today = 1
+            self.last_reset_date = today
 
-            # Update latency tracking
-            current_latency = round(self.latency * 1000)
-            self.latency_history.append(current_latency)
-            if len(self.latency_history) > 10:
-                self.latency_history.pop(0)
-            self.average_latency = sum(self.latency_history) // len(self.latency_history)
-
-            # Save stats periodically (every 10 commands)
-            if self.total_commands_used % 10 == 0:
-                await self.save_command_stats()
-
-            logger.debug(f"📊 Command tracked: {command_name} (total: {self.total_commands_used})")
-
-        except Exception as e:
-            logger.error(f"Error tracking command completion: {e}")
+        # Save stats periodically
+        if self.session_commands % 10 == 0:
+            await self.save_command_stats()
 
     async def on_command_error(self, ctx, error):
-        """Called when a command encounters an error - Enhanced tracking"""
-        try:
-            self.error_count += 1
+        """Handle command errors"""
+        self.error_count += 1
 
-            # Don't log these as errors
-            if isinstance(error, (commands.CommandNotFound, commands.CheckFailure)):
-                return
+        # Log the error
+        logger.error(f"Command error in {ctx.command}: {error}")
 
-            logger.debug(f"❌ Command error tracked: {type(error).__name__}: {error}")
-        except Exception as e:
-            logger.error(f"Error tracking command error: {e}")
+        # Send user-friendly error message
+        if isinstance(error, commands.CommandNotFound):
+            return  # Ignore command not found errors
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"❌ Missing required argument: `{error.param}`")
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send(f"❌ Invalid argument provided")
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(f"⏰ Command on cooldown. Try again in {error.retry_after:.1f}s")
+        elif isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ You don't have permission to use this command")
+        else:
+            await ctx.send("❌ An unexpected error occurred")
 
-    async def on_guild_join(self, guild):
-        """Called when bot joins a new guild - Initialize settings"""
-        try:
-            logger.info(f"🎉 Joined new guild: {guild.name} ({guild.id})")
+    async def update_stats_task(self):
+        """Background task to update bot statistics"""
+        await self.wait_until_ready()
 
-            # Initialize default settings for new guild
-            self.get_setting(guild.id, "autoresponses", False)
-            self.get_setting(guild.id, "minesweeper", True)
-            self.get_setting(guild.id, "jokes", True)
+        while not self.is_closed():
+            try:
+                # Update latency history
+                current_latency = round(self.latency * 1000)
+                self.latency_history.append(current_latency)
 
-            # Update activity status
-            activity = discord.Activity(
-                type=discord.ActivityType.watching,
-                name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
-            )
-            await self.change_presence(activity=activity)
+                # Keep only last 60 measurements (15 minutes worth)
+                if len(self.latency_history) > 60:
+                    self.latency_history = self.latency_history[-60:]
 
-        except Exception as e:
-            logger.error(f"Error handling guild join: {e}")
+                # Calculate average latency
+                self.average_latency = sum(self.latency_history) // len(self.latency_history)
 
-    async def on_guild_remove(self, guild):
-        """Called when bot leaves a guild - Clean up"""
-        try:
-            logger.info(f"👋 Left guild: {guild.name} ({guild.id})")
+                # Update other stats
+                self.unique_commands_used = len(self.command_usage)
 
-            # Clear cache for removed guild
-            self.data_manager.clear_cache(guild.id)
+                # Save stats
+                await self.save_command_stats()
 
-            # Update activity status
-            activity = discord.Activity(
-                type=discord.ActivityType.watching,
-                name=f"{len(self.guilds)} servers | {self.settings.BOT_PREFIX}help"
-            )
-            await self.change_presence(activity=activity)
+            except Exception as e:
+                logger.error(f"Error in stats update task: {e}")
 
-        except Exception as e:
-            logger.error(f"Error handling guild remove: {e}")
+            await asyncio.sleep(15)  # Update every 15 seconds
 
-    def get_bot_stats(self):
+    async def cleanup_task(self):
+        """Background task for periodic cleanup"""
+        await self.wait_until_ready()
+
+        while not self.is_closed():
+            try:
+                # Clear cache every hour
+                if (datetime.now() - self.data_manager.last_cache_clear).seconds > 3600:
+                    self.data_manager.clear_cache()
+
+                # Create backup every 6 hours
+                if self.session_commands > 0 and self.session_commands % 100 == 0:
+                    self.data_manager.backup_settings()
+
+            except Exception as e:
+                logger.error(f"Error in cleanup task: {e}")
+
+            await asyncio.sleep(3600)  # Run every hour
+
+    def get_stats(self):
         """Get comprehensive bot statistics for web dashboard"""
         try:
-            uptime = datetime.now() - self.start_time if self.start_time else datetime.now() - datetime.now()
+            uptime = datetime.now() - self.start_time if self.start_time else datetime.timedelta(0)
             uptime_str = str(uptime).split('.')[0]  # Remove microseconds
 
             return {
                 'guilds': len(self.guilds),
-                'users': len(self.users),
+                'users': sum(guild.member_count for guild in self.guilds),
                 'commands': len(self.commands),
-                'loaded_cogs': len(self.cogs),
+                'loaded_cogs': len(self.extensions),
                 'latency': round(self.latency * 1000),
                 'uptime': uptime_str,
                 'commands_today': self.commands_used_today,
