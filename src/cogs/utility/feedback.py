@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Feedback(commands.Cog):
-    """User feedback system with enhanced debugging"""
+    """User feedback system"""
 
     def __init__(self, bot):
         self.bot = bot
