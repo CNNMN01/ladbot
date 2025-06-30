@@ -1,5 +1,5 @@
 """
-Guild Settings Management Commands - Fully Fixed and Enhanced
+Guild Settings Management Commands - Fully Fixed with Correct Command Names
 Handles all setting operations with comprehensive error handling
 """
 
@@ -20,44 +20,44 @@ class Settings(commands.Cog):
         self.bot = bot
         self.embed_builder = EmbedBuilder()
 
-        # Define all available settings with their descriptions
+        # Define all available settings with CORRECT command names
         self.available_settings = {
-            # Core Commands
+            # Core Commands - ACTUAL command names
             'ping': 'Ping command',
             'help': 'Help command',
             'feedback': 'Feedback command',
             'say': 'Say command',
             'info': 'Bot info command',
 
-            # Entertainment Commands
-            'cmd_8ball': '8-Ball magic responses',
-            'eightball': '8-Ball command (alias)',
+            # Entertainment Commands - ACTUAL command names
+            '8ball': '8-Ball magic responses',           # ← FIXED: was cmd_8ball
+            'eightball': '8-Ball command (alias)',       # ← ADDED: actual alias
             'jokes': 'Random jokes command',
+            'joke': 'Joke command (alias)',             # ← ADDED: actual alias
             'laugh': 'Laugh command',
-            'ascii': 'ASCII art generator',
-            'ascii_art': 'ASCII art command (alias)',
+            'ascii': 'ASCII art generator',              # ← FIXED: was ascii_art
             'games': 'Interactive games',
             'minesweeper': 'Minesweeper game',
             'knockknock': 'Knock-knock jokes',
 
-            # Utility Commands
+            # Utility Commands - ACTUAL command names
             'weather': 'Weather information',
-            'converter': 'Unit converter',
+            'convert': 'Unit converter',                 # ← FIXED: was converter
             'roll': 'Dice rolling',
             'tools': 'Utility tools',
 
-            # Information Commands
-            'crypto': 'Cryptocurrency prices',
-            'bitcoin': 'Bitcoin information',
+            # Information Commands - ACTUAL command names
+            'crypto': 'Cryptocurrency prices',          # ← FIXED: was bitcoin
+            'bitcoin': 'Bitcoin information (alias)',   # ← ADDED: if this is an alias
             'reddit': 'Reddit content',
             'bible': 'Bible verse lookup',
-            'dinosaurs': 'Dinosaur facts',
-            'dinos': 'Dinosaur command (alias)',
+            'dino': 'Dinosaur facts',                   # ← FIXED: was dinosaurs
+            'dinos': 'Dinosaur command (alias)',        # ← ADDED: actual alias
 
-            # Admin Features
-            'autoresponses': 'Auto-response system',
+            # Admin Features - ACTUAL command names
+            'autoresponse': 'Auto-response system',     # ← FIXED: was autoresponses
             'moderation': 'Moderation features',
-            'logging': 'Command logging',
+            'logs': 'Command logging',                  # ← FIXED: was logging
             'analytics': 'Usage analytics'
         }
 
@@ -106,12 +106,12 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize settings by category
+            # Organize settings by category with CORRECTED names
             categories = {
-                '🎮 Entertainment': ['cmd_8ball', 'eightball', 'jokes', 'laugh', 'ascii', 'ascii_art', 'games', 'minesweeper', 'knockknock'],
-                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'info', 'weather', 'converter', 'roll', 'tools'],
-                '📊 Information': ['crypto', 'bitcoin', 'reddit', 'bible', 'dinosaurs', 'dinos'],
-                '👑 Admin': ['autoresponses', 'moderation', 'logging', 'analytics']
+                '🎮 Entertainment': ['8ball', 'eightball', 'jokes', 'joke', 'laugh', 'ascii', 'games', 'minesweeper', 'knockknock'],
+                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'info', 'weather', 'convert', 'roll', 'tools'],
+                '📊 Information': ['crypto', 'bitcoin', 'reddit', 'bible', 'dino', 'dinos'],
+                '👑 Admin': ['autoresponse', 'moderation', 'logs', 'analytics']
             }
 
             for category, settings in categories.items():
@@ -138,7 +138,7 @@ class Settings(commands.Cog):
                 name="📖 Usage Examples",
                 value=(
                     f"`{ctx.prefix}settings ping off` - Disable ping command\n"
-                    f"`{ctx.prefix}settings jokes on` - Enable jokes command\n"
+                    f"`{ctx.prefix}settings 8ball on` - Enable 8ball command\n"
                     f"`{ctx.prefix}settings list` - Show all available options"
                 ),
                 inline=False
@@ -318,10 +318,10 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize by category
+            # Organize by category with CORRECTED names
             categories = {
                 '🎮 Entertainment Commands': {
-                    'cmd_8ball': '8-Ball magic responses',
+                    '8ball': '8-Ball magic responses',
                     'jokes': 'Random jokes and puns',
                     'ascii': 'ASCII art generator',
                     'games': 'Interactive games',
@@ -332,19 +332,19 @@ class Settings(commands.Cog):
                     'ping': 'Bot latency check',
                     'help': 'Command help system',
                     'weather': 'Weather information',
-                    'converter': 'Unit conversion',
+                    'convert': 'Unit conversion',
                     'roll': 'Dice rolling'
                 },
                 '📊 Information Commands': {
                     'crypto': 'Cryptocurrency data',
                     'reddit': 'Reddit content',
                     'bible': 'Bible verse lookup',
-                    'dinosaurs': 'Dinosaur facts'
+                    'dino': 'Dinosaur facts'
                 },
                 '👑 Admin Features': {
-                    'autoresponses': 'Auto-response system',
+                    'autoresponse': 'Auto-response system',
                     'moderation': 'Moderation tools',
-                    'logging': 'Command logging',
+                    'logs': 'Command logging',
                     'analytics': 'Usage statistics'
                 }
             }

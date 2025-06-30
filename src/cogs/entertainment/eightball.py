@@ -94,7 +94,7 @@ class EightBall(commands.Cog):
         ]
 
     @commands.command(name="8ball", aliases=["eightball", "magic8ball"])
-    @guild_setting_enabled("cmd_8ball")
+    @guild_setting_enabled("8ball")
     @typing_context()
     async def eight_ball(self, ctx, *, question: str = None):
         """Ask the Magic 8-Ball a question
