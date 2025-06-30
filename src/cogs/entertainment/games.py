@@ -315,7 +315,7 @@ class ClassicMinesweeperGame:
 
 
 class ClassicGames(commands.Cog):
-    """Classic games collection with comprehensive error handling"""
+    """Classic games collection"""
 
     def __init__(self, bot):
         self.bot = bot
