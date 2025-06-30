@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Console(commands.Cog):
-    """Console and logging management - SECURED"""
+    """Console and logging management"""
 
     def __init__(self, bot):
         self.bot = bot

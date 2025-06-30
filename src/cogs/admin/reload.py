@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Reload(commands.Cog):
-    """Cog management commands - BULLETPROOF"""
+    """Cog management commands"""
 
     def __init__(self, bot):
         self.bot = bot

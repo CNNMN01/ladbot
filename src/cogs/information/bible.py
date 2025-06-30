@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Bible(commands.Cog):
-    """Enhanced Bible verse commands with multiple APIs"""
+    """Bible verse commands"""
 
     def __init__(self, bot):
         self.bot = bot

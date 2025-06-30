@@ -13,7 +13,7 @@ from utils.decorators import guild_setting_enabled, typing_context
 
 
 class AsciiArt(commands.Cog):
-    """Hybrid ASCII Art generator - works with or without external libraries"""
+    """ASCII Art generator commands"""
 
     def __init__(self, bot):
         self.bot = bot

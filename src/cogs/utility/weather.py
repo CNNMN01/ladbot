@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class Weather(commands.Cog):
-    """Weather information commands with fallback support"""
+    """Weather information commands"""
 
     def __init__(self, bot):
         self.bot = bot

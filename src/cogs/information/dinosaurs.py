@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Dinosaurs(commands.Cog):
-    """Enhanced dinosaur facts with reliable data sources"""
+    """Dinosaur facts"""
 
     def __init__(self, bot):
         self.bot = bot

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Settings(commands.Cog):
-    """Guild settings management with comprehensive compatibility"""
+    """Guild settings management"""
 
     def __init__(self, bot):
         self.bot = bot
