@@ -60,15 +60,11 @@ class Settings(commands.Cog):
         l.settings - Show all settings
         l.settings <option> - Show specific setting
         l.settings <option> <value> - Change setting
-        l.settings list - List available options
         l.settings reset - Reset all to defaults
         """
         try:
             # Handle special commands
-            if option and option.lower() in ['list', 'available', 'options']:
-                await self._show_available_settings(ctx)
-                return
-            elif option and option.lower() in ['reset', 'defaults']:
+            if option and option.lower() in ['reset', 'defaults']:
                 await self._reset_settings(ctx)
                 return
             elif option is None:
@@ -129,7 +125,6 @@ class Settings(commands.Cog):
                 value=(
                     f"`{ctx.prefix}settings ping off` - Disable ping command\n"
                     f"`{ctx.prefix}settings 8ball on` - Enable 8ball command\n"
-                    f"`{ctx.prefix}settings list` - Show all available options\n"
                     f"`{ctx.prefix}settings reset` - Reset all to defaults"
                 ),
                 inline=False
@@ -138,9 +133,9 @@ class Settings(commands.Cog):
             embed.add_field(
                 name="🔧 Special Commands",
                 value=(
-                    f"`{ctx.prefix}settings list` - View all configurable options\n"
                     f"`{ctx.prefix}settings reset` - Reset everything to defaults\n"
-                    f"`{ctx.prefix}settings <command>` - Check status of specific command"
+                    f"`{ctx.prefix}settings <command>` - Check status of specific command\n"
+                    f"Use `on/off`, `yes/no`, `true/false`, or `enable/disable`"
                 ),
                 inline=False
             )
@@ -310,86 +305,6 @@ class Settings(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    async def _show_available_settings(self, ctx):
-        """Show all available settings in organized categories"""
-        try:
-            embed = discord.Embed(
-                title="📋 Available Settings",
-                description="All configurable bot features for this server",
-                color=0x4e73df
-            )
-
-            # Organize by category - ONLY REAL COMMANDS
-            categories = {
-                '🎮 Entertainment Commands': {
-                    '8ball': '8-Ball magic responses',
-                    'jokes': 'Random jokes and puns',
-                    'ascii': 'ASCII art generator',
-                    'minesweeper': 'Minesweeper game',
-                    'knockknock': 'Knock-knock jokes',
-                    'laugh': 'Laugh reactions'
-                },
-                '🔧 Utility Commands': {
-                    'ping': 'Bot latency check',
-                    'help': 'Command help system',
-                    'weather': 'Weather information',
-                    'convert': 'Unit conversion',
-                    'roll': 'Dice rolling',
-                    'feedback': 'Send feedback',
-                    'say': 'Text repeating'
-                },
-                '📊 Information Commands': {
-                    'crypto': 'Cryptocurrency data',
-                    'reddit': 'Reddit content',
-                    'bible': 'Bible verse lookup',
-                    'dino': 'Dinosaur facts'
-                },
-                '👑 Admin Features': {
-                    'autoresponse': 'Auto-response system'
-                }
-            }
-
-            for category, settings in categories.items():
-                setting_list = []
-                for key, desc in settings.items():
-                    current_value = self._get_setting_safe(ctx.guild.id, key)
-                    status = "✅" if current_value else "❌"
-                    setting_list.append(f"{status} **{key}** - {desc}")
-
-                if setting_list:
-                    embed.add_field(
-                        name=category,
-                        value="\n".join(setting_list),
-                        inline=False
-                    )
-
-            embed.add_field(
-                name="💡 Usage Tips",
-                value=(
-                    f"• `{ctx.prefix}settings <option> on` - Enable a feature\n"
-                    f"• `{ctx.prefix}settings <option> off` - Disable a feature\n"
-                    f"• `{ctx.prefix}settings list` - Show all available options\n"
-                    f"• `{ctx.prefix}settings reset` - Reset all to defaults"
-                ),
-                inline=False
-            )
-
-            embed.add_field(
-                name="🔧 Advanced Options",
-                value=(
-                    f"• `{ctx.prefix}settings reset` - Resets ALL settings to enabled\n"
-                    f"• Requires ✅ confirmation before executing\n"
-                    f"• Cannot be undone - use with caution!"
-                ),
-                inline=False
-            )
-
-            await ctx.send(embed=embed)
-
-        except Exception as e:
-            logger.error(f"Error showing available settings: {e}")
-            await ctx.send("❌ Error displaying available settings.")
-
     async def _show_invalid_option(self, ctx, option):
         """Show error message for invalid setting option"""
         embed = discord.Embed(
@@ -408,12 +323,6 @@ class Settings(commands.Cog):
                 value=", ".join(f"`{s}`" for s in similar_settings[:5]),
                 inline=False
             )
-
-        embed.add_field(
-            name="📋 View All Options",
-            value=f"`{ctx.prefix}settings list`",
-            inline=True
-        )
 
         embed.add_field(
             name="🏠 View All Settings",
