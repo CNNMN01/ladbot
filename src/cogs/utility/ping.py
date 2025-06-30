@@ -2,11 +2,9 @@
 Ping command - Check bot latency
 """
 
-import sys
-
-
 import discord
 from discord.ext import commands
+from utils.decorators import guild_setting_enabled  # ← ADD THIS IMPORT
 
 
 class Ping(commands.Cog):
@@ -16,6 +14,7 @@ class Ping(commands.Cog):
         self.bot = bot
 
     @commands.command()
+    @guild_setting_enabled("ping")  # ← ADD THIS DECORATOR
     async def ping(self, ctx):
         """Check the bot's latency"""
         try:

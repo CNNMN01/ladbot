@@ -86,34 +86,46 @@ def dangerous_command():
 
 
 def guild_setting_enabled(setting_name: str):
-    """Decorator to check if a guild setting is enabled"""
+    """Decorator to check if a guild setting is enabled - ENHANCED VERSION"""
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(self, ctx, *args, **kwargs):
             guild_id = ctx.guild.id if ctx.guild else None
 
-            # Try to get setting, default to True if method doesn't exist
             try:
-                if hasattr(ctx.bot, 'get_setting'):
-                    setting_enabled = ctx.bot.get_setting(guild_id, setting_name)
-                else:
-                    logger.debug(f"Bot has no get_setting method, defaulting {setting_name} to True")
-                    setting_enabled = True
+                # Get the setting with multiple fallback methods
+                setting_enabled = True  # Default to enabled
 
-                if setting_enabled:
-                    return await func(self, ctx, *args, **kwargs)
+                if hasattr(ctx.bot, 'get_setting'):
+                    setting_enabled = ctx.bot.get_setting(guild_id, setting_name, True)
+                elif hasattr(ctx.bot, 'data_manager') and hasattr(ctx.bot.data_manager, 'get_guild_setting'):
+                    setting_enabled = ctx.bot.data_manager.get_guild_setting(guild_id, setting_name, True)
                 else:
+                    logger.debug(f"No get_setting method found, defaulting {setting_name} to True")
+
+                # If disabled, show message and block command
+                if not setting_enabled:
                     import discord
                     embed = discord.Embed(
                         title="🚫 Command Disabled",
-                        description="This command has been disabled for this server.",
-                        color=0xffaa00
+                        description=f"The `{ctx.command.name}` command has been disabled for this server.",
+                        color=0xff9900
+                    )
+                    embed.add_field(
+                        name="Re-enable Command",
+                        value=f"`{ctx.prefix}settings {setting_name} on`",
+                        inline=False
                     )
                     await ctx.send(embed=embed)
+                    return  # Block the command
+
+                # If enabled, run the command
+                return await func(self, ctx, *args, **kwargs)
+
             except Exception as e:
                 logger.error(f"Error checking guild setting {setting_name}: {e}")
-                # Default to allowing command if there's an error
+                # On error, allow command to run (fail-safe)
                 return await func(self, ctx, *args, **kwargs)
 
         return wrapper

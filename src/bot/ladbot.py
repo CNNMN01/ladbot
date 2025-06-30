@@ -337,6 +337,15 @@ class LadBot(commands.Bot):
         """Bot prefix for compatibility with autoresponses.py"""
         return self.command_prefix
 
+    # 🔧 CRITICAL FIX 7: Add helper method for decorators
+    def _get_setting_safe(self, guild_id, setting_name, default=True):
+        """Helper method for decorators to safely get settings"""
+        try:
+            return self.get_setting(guild_id, setting_name, default)
+        except Exception as e:
+            logger.debug(f"Error in _get_setting_safe for {setting_name}: {e}")
+            return default
+
     async def setup_hook(self):
         """Called when the bot is starting up"""
         try:
@@ -521,7 +530,7 @@ class LadBot(commands.Bot):
             except Exception as e:
                 logger.error(f"Error in cleanup task: {e}")
 
-            await asyncio.sleep(3600)  # Run every hour
+            await asyncio.sleep(3600)
 
     def get_stats(self):
         """Get comprehensive bot statistics for web dashboard"""
