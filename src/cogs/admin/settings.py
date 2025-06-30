@@ -1,5 +1,5 @@
 """
-Guild Settings Management Commands - Fully Fixed with Correct Command Names
+Guild Settings Management Commands - Fixed with ONLY Real Commands
 Handles all setting operations with comprehensive error handling
 """
 
@@ -20,45 +20,36 @@ class Settings(commands.Cog):
         self.bot = bot
         self.embed_builder = EmbedBuilder()
 
-        # Define all available settings with CORRECT command names
+        # Define ONLY real Discord commands that actually exist
         self.available_settings = {
-            # Core Commands - ACTUAL command names
-            'ping': 'Ping command',
-            'help': 'Help command',
-            'feedback': 'Feedback command',
-            'say': 'Say command',
-            'info': 'Bot info command',
+            # Core Commands - VERIFIED REAL COMMANDS
+            'ping': 'Ping command - Check bot latency',
+            'help': 'Help command - Show command list',
+            'feedback': 'Feedback command - Send feedback to developers',
+            'say': 'Say command - Make bot repeat text',
+            'info': 'Info command - Show bot information',
 
-            # Entertainment Commands - ACTUAL command names
-            '8ball': '8-Ball magic responses',           # ← FIXED: was cmd_8ball
-            'eightball': '8-Ball command (alias)',       # ← ADDED: actual alias
-            'jokes': 'Random jokes command',
-            'joke': 'Joke command (alias)',             # ← ADDED: actual alias
-            'laugh': 'Laugh command',
-            'ascii': 'ASCII art generator',              # ← FIXED: was ascii_art
-            'games': 'Interactive games',
-            'minesweeper': 'Minesweeper game',
-            'knockknock': 'Knock-knock jokes',
+            # Entertainment Commands - VERIFIED REAL COMMANDS
+            '8ball': '8-Ball command - Magic 8-ball responses',
+            'jokes': 'Jokes command - Random jokes',
+            'laugh': 'Laugh command - Bot laugh reactions',
+            'ascii': 'ASCII command - Generate ASCII art',
+            'minesweeper': 'Minesweeper command - Play minesweeper game',
+            'knockknock': 'Knock-knock command - Knock-knock jokes',
 
-            # Utility Commands - ACTUAL command names
-            'weather': 'Weather information',
-            'convert': 'Unit converter',                 # ← FIXED: was converter
-            'roll': 'Dice rolling',
-            'tools': 'Utility tools',
+            # Utility Commands - VERIFIED REAL COMMANDS
+            'weather': 'Weather command - Get weather information',
+            'convert': 'Convert command - Unit conversion',
+            'roll': 'Roll command - Dice rolling',
 
-            # Information Commands - ACTUAL command names
-            'crypto': 'Cryptocurrency prices',          # ← FIXED: was bitcoin
-            'bitcoin': 'Bitcoin information (alias)',   # ← ADDED: if this is an alias
-            'reddit': 'Reddit content',
-            'bible': 'Bible verse lookup',
-            'dino': 'Dinosaur facts',                   # ← FIXED: was dinosaurs
-            'dinos': 'Dinosaur command (alias)',        # ← ADDED: actual alias
+            # Information Commands - VERIFIED REAL COMMANDS
+            'crypto': 'Crypto command - Cryptocurrency prices',
+            'reddit': 'Reddit command - Browse Reddit content',
+            'bible': 'Bible command - Bible verse lookup',
+            'dino': 'Dino command - Dinosaur facts',
 
-            # Admin Features - ACTUAL command names
-            'autoresponse': 'Auto-response system',     # ← FIXED: was autoresponses
-            'moderation': 'Moderation features',
-            'logs': 'Command logging',                  # ← FIXED: was logging
-            'analytics': 'Usage analytics'
+            # Admin Features - VERIFIED REAL COMMANDS
+            'autoresponse': 'Autoresponse command - Manage auto-responses'
         }
 
     @commands.command(name="settings", aliases=["config", "cfg"])
@@ -106,12 +97,12 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize settings by category with CORRECTED names
+            # Organize settings by category - ONLY REAL COMMANDS
             categories = {
-                '🎮 Entertainment': ['8ball', 'eightball', 'jokes', 'joke', 'laugh', 'ascii', 'games', 'minesweeper', 'knockknock'],
-                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'info', 'weather', 'convert', 'roll', 'tools'],
-                '📊 Information': ['crypto', 'bitcoin', 'reddit', 'bible', 'dino', 'dinos'],
-                '👑 Admin': ['autoresponse', 'moderation', 'logs', 'analytics']
+                '🎮 Entertainment': ['8ball', 'jokes', 'laugh', 'ascii', 'minesweeper', 'knockknock'],
+                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'info', 'weather', 'convert', 'roll'],
+                '📊 Information': ['crypto', 'reddit', 'bible', 'dino'],
+                '👑 Admin': ['autoresponse']
             }
 
             for category, settings in categories.items():
@@ -125,7 +116,7 @@ class Settings(commands.Cog):
 
                 if setting_status:
                     # Split into chunks if too many settings
-                    chunks = [setting_status[i:i+8] for i in range(0, len(setting_status), 8)]
+                    chunks = [setting_status[i:i+6] for i in range(0, len(setting_status), 6)]
                     for i, chunk in enumerate(chunks):
                         field_name = category if i == 0 else f"{category} (cont.)"
                         embed.add_field(
@@ -318,22 +309,25 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize by category with CORRECTED names
+            # Organize by category - ONLY REAL COMMANDS
             categories = {
                 '🎮 Entertainment Commands': {
                     '8ball': '8-Ball magic responses',
                     'jokes': 'Random jokes and puns',
                     'ascii': 'ASCII art generator',
-                    'games': 'Interactive games',
                     'minesweeper': 'Minesweeper game',
-                    'knockknock': 'Knock-knock jokes'
+                    'knockknock': 'Knock-knock jokes',
+                    'laugh': 'Laugh reactions'
                 },
                 '🔧 Utility Commands': {
                     'ping': 'Bot latency check',
                     'help': 'Command help system',
                     'weather': 'Weather information',
                     'convert': 'Unit conversion',
-                    'roll': 'Dice rolling'
+                    'roll': 'Dice rolling',
+                    'feedback': 'Send feedback',
+                    'say': 'Text repeating',
+                    'info': 'Bot information'
                 },
                 '📊 Information Commands': {
                     'crypto': 'Cryptocurrency data',
@@ -342,10 +336,7 @@ class Settings(commands.Cog):
                     'dino': 'Dinosaur facts'
                 },
                 '👑 Admin Features': {
-                    'autoresponse': 'Auto-response system',
-                    'moderation': 'Moderation tools',
-                    'logs': 'Command logging',
-                    'analytics': 'Usage statistics'
+                    'autoresponse': 'Auto-response system'
                 }
             }
 
