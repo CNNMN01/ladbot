@@ -27,7 +27,6 @@ class Settings(commands.Cog):
             'help': 'Help command - Show command list',
             'feedback': 'Feedback command - Send feedback to developers',
             'say': 'Say command - Make bot repeat text',
-            # ❌ REMOVED 'info': 'Info command - Show bot information', (NOT A REAL COMMAND)
 
             # Entertainment Commands - VERIFIED REAL COMMANDS
             '8ball': '8-Ball command - Magic 8-ball responses',
@@ -97,10 +96,10 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize settings by category - ONLY REAL COMMANDS (removed info)
+            # Organize settings by category - ONLY REAL COMMANDS
             categories = {
                 '🎮 Entertainment': ['8ball', 'jokes', 'laugh', 'ascii', 'minesweeper', 'knockknock'],
-                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'weather', 'convert', 'roll'],  # ← REMOVED info
+                '🔧 Utility': ['ping', 'help', 'feedback', 'say', 'weather', 'convert', 'roll'],
                 '📊 Information': ['crypto', 'reddit', 'bible', 'dino'],
                 '👑 Admin': ['autoresponse']
             }
@@ -130,7 +129,18 @@ class Settings(commands.Cog):
                 value=(
                     f"`{ctx.prefix}settings ping off` - Disable ping command\n"
                     f"`{ctx.prefix}settings 8ball on` - Enable 8ball command\n"
-                    f"`{ctx.prefix}settings list` - Show all available options"
+                    f"`{ctx.prefix}settings list` - Show all available options\n"
+                    f"`{ctx.prefix}settings reset` - Reset all to defaults"
+                ),
+                inline=False
+            )
+
+            embed.add_field(
+                name="🔧 Special Commands",
+                value=(
+                    f"`{ctx.prefix}settings list` - View all configurable options\n"
+                    f"`{ctx.prefix}settings reset` - Reset everything to defaults\n"
+                    f"`{ctx.prefix}settings <command>` - Check status of specific command"
                 ),
                 inline=False
             )
@@ -309,7 +319,7 @@ class Settings(commands.Cog):
                 color=0x4e73df
             )
 
-            # Organize by category - ONLY REAL COMMANDS (removed info)
+            # Organize by category - ONLY REAL COMMANDS
             categories = {
                 '🎮 Entertainment Commands': {
                     '8ball': '8-Ball magic responses',
@@ -327,7 +337,6 @@ class Settings(commands.Cog):
                     'roll': 'Dice rolling',
                     'feedback': 'Send feedback',
                     'say': 'Text repeating'
-                    # ❌ REMOVED 'info': 'Bot information'
                 },
                 '📊 Information Commands': {
                     'crypto': 'Cryptocurrency data',
@@ -359,7 +368,18 @@ class Settings(commands.Cog):
                 value=(
                     f"• `{ctx.prefix}settings <option> on` - Enable a feature\n"
                     f"• `{ctx.prefix}settings <option> off` - Disable a feature\n"
+                    f"• `{ctx.prefix}settings list` - Show all available options\n"
                     f"• `{ctx.prefix}settings reset` - Reset all to defaults"
+                ),
+                inline=False
+            )
+
+            embed.add_field(
+                name="🔧 Advanced Options",
+                value=(
+                    f"• `{ctx.prefix}settings reset` - Resets ALL settings to enabled\n"
+                    f"• Requires ✅ confirmation before executing\n"
+                    f"• Cannot be undone - use with caution!"
                 ),
                 inline=False
             )
@@ -401,6 +421,12 @@ class Settings(commands.Cog):
             inline=True
         )
 
+        embed.add_field(
+            name="🔧 Reset to Defaults",
+            value=f"`{ctx.prefix}settings reset`",
+            inline=True
+        )
+
         await ctx.send(embed=embed)
 
     async def _reset_settings(self, ctx):
@@ -413,8 +439,13 @@ class Settings(commands.Cog):
                 color=0xff9900
             )
             embed.add_field(
+                name="⚠️ Warning",
+                value="This will enable ALL 19 commands and features for this server.",
+                inline=False
+            )
+            embed.add_field(
                 name="Confirm Reset",
-                value="React with ✅ to confirm or ❌ to cancel",
+                value="React with ✅ to confirm or ❌ to cancel\n*You have 30 seconds to respond*",
                 inline=False
             )
 
@@ -447,13 +478,18 @@ class Settings(commands.Cog):
                         value="All commands and features are now **enabled**",
                         inline=False
                     )
+                    embed.add_field(
+                        name="What's Enabled",
+                        value="Entertainment, Utility, Information, and Admin commands are all active.",
+                        inline=False
+                    )
                     await message.edit(embed=embed)
 
                     logger.info(f"Admin {ctx.author} reset all settings for guild {ctx.guild.id}")
                 else:
                     embed = discord.Embed(
                         title="❌ Reset Cancelled",
-                        description="Settings reset has been cancelled.",
+                        description="Settings reset has been cancelled. No changes were made.",
                         color=0xff9900
                     )
                     await message.edit(embed=embed)
