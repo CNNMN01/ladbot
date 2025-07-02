@@ -182,6 +182,7 @@ def register_routes(app):
                                    settings=settings_data,
                                    user=session.get('user'),
                                    user_guilds=user_guilds,
+                                   guilds=user_guilds,  # Added for template compatibility
                                    is_admin=is_admin,
                                    recent_activity=recent_activity,
                                    system_health=system_health,
@@ -199,6 +200,7 @@ def register_routes(app):
                                    settings={},
                                    user=session.get('user'),
                                    user_guilds=[],
+                                   guilds=[],  # Added for template compatibility
                                    is_admin=False,
                                    recent_activity=[],
                                    system_health={},
@@ -289,6 +291,7 @@ def register_routes(app):
                                    setting_categories=setting_categories,
                                    user=session.get('user'),
                                    user_guilds=user_guilds,
+                                   guilds=user_guilds,  # Added for template compatibility
                                    is_admin=is_admin,
                                    page_title='Settings')
 
@@ -314,6 +317,11 @@ def register_routes(app):
             stats = app.web_manager._get_comprehensive_stats()
             settings_data = app.web_manager._get_bot_settings()
             user_guilds = get_user_guilds()
+
+            # Debug logging for advanced settings
+            logger.info(f"Advanced settings access - User: {session.get('user_id')}, Guilds: {len(user_guilds)}")
+            for guild in user_guilds:
+                logger.info(f"Guild: {guild['name']} (ID: {guild['id']})")
 
             # Advanced configuration options
             advanced_options = {
@@ -365,6 +373,7 @@ def register_routes(app):
                                    advanced_options=advanced_options,
                                    user=session.get('user'),
                                    user_guilds=user_guilds,
+                                   guilds=user_guilds,  # Fixed: Added for template compatibility
                                    is_admin=True,
                                    page_title='Advanced Settings')
 
