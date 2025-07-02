@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import secrets
 import hashlib
 import base64
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 logger = logging.getLogger(__name__)
 
@@ -70,29 +70,33 @@ class DiscordOAuth:
         stored_state = session.get('oauth_state')
         stored_timestamp = session.get('oauth_timestamp')
 
-        # Clear state from session
+        # Clear used state
         session.pop('oauth_state', None)
         session.pop('oauth_timestamp', None)
 
+        # Check if state exists
         if not stored_state or not stored_timestamp:
-            logger.warning("OAuth: No stored state found")
+            logger.warning("OAuth state validation failed: No stored state")
             return False
 
+        # Check if state matches
         if stored_state != received_state:
-            logger.warning("OAuth: State mismatch - possible CSRF attack")
+            logger.warning("OAuth state validation failed: State mismatch")
             return False
 
-        # Check if state is not older than 10 minutes
-        if datetime.now().timestamp() - stored_timestamp > 600:
-            logger.warning("OAuth: State expired")
+        # Check if state is not expired (10 minutes max)
+        state_age = datetime.now().timestamp() - stored_timestamp
+        if state_age > 600:  # 10 minutes
+            logger.warning("OAuth state validation failed: State expired")
             return False
 
         return True
 
-    def get_authorization_url(self) -> str:
-        """Generate Discord authorization URL with PKCE"""
+    def get_auth_url(self) -> str:
+        """Generate Discord OAuth authorization URL"""
         if not self.is_configured():
-            raise ValueError("OAuth not properly configured")
+            logger.error("OAuth not configured - cannot generate auth URL")
+            return ""
 
         state = self.generate_state()
 
@@ -101,8 +105,7 @@ class DiscordOAuth:
             'redirect_uri': self.redirect_uri,
             'response_type': 'code',
             'scope': ' '.join(OAUTH_SCOPES),
-            'state': state,
-            'prompt': 'consent'  # Always show consent screen for security
+            'state': state
         }
 
         auth_url = f"{DISCORD_AUTH_BASE}?{urlencode(params)}"
@@ -219,19 +222,74 @@ class DiscordOAuth:
                 return None
 
             guilds_data = response.json()
-            logger.info(f"Successfully fetched {len(guilds_data)} guilds")
 
-            return guilds_data
+            # Validate guilds data
+            if not isinstance(guilds_data, list):
+                logger.error("Guilds data is not a list")
+                return None
+
+            # Filter and process guild data
+            processed_guilds = []
+            for guild in guilds_data:
+                if isinstance(guild, dict) and 'id' in guild and 'name' in guild:
+                    processed_guilds.append({
+                        'id': guild['id'],
+                        'name': guild['name'],
+                        'icon': guild.get('icon'),
+                        'owner': guild.get('owner', False),
+                        'permissions': guild.get('permissions', '0'),
+                        'features': guild.get('features', [])
+                    })
+
+            logger.info(f"Successfully fetched {len(processed_guilds)} guilds")
+            return processed_guilds
 
         except requests.RequestException as e:
-            logger.error(f"Network error fetching guilds: {e}")
+            logger.error(f"Network error fetching user guilds: {e}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error fetching guilds: {e}")
+            logger.error(f"Unexpected error fetching user guilds: {e}")
+            return None
+
+    def refresh_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
+        """Refresh access token using refresh token"""
+        try:
+            token_data = {
+                'client_id': self.client_id,
+                'client_secret': self.client_secret,
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token
+            }
+
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': 'Ladbot/2.0 (Discord Bot Dashboard)'
+            }
+
+            response = requests.post(
+                DISCORD_TOKEN_URL,
+                data=token_data,
+                headers=headers,
+                timeout=10
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Token refresh failed: {response.status_code}")
+                return None
+
+            token_info = response.json()
+            expires_in = token_info.get('expires_in', 3600)
+            token_info['expires_at'] = datetime.now() + timedelta(seconds=expires_in)
+
+            logger.info("Successfully refreshed access token")
+            return token_info
+
+        except Exception as e:
+            logger.error(f"Error refreshing token: {e}")
             return None
 
     def revoke_token(self, access_token: str) -> bool:
-        """Revoke Discord access token"""
+        """Revoke access token"""
         try:
             revoke_data = {
                 'client_id': self.client_id,
@@ -245,92 +303,88 @@ class DiscordOAuth:
                 timeout=10
             )
 
-            return response.status_code == 200
+            if response.status_code == 200:
+                logger.info("Successfully revoked access token")
+                return True
+            else:
+                logger.warning(f"Token revocation failed: {response.status_code}")
+                return False
 
         except Exception as e:
             logger.error(f"Error revoking token: {e}")
             return False
 
-def register_oauth_routes(app):
-    """Register OAuth routes with comprehensive error handling"""
 
-    oauth_handler = DiscordOAuth(app)
+# ===== FLASK ROUTE REGISTRATION =====
+
+def register_oauth_routes(app):
+    """Register OAuth routes with the Flask app"""
+
+    oauth = DiscordOAuth(app)
 
     @app.route('/auth/discord')
     def discord_auth():
         """Initiate Discord OAuth flow"""
-        try:
-            # Check if already authenticated
-            if 'user_id' in session:
-                flash('You are already logged in', 'info')
-                return redirect(url_for('dashboard'))
-
-            # Check OAuth configuration
-            if not oauth_handler.is_configured():
-                flash('Discord OAuth is not configured. Please contact the administrator.', 'error')
-                return redirect(url_for('index'))
-
-            # Generate authorization URL
-            auth_url = oauth_handler.get_authorization_url()
-
-            logger.info(f"Redirecting user to Discord OAuth: {request.remote_addr}")
-            return redirect(auth_url)
-
-        except Exception as e:
-            logger.error(f"Discord auth initiation error: {e}")
-            flash('Failed to initiate Discord authentication', 'error')
+        if not oauth.is_configured():
+            flash('OAuth not configured. Please contact administrator.', 'error')
             return redirect(url_for('index'))
 
+        auth_url = oauth.get_auth_url()
+        if not auth_url:
+            flash('Unable to generate authorization URL.', 'error')
+            return redirect(url_for('index'))
+
+        return redirect(auth_url)
+
     @app.route('/callback')
-    def discord_callback():
-        """Handle Discord OAuth callback with comprehensive validation"""
+    def oauth_callback():
+        """Handle OAuth callback from Discord"""
         try:
-            # Get parameters from callback
+            # Check for errors
+            error = request.args.get('error')
+            if error:
+                error_description = request.args.get('error_description', 'Unknown error')
+                logger.warning(f"OAuth error: {error} - {error_description}")
+                flash(f'Authentication failed: {error_description}', 'error')
+                return redirect(url_for('index'))
+
+            # Get authorization code and state
             code = request.args.get('code')
             state = request.args.get('state')
-            error = request.args.get('error')
-            error_description = request.args.get('error_description')
 
-            # Handle OAuth errors
-            if error:
-                logger.warning(f"OAuth error: {error} - {error_description}")
-                flash(f'Authentication failed: {error_description or error}', 'error')
-                return redirect(url_for('index'))
-
-            # Validate required parameters
             if not code:
-                logger.warning("OAuth callback missing authorization code")
-                flash('Authentication failed: No authorization code received', 'error')
+                flash('No authorization code received.', 'error')
                 return redirect(url_for('index'))
 
-            if not state:
-                logger.warning("OAuth callback missing state parameter")
-                flash('Authentication failed: Invalid request', 'error')
-                return redirect(url_for('index'))
-
-            # Validate state for CSRF protection
-            if not oauth_handler.validate_state(state):
-                flash('Authentication failed: Security validation failed', 'error')
+            # Validate state (CSRF protection)
+            if not oauth.validate_state(state):
+                flash('Invalid state parameter. Please try again.', 'error')
                 return redirect(url_for('index'))
 
             # Exchange code for token
-            token_info = oauth_handler.exchange_code_for_token(code)
+            token_info = oauth.exchange_code_for_token(code)
             if not token_info:
-                flash('Authentication failed: Could not obtain access token', 'error')
+                flash('Failed to obtain access token.', 'error')
                 return redirect(url_for('index'))
 
             access_token = token_info['access_token']
 
             # Get user information
-            user_data = oauth_handler.get_user_info(access_token)
+            user_data = oauth.get_user_info(access_token)
             if not user_data:
-                flash('Authentication failed: Could not retrieve user information', 'error')
+                flash('Failed to retrieve user information.', 'error')
                 return redirect(url_for('index'))
 
-            # Get user guilds (optional)
-            user_guilds = oauth_handler.get_user_guilds(access_token)
+            # Get user guilds (optional, with error handling)
+            user_guilds = None
+            try:
+                user_guilds = oauth.get_user_guilds(access_token)
+                if not user_guilds:
+                    logger.warning("Could not fetch user guilds (non-critical)")
+            except Exception as e:
+                logger.warning(f"Non-critical error fetching user guilds: {e}")
 
-            # Store user information in session
+            # Store session data
             session.permanent = True
             session['user_id'] = user_data['id']
             session['access_token'] = access_token
@@ -363,150 +417,83 @@ def register_oauth_routes(app):
             welcome_msg = f"Welcome, {user_data.get('global_name') or user_data['username']}!"
             if is_admin:
                 welcome_msg += " (Administrator)"
-
             flash(welcome_msg, 'success')
 
-            # Redirect to intended page or dashboard
-            next_page = session.pop('oauth_redirect', None)
-            return redirect(next_page or url_for('dashboard'))
+            # Redirect to dashboard
+            return redirect(url_for('dashboard'))
 
         except Exception as e:
             logger.error(f"OAuth callback error: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
-            flash('Authentication failed: An unexpected error occurred', 'error')
+            flash('An unexpected error occurred during authentication.', 'error')
             return redirect(url_for('index'))
 
-    @app.route('/auth/refresh')
-    def refresh_token():
-        """Refresh OAuth token (if needed)"""
-        if 'user_id' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-
+    @app.route('/logout')
+    def logout():
+        """Logout user and clear session"""
         try:
-            # Check if token needs refresh
-            expires_at_str = session.get('token_expires_at')
-            if not expires_at_str:
-                return jsonify({'error': 'No token expiration info'}), 400
-
-            expires_at = datetime.fromisoformat(expires_at_str)
-
-            # If token expires in less than 5 minutes, consider it expired
-            if datetime.now() + timedelta(minutes=5) < expires_at:
-                return jsonify({'status': 'token_valid'})
-
-            # For now, just redirect to re-authenticate
-            # Discord doesn't provide refresh tokens in implicit flow
-            session.clear()
-            return jsonify({'status': 'token_expired', 'redirect': url_for('discord_auth')})
-
-        except Exception as e:
-            logger.error(f"Token refresh error: {e}")
-            return jsonify({'error': 'Token refresh failed'}), 500
-
-    @app.route('/auth/logout')
-    def auth_logout():
-        """Enhanced logout with token revocation"""
-        try:
-            # Get access token for revocation
-            access_token = session.get('access_token')
-            username = session.get('user', {}).get('username', 'User')
-
             # Revoke token if available
-            if access_token and oauth_handler.is_configured():
-                oauth_handler.revoke_token(access_token)
-                logger.info(f"Revoked token for user: {username}")
+            access_token = session.get('access_token')
+            if access_token:
+                try:
+                    oauth.revoke_token(access_token)
+                except:
+                    pass  # Non-critical error
 
             # Clear session
+            username = session.get('user', {}).get('username', 'User')
             session.clear()
 
-            flash(f'Goodbye, {username}! You have been logged out successfully.', 'success')
-            return redirect(url_for('index'))
+            flash(f'Goodbye, {username}! You have been logged out.', 'info')
+            logger.info(f"User {username} logged out successfully")
 
         except Exception as e:
             logger.error(f"Logout error: {e}")
-            session.clear()  # Clear session anyway
-            flash('Logged out successfully', 'success')
-            return redirect(url_for('index'))
+            session.clear()
+            flash('Logged out successfully.', 'info')
 
-    # ===== UTILITY ROUTES =====
+        return redirect(url_for('index'))
 
-    @app.route('/auth/status')
-    def auth_status():
-        """Check authentication status (API endpoint)"""
-        if 'user_id' not in session:
-            return jsonify({'authenticated': False})
-
-        user_data = session.get('user', {})
-        expires_at_str = session.get('token_expires_at')
-
-        # Check token expiration
-        token_valid = True
-        if expires_at_str:
-            try:
-                expires_at = datetime.fromisoformat(expires_at_str)
-                token_valid = datetime.now() < expires_at
-            except:
-                token_valid = False
-
-        return jsonify({
-            'authenticated': True,
-            'user': {
-                'id': user_data.get('id'),
-                'username': user_data.get('username'),
-                'avatar': user_data.get('avatar'),
-                'is_admin': session.get('is_admin', False)
-            },
-            'token_valid': token_valid,
-            'expires_at': expires_at_str
-        })
-
-    @app.route('/auth/guilds')
-    def auth_guilds():
-        """Get user's Discord guilds (API endpoint)"""
-        if 'user_id' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-
-        user_guilds = session.get('user_guilds', [])
-
-        # Filter guilds where bot is present (if bot is available)
-        bot_guilds = []
-        if hasattr(app, 'bot') and app.bot:
-            bot_guild_ids = {str(guild.id) for guild in app.bot.guilds}
-            bot_guilds = [guild for guild in user_guilds if guild['id'] in bot_guild_ids]
-
-        return jsonify({
-            'user_guilds': user_guilds,
-            'bot_guilds': bot_guilds,
-            'total_user_guilds': len(user_guilds),
-            'total_bot_guilds': len(bot_guilds)
-        })
-
-    # ===== MIDDLEWARE =====
-
-    @app.before_request
-    def check_auth_status():
-        """Check authentication status before each request"""
-        # Skip auth check for public routes
-        public_routes = ['index', 'about', 'discord_auth', 'discord_callback', 'auth_status']
-
-        if request.endpoint in public_routes or request.path.startswith('/static'):
-            return
-
-        # Check if user is authenticated for protected routes
-        if request.endpoint and request.endpoint.startswith(('dashboard', 'settings', 'analytics')):
-            if 'user_id' not in session:
-                # Store intended destination for after login
-                session['oauth_redirect'] = request.url
-                flash('Please log in to access this page', 'warning')
+    @app.route('/auth/refresh')
+    def refresh_auth():
+        """Refresh authentication token"""
+        try:
+            refresh_token = session.get('refresh_token')
+            if not refresh_token:
+                flash('No refresh token available. Please log in again.', 'warning')
                 return redirect(url_for('discord_auth'))
 
-            # Check token expiration
-            expires_at_str = session.get('token_expires_at')
-            if expires_at_str:
-                try:
-                    expires_at = datetime.fromisoformat(expires_at_str)
-                    if datetime.now() >= expires_at:
-                        session.clear()
+            token_info = oauth.refresh_token(refresh_token)
+            if not token_info:
+                flash('Unable to refresh authentication. Please log in again.', 'warning')
+                return redirect(url_for('discord_auth'))
+
+            # Update session with new token
+            session['access_token'] = token_info['access_token']
+            session['token_expires_at'] = token_info['expires_at'].isoformat()
+
+            if 'refresh_token' in token_info:
+                session['refresh_token'] = token_info['refresh_token']
+
+            flash('Authentication refreshed successfully.', 'success')
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            logger.error(f"Auth refresh error: {e}")
+            flash('Error refreshing authentication. Please log in again.', 'error')
+            return redirect(url_for('discord_auth'))
+
+    # Token validation middleware
+    @app.before_request
+    def check_token_expiry():
+        """Check if access token is expired before each request"""
+        if 'access_token' in session and 'token_expires_at' in session:
+            try:
+                expires_at = datetime.fromisoformat(session['token_expires_at'])
+                if datetime.now() >= expires_at:
+                    # Token expired
+                    session.clear()
+                    if request.endpoint not in ['index', 'discord_auth', 'oauth_callback', 'static']:
                         flash('Your session has expired. Please log in again.', 'warning')
                         return redirect(url_for('discord_auth'))
                 except:
