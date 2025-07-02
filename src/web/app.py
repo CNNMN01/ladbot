@@ -43,6 +43,8 @@ class LadbotWebApp:
         self.startup_time = datetime.now()
         self.request_count = 0
         self.error_count = 0
+        self.commands_today = 0
+        self.total_commands = 0
 
     def create_app(self) -> Flask:
         """Create and configure Flask application with comprehensive features"""
@@ -473,6 +475,7 @@ class LadbotWebApp:
         @app.template_global()
         def moment():
             """Compatibility function for moment.js-like functionality"""
+
             class MomentLike:
                 def __init__(self):
                     self.dt = datetime.now()
@@ -585,13 +588,19 @@ class LadbotWebApp:
                         'memory_used': memory.used,
                         'memory_total': memory.total,
                         'disk_usage': psutil.disk_usage('/').percent
-                    }
+                    },
+                    'memory_usage': memory.percent,  # Backwards compatibility
+                    'average_latency': stats.get('latency', 0)
                 })
             except ImportError:
                 stats['system'] = {'error': 'psutil not available'}
+                stats['memory_usage'] = 0
+                stats['average_latency'] = 0
             except Exception as e:
                 logger.warning(f"Error getting system stats: {e}")
                 stats['system'] = {'error': str(e)}
+                stats['memory_usage'] = 0
+                stats['average_latency'] = 0
 
             # Web statistics
             stats.update({
@@ -599,7 +608,10 @@ class LadbotWebApp:
                     'requests_count': self.request_count,
                     'error_count': self.error_count,
                     'startup_time': self.startup_time.isoformat()
-                }
+                },
+                'error_count': self.error_count,
+                'total_commands': self.total_commands,
+                'commands_today': self.commands_today
             })
 
             return stats
@@ -609,8 +621,111 @@ class LadbotWebApp:
             return {
                 'error': str(e),
                 'timestamp': datetime.now().isoformat(),
-                'uptime': self._calculate_uptime()
+                'uptime': self._calculate_uptime(),
+                'bot_status': 'error',
+                'guilds': 0,
+                'users': 0,
+                'commands': 0,
+                'latency': 0,
+                'loaded_cogs': 0,
+                'memory_usage': 0,
+                'error_count': self.error_count,
+                'total_commands': 0,
+                'commands_today': 0
             }
+
+    def _get_analytics_data(self) -> Dict[str, Any]:
+        """Get analytics data for dashboard"""
+        try:
+            # Mock analytics data - replace with actual data tracking
+            analytics = {
+                'top_commands': [
+                    {'name': 'help', 'count': 45},
+                    {'name': 'ping', 'count': 32},
+                    {'name': 'weather', 'count': 28},
+                    {'name': '8ball', 'count': 21},
+                    {'name': 'crypto', 'count': 18}
+                ],
+                'daily_commands': 150,
+                'weekly_commands': 980,
+                'monthly_commands': 4200,
+                'error_rate': 2.1,
+                'peak_usage_hour': 20,  # 8 PM
+                'most_active_guild': 'Main Server',
+                'commands_today': getattr(self, 'commands_today', 0),
+                'total_commands': getattr(self, 'total_commands', 0),
+                'uptime': self._calculate_uptime(),
+                'last_updated': datetime.now().isoformat()
+            }
+
+            # Add real data if bot is available
+            if self.bot:
+                try:
+                    analytics.update({
+                        'loaded_cogs': len(self.bot.cogs),
+                        'total_guilds': len(self.bot.guilds),
+                        'total_users': len(self.bot.users),
+                        'bot_latency': round(self.bot.latency * 1000) if hasattr(self.bot, 'latency') else 0
+                    })
+                except:
+                    pass
+
+            return analytics
+
+        except Exception as e:
+            logger.error(f"Error getting analytics data: {e}")
+            return {
+                'error': str(e),
+                'top_commands': [],
+                'daily_commands': 0,
+                'weekly_commands': 0,
+                'monthly_commands': 0,
+                'error_rate': 0,
+                'uptime': self._calculate_uptime(),
+                'last_updated': datetime.now().isoformat()
+            }
+
+    def _get_fallback_stats(self) -> Dict[str, Any]:
+        """Get fallback stats when main stats fail"""
+        return {
+            'bot_status': 'unknown',
+            'guilds': 0,
+            'users': 0,
+            'commands': 0,
+            'latency': 0,
+            'loaded_cogs': 0,
+            'uptime': self._calculate_uptime(),
+            'memory_usage': 0,
+            'error_count': 0,
+            'total_commands': 0,
+            'commands_today': 0,
+            'average_latency': 0,
+            'admin_ids': getattr(settings, 'ADMIN_IDS', []),
+            'system': {
+                'cpu_percent': 0,
+                'memory_percent': 0,
+                'memory_used': 0,
+                'memory_total': 0,
+                'disk_usage': 0
+            },
+            'web': {
+                'requests_count': self.request_count,
+                'error_count': self.error_count,
+                'startup_time': self.startup_time.isoformat()
+            },
+            'timestamp': datetime.now().isoformat(),
+            'version': '2.0',
+            'environment': 'production' if settings.IS_PRODUCTION else 'development'
+        }
+
+    def _calculate_error_rate(self, error_count: int, total_count: int) -> float:
+        """Calculate error rate percentage"""
+        try:
+            if total_count == 0:
+                return 0.0
+            return round((error_count / total_count) * 100, 2)
+        except:
+            return 0.0
 
     def _calculate_uptime(self) -> str:
         """Calculate uptime string"""
