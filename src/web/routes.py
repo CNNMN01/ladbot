@@ -37,12 +37,25 @@ def register_routes(app):
 
         user_id = int(session['user_id'])
         user_guilds = []
+        is_global_admin = session.get('is_admin', False)
 
         try:
+            # Import settings to get admin IDs
+            from config.settings import settings
+
             for guild in app.bot.guilds:
-                # Check if user is in guild and has admin perms
+                # Check if user is in guild
                 member = guild.get_member(user_id)
-                if member and (member.guild_permissions.administrator or user_id in app.bot.settings.ADMIN_IDS):
+
+                # Global admins can manage all servers, or check Discord permissions
+                has_access = (
+                        is_global_admin or  # Global bot admin
+                        user_id in settings.ADMIN_IDS or  # Global admin list
+                        (member and member.guild_permissions.administrator) or  # Discord server admin
+                        (member and guild.owner_id == user_id)  # Server owner
+                )
+
+                if has_access:
                     user_guilds.append({
                         'id': str(guild.id),
                         'name': guild.name,
@@ -52,7 +65,9 @@ def register_routes(app):
                     })
         except Exception as e:
             logger.error(f"Error getting user guilds: {e}")
+            logger.error(f"User ID: {user_id}, Is Global Admin: {is_global_admin}")
 
+        logger.info(f"Found {len(user_guilds)} accessible guilds for user {user_id}")
         return user_guilds
 
     def log_page_view(page: str):
@@ -130,17 +145,21 @@ def register_routes(app):
             user_guilds = get_user_guilds()
             is_admin = require_admin()
 
+            # Debug logging
+            logger.info(
+                f"Dashboard access - User: {session.get('user_id')}, Admin: {is_admin}, Guilds: {len(user_guilds)}")
+
             # Recent activity (mock data - implement based on your tracking)
             recent_activity = [
                 {
                     'action': 'Command executed',
-                    'details': f'{stats["commands_today"]} commands used today',
+                    'details': f'{stats.get("commands_today", 0)} commands used today',
                     'timestamp': datetime.now() - timedelta(minutes=5),
                     'type': 'command'
                 },
                 {
                     'action': 'Bot status check',
-                    'details': f'Latency: {stats["latency"]}ms',
+                    'details': f'Latency: {stats.get("latency", 0)}ms',
                     'timestamp': datetime.now() - timedelta(minutes=15),
                     'type': 'system'
                 }
