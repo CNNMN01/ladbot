@@ -5,158 +5,380 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Ladbot Dashboard{% endblock %}</title>
 
+    <!-- Meta Tags -->
+    <meta name="description" content="Ladbot Dashboard - Manage your Discord bot with ease">
+    <meta name="author" content="Ladbot Team">
+    <meta name="robots" content="noindex, nofollow">
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
     <!-- Custom CSS -->
     <style>
         :root {
             --primary-color: #5865F2;
+            --primary-hover: #4752C4;
             --secondary-color: #99AAB5;
             --success-color: #57F287;
             --warning-color: #FEE75C;
             --danger-color: #ED4245;
             --dark-color: #2C2F33;
             --light-color: #F8F9FA;
+            --border-radius: 10px;
+            --border-radius-lg: 15px;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.1);
+            --shadow-md: 0 5px 15px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+            --transition: all 0.3s ease;
         }
 
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 76px; /* Account for fixed navbar */
         }
 
+        /* ===== NAVIGATION ===== */
         .navbar {
             background: var(--primary-color) !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-md);
+            border-bottom: 3px solid var(--primary-hover);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+            transition: var(--transition);
         }
 
         .navbar-brand {
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 1.5rem;
             color: white !important;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .navbar-brand:hover {
+            color: rgba(255,255,255,0.9) !important;
+            transform: scale(1.05);
+        }
+
+        .navbar-brand i {
+            margin-right: 8px;
+            color: #FEE75C;
+        }
+
+        .navbar-toggler {
+            border: none;
+            padding: 4px 8px;
+        }
+
+        .navbar-toggler:focus {
+            box-shadow: none;
         }
 
         .navbar-nav .nav-link {
             color: rgba(255,255,255,0.9) !important;
-            margin: 0 10px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
+            font-weight: 500;
+            padding: 8px 16px !important;
+            margin: 0 4px;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            position: relative;
         }
 
         .navbar-nav .nav-link:hover {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.15);
+            color: white !important;
+            transform: translateY(-1px);
+        }
+
+        .navbar-nav .nav-link i {
+            margin-right: 6px;
+            font-size: 0.9rem;
+        }
+
+        /* Active nav link */
+        .navbar-nav .nav-link.active {
+            background: rgba(255,255,255,0.2);
             color: white !important;
         }
 
+        /* ===== LAYOUT ===== */
+        .content-wrapper {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-lg);
+            margin: 20px;
+            min-height: calc(100vh - 140px);
+            overflow: hidden;
+        }
+
+        /* ===== CARDS ===== */
         .card {
             border: none;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            overflow: hidden;
         }
 
         .card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
 
+        .card-header {
+            background: linear-gradient(135deg, rgba(88, 101, 242, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border-bottom: 1px solid rgba(88, 101, 242, 0.1);
+            font-weight: 600;
+            position: relative;
+        }
+
+        .card-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+        }
+
+        /* ===== BUTTONS ===== */
         .btn {
-            border-radius: 10px;
+            border-radius: var(--border-radius);
             font-weight: 500;
-            transition: all 0.3s ease;
+            transition: var(--transition);
+            border: none;
         }
 
         .btn-primary {
             background: var(--primary-color);
-            border-color: var(--primary-color);
+            color: white;
         }
 
         .btn-primary:hover {
-            background: #4752C4;
-            border-color: #4752C4;
+            background: var(--primary-hover);
             transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
         }
 
-        .alert {
-            border-radius: 10px;
-            border: none;
+        .btn-outline-primary {
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            background: transparent;
         }
 
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .btn-outline-primary:hover {
+            background: var(--primary-color);
             color: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
         }
 
-        .stat-card h2 {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0;
-        }
-
-        .stat-card h5 {
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }
-
-        .online {
-            color: var(--success-color);
-        }
-
-        .offline {
-            color: var(--danger-color);
-        }
-
-        .container-fluid {
-            padding: 20px;
-        }
-
-        .content-wrapper {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            margin: 20px 0;
-            padding: 0;
+        /* ===== ALERTS ===== */
+        .alert {
+            border-radius: var(--border-radius);
+            border: none;
+            box-shadow: var(--shadow-sm);
+            position: relative;
             overflow: hidden;
         }
+
+        .alert::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: currentColor;
+            opacity: 0.6;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, rgba(87, 242, 135, 0.1) 0%, rgba(87, 242, 135, 0.05) 100%);
+            color: #2d5016;
+            border-left: 4px solid var(--success-color);
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, rgba(237, 66, 69, 0.1) 0%, rgba(237, 66, 69, 0.05) 100%);
+            color: #721c24;
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg, rgba(254, 231, 92, 0.1) 0%, rgba(254, 231, 92, 0.05) 100%);
+            color: #856404;
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, rgba(88, 101, 242, 0.05) 100%);
+            color: #055160;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        /* ===== UTILITIES ===== */
+        .text-primary {
+            color: var(--primary-color) !important;
+        }
+
+        .bg-primary {
+            background: var(--primary-color) !important;
+        }
+
+        .border-primary {
+            border-color: var(--primary-color) !important;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            body {
+                padding-top: 66px;
+            }
+
+            .content-wrapper {
+                margin: 10px;
+                border-radius: var(--border-radius);
+                min-height: calc(100vh - 86px);
+            }
+
+            .navbar-brand {
+                font-size: 1.25rem;
+            }
+
+            .navbar-nav .nav-link {
+                margin: 2px 0;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .content-wrapper {
+                margin: 5px;
+                min-height: calc(100vh - 76px);
+            }
+        }
+
+        /* ===== ANIMATIONS ===== */
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== LOADING STATES ===== */
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+        }
+
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin-left: -8px;
+            margin-top: -8px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ===== ACCESSIBILITY ===== */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
     </style>
+
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
+            <!-- Brand -->
             <a class="navbar-brand" href="{{ url_for('dashboard') if 'user_id' in session else url_for('index') }}">
-                <i class="fas fa-robot"></i> Ladbot Dashboard
+                <i class="fas fa-robot"></i>Ladbot Dashboard
             </a>
 
-            {% if 'user_id' in session %}
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('dashboard') }}">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                </a>
-                <a class="nav-link" href="{{ url_for('settings') }}">
-                    <i class="fas fa-cog"></i> Settings
-                </a>
-                <a class="nav-link" href="{{ url_for('logout') }}">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
+            <!-- Mobile toggle -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Navigation links -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if 'user_id' in session %}
+                    <div class="navbar-nav ms-auto">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt"></i>Dashboard
+                        </a>
+                        <a class="nav-link {{ 'active' if request.endpoint in ['settings', 'advanced_settings'] }}" href="{{ url_for('settings') }}">
+                            <i class="fas fa-cog"></i>Settings
+                        </a>
+                        <a class="nav-link {{ 'active' if request.endpoint == 'analytics' }}" href="{{ url_for('analytics') }}">
+                            <i class="fas fa-chart-line"></i>Analytics
+                        </a>
+                        <a class="nav-link" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt"></i>Logout
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="navbar-nav ms-auto">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i>Home
+                        </a>
+                    </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </nav>
 
     <!-- Flash Messages -->
-    <div class="container-fluid">
+    <div class="container-fluid mt-2">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                        <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' if category == 'info' else 'check-circle' }}"></i>
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show fade-in" role="alert">
+                        <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' if category == 'info' else 'check-circle' if category == 'success' else 'exclamation-circle' }} me-2"></i>
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
             {% endif %}
@@ -164,23 +386,135 @@
     </div>
 
     <!-- Main Content -->
-    <div class="content-wrapper">
+    <div class="content-wrapper fade-in">
         {% block content %}{% endblock %}
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Custom JS -->
+    <!-- Custom JavaScript -->
     <script>
-        // Auto-hide alerts after 5 seconds
-        setTimeout(function() {
-            var alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                var bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
+        // Global utility functions
+        window.ladbotUtils = {
+            // Auto-hide alerts
+            initAlerts: function() {
+                // Auto-hide alerts after 5 seconds
+                setTimeout(function() {
+                    var alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
+                    alerts.forEach(function(alert) {
+                        try {
+                            var bsAlert = new bootstrap.Alert(alert);
+                            bsAlert.close();
+                        } catch (e) {
+                            // Silent fail if alert already closed
+                        }
+                    });
+                }, 5000);
+            },
+
+            // Show loading state on button
+            setButtonLoading: function(button, loading = true) {
+                if (loading) {
+                    button.classList.add('btn-loading');
+                    button.disabled = true;
+                    button.setAttribute('data-original-text', button.textContent);
+                } else {
+                    button.classList.remove('btn-loading');
+                    button.disabled = false;
+                    const originalText = button.getAttribute('data-original-text');
+                    if (originalText) {
+                        button.textContent = originalText;
+                        button.removeAttribute('data-original-text');
+                    }
+                }
+            },
+
+            // Show toast notification
+            showToast: function(message, type = 'success', duration = 3000) {
+                // Create toast container if it doesn't exist
+                let toastContainer = document.querySelector('.toast-container');
+                if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                    toastContainer.style.zIndex = '1055';
+                    document.body.appendChild(toastContainer);
+                }
+
+                // Create toast element
+                const toastId = 'toast-' + Date.now();
+                const toastHtml = `
+                    <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header">
+                            <i class="fas fa-${type === 'error' ? 'exclamation-triangle text-danger' : 'check-circle text-success'} me-2"></i>
+                            <strong class="me-auto">${type === 'error' ? 'Error' : 'Success'}</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">${message}</div>
+                    </div>
+                `;
+
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+                const toastElement = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastElement, { delay: duration });
+
+                toast.show();
+
+                // Remove toast element after it's hidden
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    toastElement.remove();
+                });
+            },
+
+            // Format numbers with commas
+            formatNumber: function(num) {
+                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            },
+
+            // Set active navigation item
+            setActiveNav: function() {
+                const currentPath = window.location.pathname;
+                const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+
+                navLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    if (href && currentPath === href) {
+                        link.classList.add('active');
+                    } else {
+                        link.classList.remove('active');
+                    }
+                });
+            }
+        };
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            ladbotUtils.initAlerts();
+            ladbotUtils.setActiveNav();
+
+            // Add smooth scrolling to all links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth'
+                        });
+                    }
+                });
             });
-        }, 5000);
+
+            console.log('🤖 Ladbot Dashboard loaded successfully');
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                // Page became visible - could trigger data refresh
+                console.log('Page became visible');
+            }
+        });
     </script>
 
     {% block scripts %}{% endblock %}
