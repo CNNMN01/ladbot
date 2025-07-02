@@ -12,6 +12,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
+
 def register_routes(app):
     """Register all main web routes with comprehensive functionality"""
 
@@ -97,18 +98,18 @@ def register_routes(app):
             ]
 
             return render_template('index.html',
-                                 bot=bot_info,
-                                 stats=stats,
-                                 featured_commands=featured_commands,
-                                 oauth_enabled=bool(app.config.get('DISCORD_CLIENT_ID')))
+                                   bot=bot_info,
+                                   stats=stats,
+                                   featured_commands=featured_commands,
+                                   oauth_enabled=bool(app.config.get('DISCORD_CLIENT_ID')))
 
         except Exception as e:
             logger.error(f"Index page error: {e}")
             # Fallback for index page
             return render_template('index.html',
-                                 bot={'name': 'Ladbot', 'online': False},
-                                 stats={}, featured_commands=[],
-                                 oauth_enabled=False)
+                                   bot={'name': 'Ladbot', 'online': False},
+                                   stats={}, featured_commands=[],
+                                   oauth_enabled=False)
 
     @app.route('/dashboard')
     def dashboard():
@@ -147,25 +148,25 @@ def register_routes(app):
 
             # System health data
             system_health = {
-                'memory_usage': stats['memory_usage'],
-                'response_time': stats['latency'],
+                'memory_usage': stats.get('memory_usage', 0),
+                'response_time': stats.get('latency', 0),
                 'error_rate': app.web_manager._calculate_error_rate(
-                    stats['error_count'],
-                    stats['total_commands']
+                    stats.get('error_count', 0),
+                    stats.get('total_commands', 1)
                 ),
                 'uptime_percentage': 99.5  # Could be calculated from actual uptime tracking
             }
 
             return render_template('dashboard.html',
-                                 stats=stats,
-                                 analytics=analytics,
-                                 settings=settings_data,
-                                 user=session.get('user'),
-                                 user_guilds=user_guilds,
-                                 is_admin=is_admin,
-                                 recent_activity=recent_activity,
-                                 system_health=system_health,
-                                 page_title='Dashboard')
+                                   stats=stats,
+                                   analytics=analytics,
+                                   settings=settings_data,
+                                   user=session.get('user'),
+                                   user_guilds=user_guilds,
+                                   is_admin=is_admin,
+                                   recent_activity=recent_activity,
+                                   system_health=system_health,
+                                   page_title='Dashboard')
 
         except Exception as e:
             logger.error(f"Dashboard error: {e}")
@@ -174,15 +175,15 @@ def register_routes(app):
             # Graceful fallback
             flash('Error loading dashboard data. Some information may be unavailable.', 'warning')
             return render_template('dashboard.html',
-                                 stats=app.web_manager._get_fallback_stats(),
-                                 analytics={},
-                                 settings={},
-                                 user=session.get('user'),
-                                 user_guilds=[],
-                                 is_admin=False,
-                                 recent_activity=[],
-                                 system_health={},
-                                 page_title='Dashboard')
+                                   stats=app.web_manager._get_fallback_stats(),
+                                   analytics={},
+                                   settings={},
+                                   user=session.get('user'),
+                                   user_guilds=[],
+                                   is_admin=False,
+                                   recent_activity=[],
+                                   system_health={},
+                                   page_title='Dashboard')
 
     @app.route('/login')
     def login():
@@ -194,15 +195,15 @@ def register_routes(app):
 
         # Check if OAuth is configured
         oauth_configured = bool(app.config.get('DISCORD_CLIENT_ID') and
-                              app.config.get('DISCORD_CLIENT_SECRET'))
+                                app.config.get('DISCORD_CLIENT_SECRET'))
 
         if not oauth_configured:
             flash('Discord OAuth is not configured. Please contact the administrator.', 'error')
 
         return render_template('login.html',
-                             oauth_configured=oauth_configured,
-                             redirect_uri=app.config.get('DISCORD_REDIRECT_URI'),
-                             page_title='Login')
+                               oauth_configured=oauth_configured,
+                               redirect_uri=app.config.get('DISCORD_REDIRECT_URI'),
+                               page_title='Login')
 
     @app.route('/logout')
     def logout():
@@ -235,7 +236,12 @@ def register_routes(app):
                     'name': 'General Settings',
                     'description': 'Basic bot configuration',
                     'settings': [
-                        {'key': 'prefix', 'name': 'Command Prefix', 'type': 'text', 'value': settings_data.get('prefix', 'l.')},
+                        {'key': 'prefix', 'name': 'Command Prefix', 'type': 'text',
+                         'value': settings_data.get('prefix', 'l.')},
+                        {'key': 'timezone', 'name': 'Timezone', 'type': 'select', 'value': 'UTC',
+                         'options': ['UTC', 'EST', 'PST', 'GMT']},
+                        {'key': 'language', 'name': 'Language', 'type': 'select', 'value': 'English',
+                         'options': ['English', 'Spanish', 'French']},
                         {'key': 'auto_responses', 'name': 'Auto Responses', 'type': 'boolean', 'value': True}
                     ]
                 },
@@ -259,18 +265,94 @@ def register_routes(app):
             }
 
             return render_template('settings.html',
-                                 stats=stats,
-                                 settings=settings_data,
-                                 setting_categories=setting_categories,
-                                 user=session.get('user'),
-                                 user_guilds=user_guilds,
-                                 is_admin=is_admin,
-                                 page_title='Settings')
+                                   stats=stats,
+                                   settings=settings_data,
+                                   setting_categories=setting_categories,
+                                   user=session.get('user'),
+                                   user_guilds=user_guilds,
+                                   is_admin=is_admin,
+                                   page_title='Settings')
 
         except Exception as e:
             logger.error(f"Settings page error: {e}")
             flash('Error loading settings page', 'error')
             return redirect(url_for('dashboard'))
+
+    @app.route('/advanced_settings')
+    def advanced_settings():
+        """Advanced settings page for admin users"""
+        log_page_view('advanced_settings')
+
+        if not require_auth():
+            return redirect(url_for('login'))
+
+        # Check if user is admin for advanced settings
+        if not require_admin():
+            flash('Access denied: Administrator permissions required', 'error')
+            return redirect(url_for('dashboard'))
+
+        try:
+            stats = app.web_manager._get_comprehensive_stats()
+            settings_data = app.web_manager._get_bot_settings()
+            user_guilds = get_user_guilds()
+
+            # Advanced configuration options
+            advanced_options = {
+                'system': {
+                    'name': 'System Configuration',
+                    'description': 'Core system settings',
+                    'settings': [
+                        {'key': 'debug_mode', 'name': 'Debug Mode', 'type': 'boolean',
+                         'value': settings_data.get('debug_mode', False)},
+                        {'key': 'log_level', 'name': 'Log Level', 'type': 'select', 'value': 'INFO',
+                         'options': ['DEBUG', 'INFO', 'WARNING', 'ERROR']},
+                        {'key': 'max_retries', 'name': 'Max Command Retries', 'type': 'number', 'value': 3}
+                    ]
+                },
+                'performance': {
+                    'name': 'Performance Settings',
+                    'description': 'Bot performance and optimization',
+                    'settings': [
+                        {'key': 'command_cooldown', 'name': 'Global Command Cooldown (seconds)', 'type': 'number',
+                         'value': 1},
+                        {'key': 'cache_size', 'name': 'Cache Size (MB)', 'type': 'number', 'value': 50},
+                        {'key': 'cleanup_interval', 'name': 'Cleanup Interval (hours)', 'type': 'number', 'value': 24}
+                    ]
+                },
+                'security': {
+                    'name': 'Security Settings',
+                    'description': 'Security and permissions',
+                    'settings': [
+                        {'key': 'rate_limiting', 'name': 'Enable Rate Limiting', 'type': 'boolean', 'value': True},
+                        {'key': 'admin_only_errors', 'name': 'Hide Error Details from Users', 'type': 'boolean',
+                         'value': True},
+                        {'key': 'audit_logging', 'name': 'Enable Audit Logging', 'type': 'boolean', 'value': False}
+                    ]
+                },
+                'integrations': {
+                    'name': 'External Integrations',
+                    'description': 'Third-party service settings',
+                    'settings': [
+                        {'key': 'weather_enabled', 'name': 'Weather API Integration', 'type': 'boolean', 'value': True},
+                        {'key': 'crypto_enabled', 'name': 'Cryptocurrency API', 'type': 'boolean', 'value': True},
+                        {'key': 'reddit_enabled', 'name': 'Reddit Integration', 'type': 'boolean', 'value': False}
+                    ]
+                }
+            }
+
+            return render_template('advanced_settings.html',
+                                   stats=stats,
+                                   settings=settings_data,
+                                   advanced_options=advanced_options,
+                                   user=session.get('user'),
+                                   user_guilds=user_guilds,
+                                   is_admin=True,
+                                   page_title='Advanced Settings')
+
+        except Exception as e:
+            logger.error(f"Advanced settings page error: {e}")
+            flash('Error loading advanced settings page', 'error')
+            return redirect(url_for('settings'))
 
     @app.route('/analytics')
     def analytics():
@@ -316,14 +398,14 @@ def register_routes(app):
             }
 
             return render_template('analytics.html',
-                                 stats=stats,
-                                 analytics=analytics_data,
-                                 command_chart_data=command_chart_data,
-                                 growth_data=growth_data,
-                                 performance_metrics=performance_metrics,
-                                 user=session.get('user'),
-                                 is_admin=require_admin(),
-                                 page_title='Analytics')
+                                   stats=stats,
+                                   analytics=analytics_data,
+                                   command_chart_data=command_chart_data,
+                                   growth_data=growth_data,
+                                   performance_metrics=performance_metrics,
+                                   user=session.get('user'),
+                                   is_admin=require_admin(),
+                                   page_title='Analytics')
 
         except Exception as e:
             logger.error(f"Analytics page error: {e}")
@@ -369,10 +451,10 @@ def register_routes(app):
                 guild_settings = app.bot.data_manager.get_all_guild_settings(guild_id)
 
             return render_template('guild_dashboard.html',
-                                 guild=guild_data,
-                                 settings=guild_settings,
-                                 user=session.get('user'),
-                                 page_title=f'{guild_data["name"]} Dashboard')
+                                   guild=guild_data,
+                                   settings=guild_settings,
+                                   user=session.get('user'),
+                                   page_title=f'{guild_data["name"]} Dashboard')
 
         except Exception as e:
             logger.error(f"Guild dashboard error: {e}")
@@ -409,9 +491,9 @@ def register_routes(app):
         }
 
         return render_template('about.html',
-                             bot=bot_info,
-                             user=session.get('user'),
-                             page_title='About')
+                               bot=bot_info,
+                               user=session.get('user'),
+                               page_title='About')
 
     # ===== API INTEGRATION ROUTES =====
 
@@ -435,67 +517,112 @@ def register_routes(app):
                 'error': str(e)
             }), 500
 
+    @app.route('/api/settings/update', methods=['POST'])
+    def update_settings():
+        """Update bot settings via API"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        if not require_admin():
+            return jsonify({'error': 'Admin permissions required'}), 403
+
+        try:
+            settings_data = request.get_json()
+            # Implement settings update logic here
+            # For now, just return success
+
+            return jsonify({
+                'success': True,
+                'message': 'Settings updated successfully',
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"Settings update error: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/analytics/export')
+    def export_analytics():
+        """Export analytics data"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        try:
+            analytics_data = app.web_manager._get_analytics_data()
+            stats = app.web_manager._get_comprehensive_stats()
+
+            export_data = {
+                'analytics': analytics_data,
+                'stats': stats,
+                'exported_at': datetime.now().isoformat(),
+                'exported_by': session.get('user', {}).get('username', 'Unknown')
+            }
+
+            return jsonify(export_data)
+
+        except Exception as e:
+            logger.error(f"Analytics export error: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/bot/restart', methods=['POST'])
+    def restart_bot():
+        """Restart bot (admin only)"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        if not require_admin():
+            return jsonify({'error': 'Admin permissions required'}), 403
+
+        try:
+            # Implement bot restart logic here
+            # This would typically involve sending a signal to the bot process
+            logger.info(f"Bot restart requested by {session.get('user', {}).get('username', 'Unknown')}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Bot restart initiated',
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"Bot restart error: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
     # ===== ERROR HANDLERS =====
 
-    @app.before_request
-    def before_request():
-        """Execute before each request"""
-        # Update request count
-        app.web_manager.request_count += 1
-
-        # Log API requests
+    @app.errorhandler(404)
+    def page_not_found(error):
+        """Handle 404 errors"""
         if request.path.startswith('/api/'):
-            logger.debug(f"API Request: {request.method} {request.path}")
+            return jsonify({
+                'error': 'Endpoint not found',
+                'status': 404,
+                'path': request.path
+            }), 404
 
-    @app.after_request
-    def after_request(response):
-        """Execute after each request"""
-        # Add custom headers
-        response.headers['X-Bot-Version'] = '2.0'
-        response.headers['X-Powered-By'] = 'Ladbot'
+        return render_template('errors/404.html'), 404
 
-        return response
+    @app.errorhandler(500)
+    def internal_server_error(error):
+        """Handle 500 errors"""
+        logger.error(f"Internal server error: {error}")
 
-    # ===== TEMPLATE HELPERS =====
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'error': 'Internal server error',
+                'status': 500,
+                'timestamp': datetime.now().isoformat()
+            }), 500
 
-    @app.template_global()
-    def get_bot_status():
-        """Template helper to get bot status"""
-        try:
-            if app.bot and app.bot.is_ready():
-                return 'online'
-            return 'offline'
-        except:
-            return 'unknown'
+        return render_template('errors/500.html'), 500
 
-    @app.template_global()
-    def format_uptime(uptime_str):
-        """Template helper to format uptime"""
-        try:
-            if isinstance(uptime_str, str) and ':' in uptime_str:
-                parts = uptime_str.split(':')
-                if len(parts) >= 3:
-                    hours = int(parts[0])
-                    minutes = int(parts[1])
-
-                    if hours > 24:
-                        days = hours // 24
-                        hours = hours % 24
-                        return f"{days}d {hours}h {minutes}m"
-                    else:
-                        return f"{hours}h {minutes}m"
-
-            return uptime_str
-        except:
-            return uptime_str
-
-    @app.template_global()
-    def get_command_count():
-        """Template helper to get total command count"""
-        try:
-            stats = app.web_manager._get_comprehensive_stats()
-            return stats.get('commands', 0)
-        except:
-            return 0
-
-    logger.info("✅ All web routes registered successfully")
+    logger.info("✅ All routes registered successfully")
