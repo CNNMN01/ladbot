@@ -392,32 +392,6 @@ def register_oauth_routes(app):
             flash('An unexpected error occurred during authentication.', 'error')
             return redirect(url_for('index'))
 
-    @app.route('/logout')
-    def logout():
-        """Logout user and clear session"""
-        try:
-            # Revoke token if available
-            access_token = session.get('access_token')
-            if access_token:
-                try:
-                    oauth.revoke_token(access_token)
-                except Exception as e:
-                    logger.warning(f"Could not revoke token: {e}")
-
-            # Clear session
-            username = session.get('user', {}).get('username', 'User')
-            session.clear()
-
-            flash(f'Goodbye, {username}! You have been logged out.', 'info')
-            logger.info(f"User {username} logged out successfully")
-
-        except Exception as e:
-            logger.error(f"Logout error: {e}")
-            session.clear()
-            flash('Logged out successfully.', 'info')
-
-        return redirect(url_for('index'))
-
     # Token validation middleware
     @app.before_request
     def check_token_expiry():
