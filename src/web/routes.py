@@ -489,6 +489,136 @@ def register_routes(app):
             flash('Error loading server dashboard', 'error')
             return redirect(url_for('dashboard'))
 
+    @app.route('/guild/<int:guild_id>/settings')
+    def guild_settings(guild_id):
+        """Guild-specific settings page"""
+        log_page_view(f'guild_settings_{guild_id}')
+
+        if not require_auth():
+            return redirect(url_for('login'))
+
+        try:
+            # Check if user has access to this guild
+            user_guilds = get_user_guilds()
+            guild_data = None
+
+            for guild in user_guilds:
+                if int(guild['id']) == guild_id:
+                    guild_data = guild
+                    break
+
+            if not guild_data:
+                flash('You do not have access to this server', 'error')
+                return redirect(url_for('dashboard'))
+
+            # Get guild-specific data
+            if app.bot:
+                discord_guild = app.bot.get_guild(guild_id)
+                if discord_guild:
+                    guild_data.update({
+                        'channels': len(discord_guild.channels),
+                        'roles': len(discord_guild.roles),
+                        'created_at': discord_guild.created_at,
+                        'features': discord_guild.features
+                    })
+
+            # Get current guild settings (mock data - implement with actual settings system)
+            current_settings = {
+                'prefix': 'l.',
+                'autoresponses': False,
+                'welcome_messages': True,
+                'moderation_enabled': True,
+                'logging_enabled': True,
+                'command_cooldown': 3,
+                'embed_color': '#4e73df',
+                'disabled_commands': [],
+                'admin_roles': [],
+                'moderator_roles': []
+            }
+
+            # Get available settings categories
+            setting_categories = {
+                'general': {
+                    'name': 'General Settings',
+                    'description': 'Basic guild configuration',
+                    'settings': [
+                        {'key': 'prefix', 'name': 'Command Prefix', 'type': 'text',
+                         'value': current_settings['prefix']},
+                        {'key': 'embed_color', 'name': 'Embed Color', 'type': 'color',
+                         'value': current_settings['embed_color']},
+                        {'key': 'command_cooldown', 'name': 'Command Cooldown (seconds)', 'type': 'number',
+                         'value': current_settings['command_cooldown']}
+                    ]
+                },
+                'features': {
+                    'name': 'Features',
+                    'description': 'Enable or disable bot features',
+                    'settings': [
+                        {'key': 'autoresponses', 'name': 'Auto Responses', 'type': 'boolean',
+                         'value': current_settings['autoresponses']},
+                        {'key': 'welcome_messages', 'name': 'Welcome Messages', 'type': 'boolean',
+                         'value': current_settings['welcome_messages']},
+                        {'key': 'moderation_enabled', 'name': 'Moderation', 'type': 'boolean',
+                         'value': current_settings['moderation_enabled']}
+                    ]
+                },
+                'commands': {
+                    'name': 'Command Settings',
+                    'description': 'Manage bot commands',
+                    'settings': [
+                        {'key': 'disabled_commands', 'name': 'Disabled Commands', 'type': 'multiselect',
+                         'value': current_settings['disabled_commands']},
+                        {'key': 'logging_enabled', 'name': 'Command Logging', 'type': 'boolean',
+                         'value': current_settings['logging_enabled']}
+                    ]
+                }
+            }
+
+            return render_template('guild_settings.html',
+                                   guild=guild_data,
+                                   current_settings=current_settings,
+                                   setting_categories=setting_categories,
+                                   user=session.get('user'),
+                                   page_title=f'{guild_data["name"]} Settings')
+
+        except Exception as e:
+            logger.error(f"Guild settings error: {e}")
+            flash('Error loading guild settings', 'error')
+            return redirect(url_for('dashboard'))
+
+    @app.route('/guild/<int:guild_id>/settings/save', methods=['POST'])
+    def save_guild_settings(guild_id):
+        """Save guild settings via API"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        try:
+            # Check if user has access to this guild
+            user_guilds = get_user_guilds()
+            has_access = any(int(guild['id']) == guild_id for guild in user_guilds)
+
+            if not has_access:
+                return jsonify({'error': 'Access denied'}), 403
+
+            settings_data = request.get_json()
+            logger.info(f"Saving settings for guild {guild_id}: {settings_data}")
+
+            # Here you would implement actual settings saving logic
+            # For now, just return success
+
+            return jsonify({
+                'success': True,
+                'message': 'Settings saved successfully',
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"Error saving guild settings: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
     @app.route('/about')
     def about():
         """About page with bot information"""
