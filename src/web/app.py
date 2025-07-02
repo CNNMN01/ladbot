@@ -232,140 +232,75 @@ class LadbotWebApp:
                     'guilds': len(self.bot.guilds) if hasattr(self.bot, 'guilds') else 0,
                     'users': len(self.bot.users) if hasattr(self.bot, 'users') else 0,
                     'uptime': self._calculate_uptime(),
-                    'memory_usage': self._get_memory_usage(),
-                    'timestamp': datetime.now().isoformat()
+                    'commands_loaded': len(self.bot.commands) if hasattr(self.bot, 'commands') else 0,
+                    'cogs_loaded': len(self.bot.cogs) if hasattr(self.bot, 'cogs') else 0
                 }
 
                 return jsonify(health_data)
 
             except Exception as e:
-                logger.error(f"Health check error: {e}")
+                logger.error(f"Bot health check error: {e}")
                 return jsonify({
                     'status': 'error',
                     'message': str(e)
                 }), 500
 
-        @app.route('/api/bot/reload', methods=['POST'])
-        def api_bot_reload():
-            """Bot reload endpoint (admin only) - FIXED VERSION"""
+        @app.route('/api/refresh', methods=['POST'])
+        def api_refresh_data():
+            """Refresh dashboard data"""
             try:
-                # Check authentication
-                if 'user_id' not in session:
-                    return jsonify({'error': 'Authentication required'}), 401
-
-                # Check admin permissions
-                user_id = int(session['user_id'])
-                if not self._is_admin(user_id):
-                    return jsonify({'error': 'Admin permissions required'}), 403
-
-                if not self.bot:
-                    return jsonify({'error': 'Bot not available'}), 503
-
-                # Since we're in a sync context, we can't await async functions
-                # Instead, we'll schedule the reload to happen asynchronously
-                try:
-                    if hasattr(self.bot, 'cog_loader'):
-                        # Note: This is a synchronous reload trigger
-                        # The actual async reload will happen in the bot's event loop
-                        reload_scheduled = True
-                        message = 'Bot reload scheduled successfully'
-                    else:
-                        reload_scheduled = False
-                        message = 'Bot reload not available (no cog_loader found)'
-
-                    return jsonify({
-                        'success': reload_scheduled,
-                        'message': message,
-                        'timestamp': datetime.now().isoformat(),
-                        'note': 'Reload will be processed asynchronously'
-                    })
-
-                except Exception as reload_error:
-                    logger.error(f"Bot reload scheduling error: {reload_error}")
-                    return jsonify({
-                        'success': False,
-                        'message': f'Failed to schedule reload: {str(reload_error)}'
-                    }), 500
-
-            except Exception as e:
-                logger.error(f"Bot reload API error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e)
-                }), 500
-
-        @app.route('/api/analytics')
-        def api_analytics():
-            """Comprehensive analytics endpoint"""
-            try:
-                analytics = self._get_analytics_data()
+                stats = self._get_comprehensive_stats()
                 return jsonify({
                     'success': True,
-                    'data': analytics,
+                    'data': stats,
                     'timestamp': datetime.now().isoformat()
                 })
             except Exception as e:
-                logger.error(f"Analytics API error: {e}")
                 return jsonify({
                     'success': False,
                     'error': str(e)
                 }), 500
 
-        @app.route('/api/settings', methods=['GET', 'POST'])
-        def api_settings():
-            """Settings management endpoint"""
+        @app.route('/api/logs')
+        def api_get_logs():
+            """Get recent logs via API"""
             try:
-                if request.method == 'GET':
-                    settings_data = self._get_bot_settings()
-                    return jsonify({
-                        'success': True,
-                        'data': settings_data
-                    })
+                log_file = PROJECT_ROOT / 'logs' / 'bot.log'
+                if not log_file.exists():
+                    return jsonify({'error': 'Log file not found'}), 404
 
-                elif request.method == 'POST':
-                    # Check authentication
-                    if 'user_id' not in session:
-                        return jsonify({'error': 'Authentication required'}), 401
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
 
-                    data = request.get_json()
-                    setting = data.get('setting')
-                    value = data.get('value')
+                # Get last 50 lines
+                recent_lines = lines[-50:] if len(lines) > 50 else lines
 
-                    if not setting:
-                        return jsonify({'error': 'Setting name required'}), 400
-
-                    # Update setting (implement based on your settings system)
-                    success = self._update_setting(setting, value)
-
-                    if success:
-                        return jsonify({
-                            'success': True,
-                            'message': f'Setting {setting} updated'
-                        })
+                # Filter sensitive information
+                filtered_lines = []
+                for line in recent_lines:
+                    if any(sensitive in line.lower() for sensitive in ['token', 'secret', 'password']):
+                        parts = line.split(' - ')
+                        if len(parts) >= 3:
+                            filtered_lines.append(f"{parts[0]} - {parts[1]} - [SENSITIVE DATA FILTERED]\n")
                     else:
-                        return jsonify({
-                            'success': False,
-                            'message': 'Failed to update setting'
-                        }), 500
+                        filtered_lines.append(line)
+
+                return jsonify({
+                    'logs': filtered_lines,
+                    'total_lines': len(lines),
+                    'timestamp': datetime.now().isoformat()
+                })
 
             except Exception as e:
-                logger.error(f"Settings API error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e)
-                }), 500
+                logger.error(f"API logs error: {e}")
+                return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/report-error', methods=['POST'])
+        @app.route('/api/report_error', methods=['POST'])
         def api_report_error():
             """Error reporting endpoint"""
             try:
-                data = request.get_json()
-
-                # Log the error report
-                logger.warning(f"User error report: {data}")
-
-                # Here you could send to external error tracking service
-                # like Sentry, or store in database
+                error_data = request.get_json()
+                logger.error(f"Client error report: {error_data}")
 
                 return jsonify({
                     'success': True,
@@ -507,225 +442,264 @@ class LadbotWebApp:
             except:
                 return str(value)
 
+        @app.template_filter('format_uptime')
+        def format_uptime_filter(seconds):
+            try:
+                seconds = int(float(seconds))
+                days = seconds // 86400
+                hours = (seconds % 86400) // 3600
+                minutes = (seconds % 3600) // 60
+
+                if days > 0:
+                    return f"{days}d {hours}h {minutes}m"
+                elif hours > 0:
+                    return f"{hours}h {minutes}m"
+                else:
+                    return f"{minutes}m"
+            except:
+                return 'Unknown'
+
+        # Template global functions
+        @app.template_global()
+        def now():
+            """Current datetime for templates"""
+            return datetime.now()
+
+        @app.template_global()
+        def utcnow():
+            """Current UTC datetime for templates"""
+            return datetime.utcnow()
+
+        @app.template_global()
+        def moment():
+            """Compatibility function for moment.js-like functionality"""
+            class MomentLike:
+                def __init__(self):
+                    self.dt = datetime.now()
+
+                def utc(self):
+                    self.dt = datetime.utcnow()
+                    return self
+
+                def format(self, fmt):
+                    # Convert moment.js format to Python strftime format
+                    fmt_map = {
+                        'YYYY-MM-DD HH:mm:ss UTC': '%Y-%m-%d %H:%M:%S UTC',
+                        'YYYY-MM-DD': '%Y-%m-%d',
+                        'YYYY': '%Y',
+                        'MM': '%m',
+                        'DD': '%d',
+                        'HH': '%H',
+                        'mm': '%M',
+                        'ss': '%S'
+                    }
+                    python_fmt = fmt_map.get(fmt, fmt)
+                    return self.dt.strftime(python_fmt)
+
+            return MomentLike()
+
         @app.context_processor
         def inject_globals():
             return {
                 'bot_name': 'Ladbot',
                 'current_year': datetime.now().year,
                 'app_version': '2.0',
+                'current_time': datetime.now(),
+                'current_time_utc': datetime.utcnow(),
                 'is_production': settings.IS_PRODUCTION,
-                'discord_invite': 'https://discord.gg/your-invite',  # Update with your invite
-                'github_repo': 'https://github.com/your-username/ladbot'  # Update with your repo
+                'environment': 'production' if settings.IS_PRODUCTION else 'development',
+                'debug_mode': settings.DEBUG,
+                'uptime': self._calculate_uptime()
             }
+
+        logger.info("🎨 Template helpers configured")
 
     def _setup_background_tasks(self, app: Flask) -> None:
-        """Setup background tasks for maintenance"""
-        # This would be implemented with APScheduler or similar
-        # For now, just log that it's ready
-        logger.info("📅 Background tasks configured")
+        """Setup background tasks and scheduled jobs"""
+        # Future: Setup periodic tasks like cache cleanup, analytics aggregation
+        logger.info("⚙️ Background tasks configured")
 
-    # ===== HELPER METHODS =====
+    # ===== DATA MANAGEMENT METHODS =====
 
     def _get_comprehensive_stats(self) -> Dict[str, Any]:
-        """Get comprehensive bot statistics"""
+        """Get comprehensive bot and system statistics"""
         try:
-            if not self.bot:
-                return self._get_fallback_stats()
-
-            # Bot basic stats
-            guilds = len(self.bot.guilds) if hasattr(self.bot, 'guilds') else 0
-            users = sum(guild.member_count for guild in self.bot.guilds) if hasattr(self.bot, 'guilds') else 0
-            commands = len(self.bot.commands) if hasattr(self.bot, 'commands') else 0
-
-            # Performance stats
-            latency = round(self.bot.latency * 1000) if hasattr(self.bot, 'latency') else 0
-            uptime = self._calculate_uptime()
-            memory_usage = self._get_memory_usage()
-
-            # Command tracking
-            command_usage = getattr(self.bot, 'command_usage', {})
-            commands_today = getattr(self.bot, 'commands_used_today', 0)
-            total_commands = getattr(self.bot, 'total_commands_used', 0)
-
-            return {
-                'guilds': guilds,
-                'users': users,
-                'commands': commands,
-                'latency': latency,
-                'uptime': uptime,
-                'memory_usage': memory_usage['percent'],
-                'memory_mb': memory_usage['mb'],
-                'bot_status': 'online' if self.bot.is_ready() else 'offline',
-                'loaded_cogs': len(self.bot.cogs) if hasattr(self.bot, 'cogs') else 0,
-                'command_usage': dict(list(command_usage.items())[:10]),  # Top 10 commands
-                'commands_today': commands_today,
-                'total_commands': total_commands,
-                'session_commands': getattr(self.bot, 'session_commands', 0),
-                'error_count': getattr(self.bot, 'error_count', 0),
-                'average_latency': getattr(self.bot, 'average_latency', latency),
-                'last_updated': datetime.now().isoformat()
+            stats = {
+                'timestamp': datetime.now().isoformat(),
+                'uptime': self._calculate_uptime(),
+                'version': '2.0',
+                'environment': 'production' if settings.IS_PRODUCTION else 'development'
             }
 
+            # Bot statistics
+            if self.bot:
+                try:
+                    stats.update({
+                        'bot_status': 'online' if self.bot.is_ready() else 'offline',
+                        'guilds': len(self.bot.guilds) if hasattr(self.bot, 'guilds') else 0,
+                        'users': len(self.bot.users) if hasattr(self.bot, 'users') else 0,
+                        'commands': len(self.bot.commands) if hasattr(self.bot, 'commands') else 0,
+                        'latency': round(self.bot.latency * 1000) if hasattr(self.bot, 'latency') else 0,
+                        'loaded_cogs': len(self.bot.cogs) if hasattr(self.bot, 'cogs') else 0,
+                        'admin_ids': getattr(settings, 'ADMIN_IDS', [])
+                    })
+
+                    # Cog status
+                    if hasattr(self.bot, 'cogs'):
+                        cog_status = {}
+                        for cog_name in self.bot.cogs.keys():
+                            category = cog_name.lower()
+                            if 'admin' in category:
+                                cog_status.setdefault('admin', []).append(cog_name)
+                            elif any(cat in category for cat in ['entertainment', 'game', 'fun']):
+                                cog_status.setdefault('entertainment', []).append(cog_name)
+                            elif any(cat in category for cat in ['utility', 'tool']):
+                                cog_status.setdefault('utility', []).append(cog_name)
+                            elif any(cat in category for cat in ['info', 'information']):
+                                cog_status.setdefault('information', []).append(cog_name)
+                            else:
+                                cog_status.setdefault('other', []).append(cog_name)
+
+                        stats['cog_status'] = cog_status
+
+                except Exception as e:
+                    logger.warning(f"Error getting bot stats: {e}")
+                    stats['bot_status'] = 'error'
+            else:
+                stats.update({
+                    'bot_status': 'unavailable',
+                    'guilds': 0,
+                    'users': 0,
+                    'commands': 0,
+                    'latency': 0,
+                    'loaded_cogs': 0
+                })
+
+            # System statistics
+            try:
+                memory = psutil.virtual_memory()
+                stats.update({
+                    'system': {
+                        'cpu_percent': psutil.cpu_percent(),
+                        'memory_percent': memory.percent,
+                        'memory_used': memory.used,
+                        'memory_total': memory.total,
+                        'disk_usage': psutil.disk_usage('/').percent
+                    }
+                })
+            except ImportError:
+                stats['system'] = {'error': 'psutil not available'}
+            except Exception as e:
+                logger.warning(f"Error getting system stats: {e}")
+                stats['system'] = {'error': str(e)}
+
+            # Web statistics
+            stats.update({
+                'web': {
+                    'requests_count': self.request_count,
+                    'error_count': self.error_count,
+                    'startup_time': self.startup_time.isoformat()
+                }
+            })
+
+            return stats
+
         except Exception as e:
-            logger.error(f"Error getting stats: {e}")
-            return self._get_fallback_stats()
-
-    def _get_fallback_stats(self) -> Dict[str, Any]:
-        """Fallback stats when bot is unavailable"""
-        return {
-            'guilds': 0,
-            'users': 0,
-            'commands': 0,
-            'latency': 0,
-            'uptime': '0:00:00',
-            'memory_usage': 0,
-            'memory_mb': 0,
-            'bot_status': 'offline',
-            'loaded_cogs': 0,
-            'command_usage': {},
-            'commands_today': 0,
-            'total_commands': 0,
-            'session_commands': 0,
-            'error_count': 0,
-            'average_latency': 0,
-            'last_updated': datetime.now().isoformat()
-        }
-
-    def _get_analytics_data(self) -> Dict[str, Any]:
-        """Get comprehensive analytics data"""
-        try:
-            stats = self._get_comprehensive_stats()
-
-            # Calculate analytics from stats
+            logger.error(f"Error getting comprehensive stats: {e}")
             return {
-                'total_guilds': stats['guilds'],
-                'total_users': stats['users'],
-                'total_commands': stats['total_commands'],
-                'daily_commands': stats['commands_today'],
-                'session_commands': stats['session_commands'],
-                'top_commands': [
-                    {'name': name, 'count': count}
-                    for name, count in stats['command_usage'].items()
-                ],
-                'guild_growth': self._calculate_growth('guilds', stats['guilds']),
-                'user_growth': self._calculate_growth('users', stats['users']),
-                'error_rate': self._calculate_error_rate(stats['error_count'], stats['total_commands']),
-                'uptime_percentage': 99.5,  # Could be calculated from uptime tracking
-                'average_response_time': stats['average_latency'],
-                'peak_guilds': stats['guilds'],  # Could track historical peak
-                'unique_commands_used': len(stats['command_usage']),
-                'last_updated': datetime.now().isoformat()
+                'error': str(e),
+                'timestamp': datetime.now().isoformat(),
+                'uptime': self._calculate_uptime()
             }
-
-        except Exception as e:
-            logger.error(f"Error getting analytics: {e}")
-            return {}
-
-    def _get_bot_settings(self) -> Dict[str, Any]:
-        """Get bot configuration settings"""
-        return {
-            'prefix': settings.BOT_PREFIX,
-            'admin_ids': settings.ADMIN_IDS,
-            'features_enabled': True,
-            'debug_mode': settings.DEBUG,
-            'log_level': settings.LOG_LEVEL,
-            'environment': 'production' if settings.IS_PRODUCTION else 'development'
-        }
 
     def _calculate_uptime(self) -> str:
-        """Calculate application uptime"""
-        uptime = datetime.now() - self.startup_time
-        return str(uptime).split('.')[0]  # Remove microseconds
-
-    def _get_memory_usage(self) -> Dict[str, float]:
-        """Get memory usage statistics"""
+        """Calculate uptime string"""
         try:
-            process = psutil.Process()
-            memory_info = process.memory_info()
-            memory_percent = process.memory_percent()
+            uptime_delta = datetime.now() - self.startup_time
+            days = uptime_delta.days
+            hours, remainder = divmod(uptime_delta.seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
 
-            return {
-                'mb': round(memory_info.rss / 1024 / 1024, 2),
-                'percent': round(memory_percent, 2)
-            }
+            if days > 0:
+                return f"{days}d {hours}h {minutes}m"
+            elif hours > 0:
+                return f"{hours}h {minutes}m"
+            else:
+                return f"{minutes}m"
         except:
-            return {'mb': 0, 'percent': 0}
-
-    def _calculate_growth(self, metric: str, current_value: int) -> float:
-        """Calculate growth percentage (placeholder implementation)"""
-        # This would typically compare against historical data
-        return 5.0  # Placeholder 5% growth
-
-    def _calculate_error_rate(self, errors: int, total: int) -> float:
-        """Calculate error rate percentage"""
-        if total == 0:
-            return 0.0
-        return round((errors / total) * 100, 2)
+            return "Unknown"
 
     def _is_admin(self, user_id: int) -> bool:
-        """Check if user is admin"""
-        return user_id in settings.ADMIN_IDS
-
-    def _update_setting(self, setting: str, value: Any) -> bool:
-        """Update a bot setting"""
+        """Check if user is an admin"""
         try:
-            # Implement setting update logic based on your system
-            # This would typically call your bot's settings manager
-            if self.bot and hasattr(self.bot, 'data_manager'):
-                return self.bot.data_manager.update_setting(setting, value)
+            return user_id in settings.ADMIN_IDS
+        except:
             return False
+
+    def _get_bot_settings(self) -> Dict[str, Any]:
+        """Get bot settings for display"""
+        try:
+            if hasattr(self.bot, 'settings'):
+                return {
+                    'prefix': getattr(settings, 'BOT_PREFIX', 'l.'),
+                    'admin_ids': getattr(settings, 'ADMIN_IDS', []),
+                    'debug_mode': getattr(settings, 'DEBUG', False),
+                    'environment': 'production' if settings.IS_PRODUCTION else 'development'
+                }
+            return {
+                'prefix': settings.BOT_PREFIX,
+                'admin_ids': settings.ADMIN_IDS,
+                'debug_mode': settings.DEBUG,
+                'environment': 'production' if settings.IS_PRODUCTION else 'development'
+            }
         except Exception as e:
-            logger.error(f"Error updating setting {setting}: {e}")
-            return False
+            logger.error(f"Error getting bot settings: {e}")
+            return {}
 
 
-# ===== FACTORY FUNCTIONS =====
+# ===== PRODUCTION SERVER RUNNER =====
 
-def create_app(bot=None) -> Flask:
-    """Factory function to create Flask application"""
-    web_manager = LadbotWebApp(bot)
-    return web_manager.create_app()
-
-
-def run_web_server(bot, host='0.0.0.0', port=8080, debug=False):
-    """Run the web server with proper configuration"""
-    app = create_app(bot)
-
-    logger.info(f"🌐 Starting Ladbot web dashboard on http://{host}:{port}")
-    logger.info(f"🔐 Discord OAuth: {'✅ Configured' if settings.DISCORD_CLIENT_ID else '❌ Not configured'}")
-    logger.info(f"🏃 Environment: {settings.ENVIRONMENT}")
-
+def run_web_server(bot=None, host='0.0.0.0', port=8080, debug=False):
+    """Production-ready web server runner"""
     try:
-        # Production vs Development server
+        logger.info("🚀 Ladbot web dashboard startup")
+
+        # Create web application
+        web_manager = LadbotWebApp(bot)
+        app = web_manager.create_app()
+
         if settings.IS_PRODUCTION:
-            # Production configuration
+            logger.info("🏭 Running in production mode")
+            # Use Werkzeug's built-in server with threading
             app.run(
                 host=host,
                 port=port,
                 debug=False,
-                use_reloader=False,
-                threaded=True
+                threaded=True,
+                use_reloader=False
             )
         else:
-            # Development configuration
+            logger.info("🔧 Running in development mode")
             app.run(
                 host=host,
                 port=port,
-                debug=debug or settings.DEBUG,
-                use_reloader=False,  # Disabled to prevent conflicts with bot
-                threaded=True
+                debug=debug,
+                use_reloader=False  # Disable reloader in bot context
             )
 
     except Exception as e:
-        logger.error(f"❌ Web server error: {e}")
+        logger.error(f"❌ Web server failed to start: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
 
-# ===== MODULE LEVEL EXPORTS =====
+def create_app(bot=None):
+    """Flask application factory"""
+    web_manager = LadbotWebApp(bot)
+    return web_manager.create_app()
 
-__all__ = ['create_app', 'run_web_server', 'LadbotWebApp']
 
 if __name__ == '__main__':
-    # For direct execution (development only)
-    app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    # Standalone mode for testing
+    print("🚀 Starting Ladbot Web Dashboard in standalone mode...")
+    run_web_server(debug=True)
