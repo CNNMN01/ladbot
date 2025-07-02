@@ -1,0 +1,614 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - Ladbot Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .error-container {
+        min-height: 70vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        position: relative;
+    }
+
+    .error-content {
+        max-width: 600px;
+        padding: 2rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .error-code {
+        font-size: 8rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1;
+        margin-bottom: 1rem;
+        text-shadow: 0 0 30px rgba(255, 107, 107, 0.3);
+        animation: pulse-error 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-error {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .error-message {
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+
+    .error-description {
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        line-height: 1.6;
+        font-size: 1.1rem;
+    }
+
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem 1.5rem;
+        background: linear-gradient(135deg, rgba(255, 107, 107, 0.1) 0%, rgba(238, 90, 82, 0.1) 100%);
+        border: 1px solid rgba(255, 107, 107, 0.2);
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 2rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .pulse-dot {
+        width: 12px;
+        height: 12px;
+        background: #ff6b6b;
+        border-radius: 50%;
+        animation: pulse-dot 2s infinite;
+        box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.5;
+            transform: scale(1.2);
+        }
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+
+    .error-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 2px solid transparent;
+    }
+
+    .error-btn-primary {
+        background: var(--discord-primary);
+        color: white;
+        border-color: var(--discord-primary);
+    }
+
+    .error-btn-primary:hover {
+        background: var(--discord-hover);
+        border-color: var(--discord-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3);
+        color: white;
+        text-decoration: none;
+    }
+
+    .error-btn-warning {
+        background: #ffc107;
+        color: #212529;
+        border-color: #ffc107;
+    }
+
+    .error-btn-warning:hover {
+        background: #ffca2c;
+        border-color: #ffca2c;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+        color: #212529;
+        text-decoration: none;
+    }
+
+    .error-btn-secondary {
+        background: transparent;
+        color: var(--text-primary);
+        border-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .error-btn-secondary:hover {
+        background: rgba(0, 0, 0, 0.05);
+        transform: translateY(-2px);
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+
+    .technical-details {
+        background: rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 1.5rem 0;
+    }
+
+    .technical-summary {
+        padding: 1rem 1.5rem;
+        cursor: pointer;
+        background: rgba(0, 0, 0, 0.02);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        transition: background 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .technical-summary:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .technical-content {
+        padding: 1.5rem;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.85rem;
+        background: #f8f9fa;
+        border-radius: 0 0 12px 12px;
+        color: #495057;
+        line-height: 1.5;
+    }
+
+    .error-id {
+        background: rgba(255, 107, 107, 0.1);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-family: monospace;
+        color: #dc3545;
+        font-size: 0.8rem;
+    }
+
+    .support-section {
+        background: linear-gradient(135deg, rgba(88, 101, 242, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+        border: 1px solid rgba(88, 101, 242, 0.1);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .support-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .support-text {
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+
+    .support-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .support-link {
+        color: var(--discord-primary);
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--discord-primary);
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        font-size: 0.875rem;
+    }
+
+    .support-link:hover {
+        background: var(--discord-primary);
+        color: white;
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+
+    .retry-timer {
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.2);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #856404;
+    }
+
+    .floating-error-elements {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    .floating-element {
+        position: absolute;
+        opacity: 0.1;
+        color: #ff6b6b;
+        animation: float-error 8s ease-in-out infinite;
+    }
+
+    .floating-element:nth-child(1) {
+        top: 15%;
+        left: 10%;
+        font-size: 2.5rem;
+        animation-delay: 0s;
+    }
+
+    .floating-element:nth-child(2) {
+        top: 25%;
+        right: 15%;
+        font-size: 2rem;
+        animation-delay: 1.5s;
+    }
+
+    .floating-element:nth-child(3) {
+        bottom: 25%;
+        left: 20%;
+        font-size: 3rem;
+        animation-delay: 3s;
+    }
+
+    .floating-element:nth-child(4) {
+        bottom: 35%;
+        right: 10%;
+        font-size: 2.2rem;
+        animation-delay: 4.5s;
+    }
+
+    @keyframes float-error {
+        0%, 100% {
+            transform: translateY(0px) rotate(0deg);
+            opacity: 0.1;
+        }
+        50% {
+            transform: translateY(-30px) rotate(180deg);
+            opacity: 0.2;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .error-code {
+            font-size: 6rem;
+        }
+
+        .error-message {
+            font-size: 1.25rem;
+        }
+
+        .error-description {
+            font-size: 1rem;
+        }
+
+        .error-actions {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .error-btn {
+            width: 100%;
+            max-width: 250px;
+            justify-content: center;
+        }
+
+        .support-actions {
+            flex-direction: column;
+        }
+
+        .floating-error-elements {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="floating-error-elements">
+        <i class="fas fa-exclamation-triangle floating-element"></i>
+        <i class="fas fa-bug floating-element"></i>
+        <i class="fas fa-wrench floating-element"></i>
+        <i class="fas fa-cog floating-element"></i>
+    </div>
+
+    <div class="error-content">
+        <div class="error-code">500</div>
+        <h1 class="error-message">Internal Server Error</h1>
+
+        <div class="status-indicator">
+            <div class="pulse-dot"></div>
+            <span>Our robots are working on it...</span>
+        </div>
+
+        <p class="error-description">
+            Something went wrong on our end. Don't worry, it's not you, it's us!
+            Our team has been automatically notified and is working to fix this issue.
+        </p>
+
+        <div class="error-actions">
+            <a href="{{ url_for('index') }}" class="error-btn error-btn-primary">
+                <i class="fas fa-home"></i>
+                Go Home
+            </a>
+
+            <button class="error-btn error-btn-warning" onclick="retryPage()" id="retryBtn">
+                <i class="fas fa-redo"></i>
+                Try Again
+            </button>
+
+            {% if 'user_id' in session %}
+            <a href="{{ url_for('dashboard') }}" class="error-btn error-btn-secondary">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Technical Details -->
+        <div class="technical-details">
+            <div class="technical-summary" onclick="toggleTechnicalDetails()">
+                <span>
+                    <i class="fas fa-code"></i>
+                    <strong>Technical Details</strong>
+                </span>
+                <i class="fas fa-chevron-down" id="technicalChevron"></i>
+            </div>
+            <div class="technical-content" id="technicalContent" style="display: none;">
+                <div><strong>Error ID:</strong> <span class="error-id">{{ request.headers.get('X-Request-ID', 'ERR-' + range(10000, 99999) | random | string) }}</span></div>
+                <div><strong>Timestamp:</strong> {{ moment().utc().format('YYYY-MM-DD HH:mm:ss UTC') }}</div>
+                <div><strong>Request URL:</strong> {{ request.url }}</div>
+                <div><strong>User Agent:</strong> {{ request.headers.get('User-Agent', 'Unknown')[:100] }}...</div>
+                <div><strong>IP Address:</strong> {{ request.headers.get('X-Forwarded-For', request.remote_addr) }}</div>
+                {% if error_message %}
+                <div><strong>Error Message:</strong> {{ error_message }}</div>
+                {% endif %}
+                <div><strong>Server Time:</strong> {{ moment().format('YYYY-MM-DD HH:mm:ss') }}</div>
+                <div><strong>Bot Status:</strong> <span id="botStatus">Checking...</span></div>
+            </div>
+        </div>
+
+        <!-- Auto-retry Timer -->
+        <div class="retry-timer" id="retryTimer" style="display: none;">
+            <i class="fas fa-clock"></i>
+            <strong>Auto-retry:</strong> This page will automatically retry in <span id="countdown">30</span> seconds.
+            <button onclick="cancelAutoRetry()" style="margin-left: 1rem; background: none; border: 1px solid #856404; border-radius: 4px; padding: 0.25rem 0.5rem; color: #856404; cursor: pointer;">
+                Cancel
+            </button>
+        </div>
+
+        <!-- Support Section -->
+        <div class="support-section">
+            <div class="support-title">
+                <i class="fas fa-life-ring"></i>
+                Need Help?
+            </div>
+            <p class="support-text">
+                If this problem persists or you need immediate assistance,
+                our support team is here to help. Please include the error ID above when contacting us.
+            </p>
+            <div class="support-actions">
+                <a href="#" onclick="reportError('500', window.location.href)" class="support-link">
+                    <i class="fas fa-bug"></i> Report Issue
+                </a>
+                <a href="{{ url_for('about') }}" class="support-link">
+                    <i class="fas fa-question-circle"></i> Get Help
+                </a>
+                <a href="mailto:support@yourbot.com" class="support-link">
+                    <i class="fas fa-envelope"></i> Contact Support
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let autoRetryTimer = null;
+let retryCountdown = 30;
+
+// Toggle technical details
+function toggleTechnicalDetails() {
+    const content = document.getElementById('technicalContent');
+    const chevron = document.getElementById('technicalChevron');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
+// Retry page function
+function retryPage() {
+    const btn = document.getElementById('retryBtn');
+    const originalContent = btn.innerHTML;
+
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retrying...';
+    btn.disabled = true;
+
+    // Cancel auto-retry if active
+    cancelAutoRetry();
+
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+// Error reporting function
+function reportError(errorCode, url) {
+    if (confirm('Would you like to report this error to our support team? This will help us improve the service.')) {
+        const errorData = {
+            error_code: errorCode,
+            url: url,
+            timestamp: new Date().toISOString(),
+            user_agent: navigator.userAgent,
+            referrer: document.referrer,
+            error_id: document.querySelector('.error-id')?.textContent || 'Unknown',
+            screen_resolution: `${screen.width}x${screen.height}`,
+            viewport_size: `${window.innerWidth}x${window.innerHeight}`
+        };
+
+        fetch('/api/report-error', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(errorData)
+        }).then(response => {
+            if (response.ok) {
+                alert('Error reported successfully. Our team will investigate this issue. Thank you for your help!');
+            } else {
+                throw new Error('Report failed');
+            }
+        }).catch(() => {
+            alert('Could not report error automatically. Please contact support directly with error ID: ' + errorData.error_id);
+        });
+    }
+}
+
+// Start auto-retry countdown
+function startAutoRetry() {
+    const timerDiv = document.getElementById('retryTimer');
+    const countdownSpan = document.getElementById('countdown');
+
+    timerDiv.style.display = 'block';
+
+    autoRetryTimer = setInterval(() => {
+        retryCountdown--;
+        countdownSpan.textContent = retryCountdown;
+
+        if (retryCountdown <= 0) {
+            cancelAutoRetry();
+            window.location.reload();
+        }
+    }, 1000);
+}
+
+// Cancel auto-retry
+function cancelAutoRetry() {
+    if (autoRetryTimer) {
+        clearInterval(autoRetryTimer);
+        autoRetryTimer = null;
+    }
+
+    const timerDiv = document.getElementById('retryTimer');
+    timerDiv.style.display = 'none';
+    retryCountdown = 30;
+}
+
+// Check bot status
+async function checkBotStatus() {
+    try {
+        const response = await fetch('/api/bot/health');
+        const data = await response.json();
+
+        const statusElement = document.getElementById('botStatus');
+        if (data.status === 'healthy') {
+            statusElement.innerHTML = '<span style="color: #28a745;">Online</span>';
+        } else {
+            statusElement.innerHTML = '<span style="color: #dc3545;">Offline</span>';
+        }
+    } catch (error) {
+        document.getElementById('botStatus').innerHTML = '<span style="color: #ffc107;">Unknown</span>';
+    }
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Check bot status
+    checkBotStatus();
+
+    // Start auto-retry after 10 seconds
+    setTimeout(() => {
+        if (confirm('Would you like to automatically retry loading this page in 30 seconds?')) {
+            startAutoRetry();
+        }
+    }, 10000);
+
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // R key to retry
+        if (e.key === 'r' || e.key === 'R') {
+            e.preventDefault();
+            retryPage();
+        }
+
+        // H key to go home
+        if (e.key === 'h' || e.key === 'H') {
+            e.preventDefault();
+            window.location.href = '{{ url_for("index") }}';
+        }
+    });
+});
+
+// Show keyboard shortcuts hint
+setTimeout(() => {
+    const hint = document.createElement('div');
+    hint.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    `;
+    hint.innerHTML = 'Press <kbd style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 3px;">R</kbd> to retry or <kbd style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 3px;">H</kbd> for home';
+    document.body.appendChild(hint);
+
+    // Fade in
+    setTimeout(() => {
+        hint.style.opacity = '1';
+    }, 100);
+
+    // Fade out after 5 seconds
+    setTimeout(() => {
+        hint.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(hint);
+        }, 300);
+    }, 5000);
+}, 3000);
+</script>
+{% endblock %}

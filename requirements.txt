@@ -1,33 +1,146 @@
-# Core Discord.py and async libraries
-discord.py>=2.3.0
-aiohttp>=3.8.0
+# ===============================================
+# LADBOT ENHANCED - PRODUCTION DEPENDENCIES
+# Complete dependency list for Discord bot with web dashboard
+# ===============================================
 
-# Web framework (for optional dashboard)
-flask>=2.3.0
-flask-cors>=4.0.0
+# ===== CORE DISCORD BOT =====
+# Discord.py library and async support
+discord.py>=2.3.0,<3.0.0
+aiohttp>=3.8.0,<4.0.0
+asyncio-mqtt>=0.11.0
 
-# Environment and configuration
+# ===== WEB DASHBOARD =====
+# Flask web framework and extensions
+Flask>=2.3.0,<3.0.0
+Flask-CORS>=4.0.0
+Werkzeug>=2.3.0,<3.0.0
+
+# ===== ENVIRONMENT & CONFIGURATION =====
+# Environment variables and configuration management
 python-dotenv>=1.0.0
+pydantic>=2.0.0
 
-# HTTP requests and API calls
+# ===== HTTP REQUESTS & API INTEGRATION =====
+# HTTP client for API calls
 requests>=2.31.0
+urllib3>=1.26.0,<2.0.0
 
-# System monitoring
+# ===== SYSTEM MONITORING =====
+# System resource monitoring
 psutil>=5.9.0
 
+# ===== TEXT PROCESSING =====
 # Text processing and fuzzy matching
 fuzzywuzzy>=0.18.0
 python-Levenshtein>=0.20.0
 
-# Production WSGI server (for web dashboard)
+# ===== PRODUCTION WEB SERVER =====
+# WSGI server for production deployment
 gunicorn>=21.2.0
+waitress>=2.1.0
 
-# Optional: Additional useful libraries
-asyncio-mqtt>=0.11.0
-
+# ===== IMAGE PROCESSING =====
+# Image manipulation and processing
 Pillow>=10.0.0
 
+# ===== ASCII ART & TEXT =====
+# ASCII art generation
 art>=6.0
 
-psutil>=5.9.0
+# ===== DATA PROCESSING =====
+# JSON and data handling
+ujson>=5.7.0
+python-dateutil>=2.8.0
 
+# ===== LOGGING & MONITORING =====
+# Enhanced logging capabilities
+colorlog>=6.7.0
+structlog>=23.1.0
+
+# ===== SECURITY =====
+# Security and cryptography
+cryptography>=41.0.0
+PyJWT>=2.8.0
+
+# ===== DATABASE (OPTIONAL) =====
+# SQLite support (already in Python stdlib, but explicit for clarity)
+# For future database integration
+# SQLAlchemy>=2.0.0
+
+# ===== TESTING & DEVELOPMENT =====
+# Development and testing tools (commented out for production)
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# black>=23.7.0
+# flake8>=6.0.0
+
+# ===== OPTIONAL INTEGRATIONS =====
+# Weather API integration
+# pyowm>=3.3.0
+
+# Cryptocurrency API
+# python-binance>=1.0.0
+
+# Reddit API integration
+# praw>=7.7.0
+
+# ===== DEPLOYMENT SPECIFIC =====
+# Platform-specific requirements
+
+# For Railway deployment
+# railway>=0.6.0
+
+# For Render deployment
+# render>=1.0.0
+
+# For Docker deployment
+# docker>=6.1.0
+
+# ===== VERSION CONSTRAINTS =====
+# Python version requirement (in comments for reference)
+# Requires Python 3.8+
+
+# ===== DEPENDENCY NOTES =====
+#
+# Core Dependencies:
+# - discord.py: Main Discord API wrapper
+# - Flask: Web dashboard framework
+# - requests: HTTP client for API calls
+# - psutil: System monitoring
+# - python-dotenv: Environment variables
+#
+# Optional Dependencies:
+# - Pillow: Image processing for avatar handling
+# - art: ASCII art generation
+# - fuzzywuzzy: Fuzzy string matching for commands
+#
+# Production Dependencies:
+# - gunicorn: Production WSGI server
+# - cryptography: Security features
+# - colorlog: Enhanced logging
+#
+# Development Dependencies (commented out):
+# - pytest: Testing framework
+# - black: Code formatting
+# - flake8: Code linting
+#
+# Platform Dependencies:
+# - waitress: Alternative WSGI server for Windows
+# - ujson: Fast JSON processing
+#
+# ===============================================
+# INSTALLATION COMMANDS:
+#
+# Basic installation:
+# pip install -r requirements.txt
+#
+# Development installation:
+# pip install -r requirements.txt -r requirements-dev.txt
+#
+# Production installation:
+# pip install -r requirements.txt --no-dev
+#
+# Upgrade all packages:
+# pip install -r requirements.txt --upgrade
+#
+# ===============================================

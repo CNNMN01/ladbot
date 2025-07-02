@@ -2,69 +2,668 @@
 
 {% block title %}Login - Ladbot Dashboard{% endblock %}
 
+{% block extra_head %}
+<style>
+    .login-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+
+    .login-card {
+        max-width: 500px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        position: relative;
+    }
+
+    .login-header {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 2.5rem 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+        animation: shimmer 4s linear infinite;
+    }
+
+    @keyframes shimmer {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .login-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.95;
+        position: relative;
+        z-index: 2;
+        animation: bounce-gentle 3s ease-in-out infinite;
+    }
+
+    @keyframes bounce-gentle {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
+
+    .login-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+        position: relative;
+        z-index: 2;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .login-subtitle {
+        opacity: 0.9;
+        margin: 0.5rem 0 0 0;
+        position: relative;
+        z-index: 2;
+        font-size: 1rem;
+    }
+
+    .login-body {
+        padding: 2.5rem 2rem;
+    }
+
+    .login-description {
+        text-align: center;
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        line-height: 1.6;
+        font-size: 1rem;
+    }
+
+    .discord-login-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        width: 100%;
+        padding: 1.25rem 2rem;
+        background: #5865F2;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(88, 101, 242, 0.3);
+    }
+
+    .discord-login-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .discord-login-btn:hover::before {
+        left: 100%;
+    }
+
+    .discord-login-btn:hover {
+        background: #4752C4;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(88, 101, 242, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+
+    .discord-login-btn:active {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(88, 101, 242, 0.3);
+    }
+
+    .discord-login-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+        opacity: 0.6;
+    }
+
+    .discord-login-btn:disabled:hover {
+        background: #ccc;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .login-btn-icon {
+        font-size: 1.25rem;
+        transition: transform 0.3s ease;
+    }
+
+    .discord-login-btn:hover .login-btn-icon {
+        transform: scale(1.1);
+    }
+
+    .features-list {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .features-title {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        color: var(--text-secondary);
+        padding: 0.75rem;
+        border-radius: 8px;
+        transition: background 0.3s ease;
+    }
+
+    .feature-item:hover {
+        background: rgba(88, 101, 242, 0.03);
+    }
+
+    .feature-icon {
+        width: 45px;
+        height: 45px;
+        background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--discord-primary);
+        flex-shrink: 0;
+        font-size: 1.1rem;
+        transition: transform 0.3s ease;
+    }
+
+    .feature-item:hover .feature-icon {
+        transform: scale(1.05);
+    }
+
+    .feature-content h6 {
+        margin: 0 0 0.25rem 0;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+    }
+
+    .feature-content small {
+        color: var(--text-muted);
+        line-height: 1.4;
+        font-size: 0.85rem;
+    }
+
+    .oauth-notice {
+        background: linear-gradient(135deg, rgba(88, 101, 242, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+        border: 1px solid rgba(88, 101, 242, 0.15);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        position: relative;
+    }
+
+    .oauth-notice::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--gradient-primary);
+        border-radius: 12px 12px 0 0;
+    }
+
+    .oauth-notice .notice-icon {
+        color: var(--discord-primary);
+        margin-right: 0.5rem;
+    }
+
+    .error-notice {
+        background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 107, 107, 0.05) 100%);
+        border: 1px solid rgba(220, 53, 69, 0.2);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        color: #dc3545;
+        position: relative;
+    }
+
+    .error-notice::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(135deg, #dc3545 0%, #ff6b6b 100%);
+        border-radius: 12px 12px 0 0;
+    }
+
+    .error-notice .error-icon {
+        margin-right: 0.5rem;
+        animation: pulse 2s infinite;
+    }
+
+    .status-badges {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: rgba(87, 242, 135, 0.1);
+        color: var(--discord-success);
+        border: 1px solid rgba(87, 242, 135, 0.2);
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        background: currentColor;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+    }
+
+    .loading-content {
+        text-align: center;
+        color: var(--discord-primary);
+    }
+
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(88, 101, 242, 0.1);
+        border-top: 4px solid var(--discord-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+        .login-container {
+            padding: 1rem;
+        }
+
+        .login-card {
+            margin: 1rem;
+            border-radius: 15px;
+        }
+
+        .login-header,
+        .login-body {
+            padding: 2rem 1.5rem;
+        }
+
+        .login-icon {
+            font-size: 3rem;
+        }
+
+        .login-title {
+            font-size: 1.5rem;
+        }
+
+        .login-subtitle {
+            font-size: 0.9rem;
+        }
+
+        .discord-login-btn {
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .status-badges {
+            flex-direction: column;
+            align-items: center;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .feature-item {
+            flex-direction: column;
+            text-align: center;
+            gap: 0.75rem;
+        }
+
+        .feature-icon {
+            margin: 0 auto;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-body text-center p-5">
-                    <div class="mb-4">
-                        <i class="fas fa-robot fa-4x text-primary mb-3"></i>
-                        <h3>Ladbot Dashboard</h3>
-                        <p class="text-muted">Welcome to the Ladbot management dashboard!</p>
+<div class="login-container">
+    <div class="login-card">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <h6>Connecting to Discord...</h6>
+                <small>Please wait while we redirect you</small>
+            </div>
+        </div>
+
+        <div class="login-header">
+            <div class="login-icon">
+                <i class="fab fa-discord"></i>
+            </div>
+            <h1 class="login-title">Welcome to Ladbot</h1>
+            <p class="login-subtitle">Access your bot dashboard</p>
+        </div>
+
+        <div class="login-body">
+            {% if not oauth_configured %}
+            <div class="error-notice">
+                <i class="fas fa-exclamation-triangle error-icon"></i>
+                <strong>OAuth Not Configured</strong><br>
+                Discord authentication is not properly set up. Please contact the administrator to configure Discord OAuth settings.
+            </div>
+            {% endif %}
+
+            <p class="login-description">
+                Sign in with your Discord account to access the Ladbot dashboard.
+                Monitor your bot's performance, manage server settings, and view detailed analytics.
+            </p>
+
+            {% if oauth_configured %}
+            <a href="{{ url_for('discord_auth') }}" class="discord-login-btn" id="loginBtn">
+                <i class="fab fa-discord login-btn-icon"></i>
+                <span id="loginBtnText">Continue with Discord</span>
+            </a>
+
+            <div class="status-badges">
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    <span>Secure OAuth</span>
+                </div>
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    <span>Privacy Focused</span>
+                </div>
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    <span>No Registration</span>
+                </div>
+            </div>
+            {% else %}
+            <button class="discord-login-btn" disabled>
+                <i class="fas fa-exclamation-triangle login-btn-icon"></i>
+                <span>OAuth Not Available</span>
+            </button>
+            {% endif %}
+
+            <div class="features-list">
+                <h6 class="features-title">What you'll get access to</h6>
+
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-tachometer-alt"></i>
                     </div>
-
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ 'danger' if category == 'error' else 'warning' if category == 'warning' else 'success' }} alert-dismissible fade show" role="alert">
-                                    {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-
-                    {% if config['DISCORD_CLIENT_ID'] %}
-                        <a href="{{ url_for('discord_auth') }}" class="btn btn-primary btn-lg mb-3">
-                            <i class="fab fa-discord me-2"></i> Login with Discord
-                        </a>
-                        <p class="small text-muted">
-                            <i class="fas fa-info-circle"></i> Admin permissions required for access
-                        </p>
-                    {% else %}
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle"></i> Discord OAuth not configured
-                        </div>
-                        <p class="text-muted">Please contact the administrator to set up Discord authentication.</p>
-
-                        <!-- Development demo login -->
-                        {% if config.get('DEVELOPMENT') %}
-                            <hr>
-                            <a href="{{ url_for('demo_login') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-user"></i> Demo Login (Development)
-                            </a>
-                        {% endif %}
-                    {% endif %}
-
-                    <hr class="my-4">
-
-                    <h6>Dashboard Features:</h6>
-                    <ul class="list-unstyled text-start">
-                        <li class="mb-2"><i class="fas fa-chart-line text-primary me-2"></i> Real-time bot statistics</li>
-                        <li class="mb-2"><i class="fas fa-cog text-success me-2"></i> Server settings management</li>
-                        <li class="mb-2"><i class="fas fa-users text-info me-2"></i> User analytics</li>
-                        <li class="mb-2"><i class="fas fa-shield-alt text-warning me-2"></i> Admin controls</li>
-                    </ul>
-
-                    <div class="mt-4">
-                        <small class="text-muted">
-                            <i class="fas fa-lock"></i> Secure authentication powered by Discord OAuth 2.0
-                        </small>
+                    <div class="feature-content">
+                        <h6>Real-time Dashboard</h6>
+                        <small>Live bot statistics, performance monitoring, and system health indicators</small>
                     </div>
                 </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="feature-content">
+                        <h6>Advanced Analytics</h6>
+                        <small>Command usage patterns, server growth metrics, and detailed insights</small>
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <div class="feature-content">
+                        <h6>Server Management</h6>
+                        <small>Configure bot settings, manage features, and customize behavior per server</small>
+                    </div>
+                </div>
+
+                {% if session.get('is_admin') %}
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <div class="feature-content">
+                        <h6>Admin Controls</h6>
+                        <small>Full bot administration, advanced features, and system management</small>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="oauth-notice">
+                <i class="fas fa-shield-alt notice-icon"></i>
+                <strong>Secure Authentication:</strong> We only request basic profile information from Discord.
+                Your data is protected and we never store your Discord password or sensitive information.
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Login button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const loginBtn = document.getElementById('loginBtn');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loginBtnText = document.getElementById('loginBtnText');
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', function(e) {
+            // Show loading state
+            loadingOverlay.style.display = 'flex';
+
+            // Update button text
+            loginBtnText.textContent = 'Redirecting...';
+            this.style.pointerEvents = 'none';
+
+            // Reset if user comes back (e.g., cancels OAuth)
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+                loginBtnText.textContent = 'Continue with Discord';
+                this.style.pointerEvents = 'auto';
+            }, 10000);
+        });
+
+        // Add keyboard support
+        loginBtn.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            }
+        });
+    }
+});
+
+// Handle OAuth errors from URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const error = urlParams.get('error');
+const errorDescription = urlParams.get('error_description');
+
+if (error) {
+    let errorMessage = 'Authentication failed';
+
+    switch (error) {
+        case 'access_denied':
+            errorMessage = 'You denied access to Discord. Please try again and allow access to continue.';
+            break;
+        case 'invalid_request':
+            errorMessage = 'Invalid authentication request. Please try again or contact support.';
+            break;
+        case 'server_error':
+            errorMessage = 'Discord server error. Please try again in a few moments.';
+            break;
+        case 'temporarily_unavailable':
+            errorMessage = 'Discord service is temporarily unavailable. Please try again later.';
+            break;
+        default:
+            errorMessage = errorDescription || `Authentication error: ${error}`;
+    }
+
+    // Show error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-notice';
+    errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle error-icon"></i>
+        <strong>Authentication Error</strong><br>
+        ${errorMessage}
+        <div style="margin-top: 0.75rem;">
+            <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: 1px solid currentColor; border-radius: 4px; padding: 0.25rem 0.5rem; color: inherit; cursor: pointer; font-size: 0.8rem;">
+                Dismiss
+            </button>
+        </div>
+    `;
+
+    const loginBody = document.querySelector('.login-body');
+    loginBody.insertBefore(errorDiv, loginBody.firstChild);
+
+    // Clean URL after showing error
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+// Add some personality with random loading messages
+const loadingMessages = [
+    'Connecting to Discord...',
+    'Preparing your dashboard...',
+    'Setting up your session...',
+    'Validating credentials...',
+    'Almost ready...'
+];
+
+function updateLoadingMessage() {
+    const loadingContent = document.querySelector('.loading-content h6');
+    if (loadingContent) {
+        const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+        loadingContent.textContent = randomMessage;
+    }
+}
+
+// Update loading message every 2 seconds when visible
+setInterval(() => {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay && loadingOverlay.style.display === 'flex') {
+        updateLoadingMessage();
+    }
+}, 2000);
+
+// Add smooth scroll to features when button is clicked
+function scrollToFeatures() {
+    document.querySelector('.features-list').scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+    });
+}
+
+// Add focus management for accessibility
+document.addEventListener('keydown', function(e) {
+    // ESC key to dismiss any visible errors
+    if (e.key === 'Escape') {
+        const errorNotices = document.querySelectorAll('.error-notice');
+        errorNotices.forEach(notice => {
+            const dismissBtn = notice.querySelector('button');
+            if (dismissBtn) {
+                dismissBtn.click();
+            }
+        });
+    }
+});
+
+// Auto-focus login button when page loads
+setTimeout(() => {
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn && !loginBtn.disabled) {
+        loginBtn.focus();
+    }
+}, 500);
+
+// Add visual feedback for connection status
+fetch('/api/bot/health')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'healthy') {
+            const statusBadges = document.querySelector('.status-badges');
+            if (statusBadges) {
+                const botStatus = document.createElement('div');
+                botStatus.className = 'status-badge';
+                botStatus.innerHTML = `
+                    <div class="status-dot"></div>
+                    <span>Bot Online</span>
+                `;
+                statusBadges.appendChild(botStatus);
+            }
+        }
+    })
+    .catch(() => {
+        // Bot status check failed, but don't show error to user
+        console.debug('Bot health check failed');
+    });
+</script>
 {% endblock %}

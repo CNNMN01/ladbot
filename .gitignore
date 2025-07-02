@@ -78,7 +78,7 @@ tmp/
 
 # Web dashboard uploads
 uploads/
-static/uploads/
+src/web/static/uploads/
 
 # Test files
 .pytest_cache/

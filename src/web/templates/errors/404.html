@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - Ladbot Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .error-container {
+        min-height: 70vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        position: relative;
+    }
+
+    .error-content {
+        max-width: 600px;
+        padding: 2rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .error-code {
+        font-size: 8rem;
+        font-weight: 800;
+        background: var(--gradient-primary);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1;
+        margin-bottom: 1rem;
+        text-shadow: 0 0 30px rgba(88, 101, 242, 0.3);
+    }
+
+    .error-message {
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+
+    .error-description {
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        line-height: 1.6;
+        font-size: 1.1rem;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+
+    .error-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .error-btn-primary {
+        background: var(--discord-primary);
+        color: white;
+        border: 2px solid var(--discord-primary);
+    }
+
+    .error-btn-primary:hover {
+        background: var(--discord-hover);
+        border-color: var(--discord-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3);
+        color: white;
+        text-decoration: none;
+    }
+
+    .error-btn-secondary {
+        background: transparent;
+        color: var(--text-primary);
+        border: 2px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .error-btn-secondary:hover {
+        background: rgba(0, 0, 0, 0.05);
+        transform: translateY(-2px);
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+
+    .floating-icons {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    .floating-icon {
+        position: absolute;
+        opacity: 0.1;
+        animation: float 6s ease-in-out infinite;
+        color: var(--discord-primary);
+    }
+
+    .floating-icon:nth-child(1) {
+        top: 10%;
+        left: 10%;
+        font-size: 3rem;
+        animation-delay: 0s;
+    }
+
+    .floating-icon:nth-child(2) {
+        top: 20%;
+        right: 15%;
+        font-size: 2rem;
+        animation-delay: 1s;
+    }
+
+    .floating-icon:nth-child(3) {
+        bottom: 30%;
+        left: 20%;
+        font-size: 2.5rem;
+        animation-delay: 2s;
+    }
+
+    .floating-icon:nth-child(4) {
+        bottom: 20%;
+        right: 25%;
+        font-size: 2rem;
+        animation-delay: 3s;
+    }
+
+    .floating-icon:nth-child(5) {
+        top: 50%;
+        left: 5%;
+        font-size: 1.5rem;
+        animation-delay: 4s;
+    }
+
+    .floating-icon:nth-child(6) {
+        top: 60%;
+        right: 10%;
+        font-size: 1.8rem;
+        animation-delay: 5s;
+    }
+
+    @keyframes float {
+        0%, 100% {
+            transform: translateY(0px) rotate(0deg);
+            opacity: 0.1;
+        }
+        50% {
+            transform: translateY(-20px) rotate(180deg);
+            opacity: 0.2;
+        }
+    }
+
+    .error-help {
+        background: rgba(88, 101, 242, 0.05);
+        border: 1px solid rgba(88, 101, 242, 0.1);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .error-help-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .error-help-text {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    .error-help-link {
+        color: var(--discord-primary);
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .error-help-link:hover {
+        text-decoration: underline;
+        color: var(--discord-hover);
+    }
+
+    .search-suggestion {
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.3s ease;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--discord-primary);
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1);
+    }
+
+    @media (max-width: 768px) {
+        .error-code {
+            font-size: 6rem;
+        }
+
+        .error-message {
+            font-size: 1.25rem;
+        }
+
+        .error-description {
+            font-size: 1rem;
+        }
+
+        .error-actions {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .error-btn {
+            width: 100%;
+            max-width: 250px;
+            justify-content: center;
+        }
+
+        .floating-icons {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="floating-icons">
+        <i class="fas fa-robot floating-icon"></i>
+        <i class="fas fa-search floating-icon"></i>
+        <i class="fas fa-question-circle floating-icon"></i>
+        <i class="fas fa-home floating-icon"></i>
+        <i class="fas fa-compass floating-icon"></i>
+        <i class="fas fa-map-signs floating-icon"></i>
+    </div>
+
+    <div class="error-content">
+        <div class="error-code">404</div>
+        <h1 class="error-message">Page Not Found</h1>
+        <p class="error-description">
+            Oops! The page you're looking for seems to have wandered off into the digital void.
+            Our bot is searching for it, but it might take a while to find its way back...
+        </p>
+
+        <div class="error-actions">
+            <a href="{{ url_for('index') }}" class="error-btn error-btn-primary">
+                <i class="fas fa-home"></i>
+                Go Home
+            </a>
+
+            {% if 'user_id' in session %}
+            <a href="{{ url_for('dashboard') }}" class="error-btn error-btn-secondary">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </a>
+            {% endif %}
+
+            <button class="error-btn error-btn-secondary" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i>
+                Go Back
+            </button>
+        </div>
+
+        <!-- Search Suggestion -->
+        <div class="search-suggestion">
+            <h6 class="mb-3">
+                <i class="fas fa-search text-primary"></i>
+                Looking for something specific?
+            </h6>
+            <div class="input-group">
+                <input type="text" class="search-input" placeholder="Search for pages, commands, or features..." id="pageSearch">
+                <button class="btn btn-primary ms-2" onclick="performSearch()">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <div id="searchSuggestions" class="mt-2"></div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="error-help">
+            <div class="error-help-title">
+                <i class="fas fa-lightbulb"></i>
+                Need Help?
+            </div>
+            <p class="error-help-text">
+                If you believe this is an error or need assistance, please
+                <a href="#" onclick="reportError('404', window.location.href)" class="error-help-link">
+                    report this issue
+                </a>
+                or check our
+                <a href="{{ url_for('about') }}" class="error-help-link">documentation</a>.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Popular pages for search suggestions
+const popularPages = [
+    { name: 'Dashboard', url: '{{ url_for("dashboard") }}', description: 'Main bot dashboard' },
+    { name: 'Analytics', url: '{{ url_for("analytics") }}', description: 'Bot usage statistics' },
+    { name: 'Settings', url: '{{ url_for("settings") }}', description: 'Bot configuration' },
+    { name: 'About', url: '{{ url_for("about") }}', description: 'About Ladbot' },
+    { name: 'Login', url: '{{ url_for("login") }}', description: 'Sign in with Discord' }
+];
+
+// Error reporting function
+function reportError(errorCode, url) {
+    if (confirm('Would you like to report this error to the administrators?')) {
+        fetch('/api/report-error', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                error_code: errorCode,
+                url: url,
+                timestamp: new Date().toISOString(),
+                user_agent: navigator.userAgent,
+                referrer: document.referrer
+            })
+        }).then(response => {
+            if (response.ok) {
+                alert('Error reported successfully. Thank you for helping us improve!');
+            } else {
+                throw new Error('Report failed');
+            }
+        }).catch(() => {
+            alert('Could not report error. Please try again later or contact us directly.');
+        });
+    }
+}
+
+// Search functionality
+function performSearch() {
+    const query = document.getElementById('pageSearch').value.toLowerCase().trim();
+
+    if (!query) {
+        return;
+    }
+
+    // Simple search through popular pages
+    const matches = popularPages.filter(page =>
+        page.name.toLowerCase().includes(query) ||
+        page.description.toLowerCase().includes(query)
+    );
+
+    if (matches.length > 0) {
+        // Redirect to first match
+        window.location.href = matches[0].url;
+    } else {
+        // Show "no results" message
+        document.getElementById('searchSuggestions').innerHTML = `
+            <div class="alert alert-warning mt-2" role="alert">
+                <i class="fas fa-exclamation-triangle"></i>
+                No matching pages found for "${query}". Try searching for "dashboard", "settings", or "analytics".
+            </div>
+        `;
+
+        setTimeout(() => {
+            document.getElementById('searchSuggestions').innerHTML = '';
+        }, 3000);
+    }
+}
+
+// Search suggestions as user types
+document.getElementById('pageSearch').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase().trim();
+    const suggestionsDiv = document.getElementById('searchSuggestions');
+
+    if (query.length < 2) {
+        suggestionsDiv.innerHTML = '';
+        return;
+    }
+
+    const matches = popularPages.filter(page =>
+        page.name.toLowerCase().includes(query) ||
+        page.description.toLowerCase().includes(query)
+    ).slice(0, 3);
+
+    if (matches.length > 0) {
+        const suggestionsHTML = matches.map(page => `
+            <div class="suggestion-item" onclick="window.location.href='${page.url}'" style="
+                padding: 0.5rem;
+                cursor: pointer;
+                border-radius: 4px;
+                margin: 0.25rem 0;
+                background: rgba(88, 101, 242, 0.05);
+                border: 1px solid rgba(88, 101, 242, 0.1);
+                transition: background 0.2s ease;
+            " onmouseover="this.style.background='rgba(88, 101, 242, 0.1)'"
+               onmouseout="this.style.background='rgba(88, 101, 242, 0.05)'">
+                <small><strong>${page.name}</strong> - ${page.description}</small>
+            </div>
+        `).join('');
+
+        suggestionsDiv.innerHTML = `<div class="mt-2">${suggestionsHTML}</div>`;
+    } else {
+        suggestionsDiv.innerHTML = '';
+    }
+});
+
+// Enter key to search
+document.getElementById('pageSearch').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        performSearch();
+    }
+});
+
+// Auto-focus search input after a delay
+setTimeout(() => {
+    document.getElementById('pageSearch').focus();
+}, 1000);
+
+// Add some personality with random messages
+const funMessages = [
+    "Our bot got lost in cyberspace!",
+    "This page went on vacation without telling us.",
+    "404: Page not found, but our sense of humor is still here!",
+    "The page you're looking for is playing hide and seek.",
+    "Even robots make mistakes sometimes."
+];
+
+// Randomly update the description with a fun message
+setTimeout(() => {
+    const randomMessage = funMessages[Math.floor(Math.random() * funMessages.length)];
+    const description = document.querySelector('.error-description');
+    if (description) {
+        description.innerHTML = randomMessage + " But don't worry, we'll help you find what you're looking for!";
+    }
+}, 2000);
+</script>
+{% endblock %}
