@@ -5,6 +5,7 @@ Complete OAuth2 flow with comprehensive error handling and security features
 
 import requests
 import logging
+import traceback
 from urllib.parse import urlencode, parse_qs
 from flask import session, request, redirect, url_for, flash, current_app, jsonify
 from datetime import datetime, timedelta
@@ -251,43 +252,6 @@ class DiscordOAuth:
             logger.error(f"Unexpected error fetching user guilds: {e}")
             return None
 
-    def refresh_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
-        """Refresh access token using refresh token"""
-        try:
-            token_data = {
-                'client_id': self.client_id,
-                'client_secret': self.client_secret,
-                'grant_type': 'refresh_token',
-                'refresh_token': refresh_token
-            }
-
-            headers = {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'Ladbot/2.0 (Discord Bot Dashboard)'
-            }
-
-            response = requests.post(
-                DISCORD_TOKEN_URL,
-                data=token_data,
-                headers=headers,
-                timeout=10
-            )
-
-            if response.status_code != 200:
-                logger.error(f"Token refresh failed: {response.status_code}")
-                return None
-
-            token_info = response.json()
-            expires_in = token_info.get('expires_in', 3600)
-            token_info['expires_at'] = datetime.now() + timedelta(seconds=expires_in)
-
-            logger.info("Successfully refreshed access token")
-            return token_info
-
-        except Exception as e:
-            logger.error(f"Error refreshing token: {e}")
-            return None
-
     def revoke_token(self, access_token: str) -> bool:
         """Revoke access token"""
         try:
@@ -437,8 +401,8 @@ def register_oauth_routes(app):
             if access_token:
                 try:
                     oauth.revoke_token(access_token)
-                except:
-                    pass  # Non-critical error
+                except Exception as e:
+                    logger.warning(f"Could not revoke token: {e}")
 
             # Clear session
             username = session.get('user', {}).get('username', 'User')
@@ -454,35 +418,6 @@ def register_oauth_routes(app):
 
         return redirect(url_for('index'))
 
-    @app.route('/auth/refresh')
-    def refresh_auth():
-        """Refresh authentication token"""
-        try:
-            refresh_token = session.get('refresh_token')
-            if not refresh_token:
-                flash('No refresh token available. Please log in again.', 'warning')
-                return redirect(url_for('discord_auth'))
-
-            token_info = oauth.refresh_token(refresh_token)
-            if not token_info:
-                flash('Unable to refresh authentication. Please log in again.', 'warning')
-                return redirect(url_for('discord_auth'))
-
-            # Update session with new token
-            session['access_token'] = token_info['access_token']
-            session['token_expires_at'] = token_info['expires_at'].isoformat()
-
-            if 'refresh_token' in token_info:
-                session['refresh_token'] = token_info['refresh_token']
-
-            flash('Authentication refreshed successfully.', 'success')
-            return redirect(url_for('dashboard'))
-
-        except Exception as e:
-            logger.error(f"Auth refresh error: {e}")
-            flash('Error refreshing authentication. Please log in again.', 'error')
-            return redirect(url_for('discord_auth'))
-
     # Token validation middleware
     @app.before_request
     def check_token_expiry():
@@ -496,8 +431,8 @@ def register_oauth_routes(app):
                     if request.endpoint not in ['index', 'discord_auth', 'oauth_callback', 'static']:
                         flash('Your session has expired. Please log in again.', 'warning')
                         return redirect(url_for('discord_auth'))
-                except:
-                    pass
+            except Exception as e:
+                logger.warning(f"Error checking token expiry: {e}")
 
     logger.info("✅ Discord OAuth routes registered successfully")
 
