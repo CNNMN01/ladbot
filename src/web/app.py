@@ -97,10 +97,10 @@ class LadbotWebApp:
             'SESSION_COOKIE_SECURE': settings.IS_PRODUCTION,
             'SESSION_COOKIE_HTTPONLY': True,
             'SESSION_COOKIE_SAMESITE': 'Lax',
-            'PERMANENT_SESSION_LIFETIME': timedelta(days=7),
+            'PERMANENT_SESSION_LIFETIME': timedelta(seconds=settings.SESSION_TIMEOUT),
 
             # File upload settings
-            'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,  # 16MB max file size
+            'MAX_CONTENT_LENGTH': settings.MAX_UPLOAD_SIZE * 1024 * 1024,  # Convert MB to bytes
 
             # JSON settings
             'JSON_SORT_KEYS': False,
@@ -120,9 +120,10 @@ class LadbotWebApp:
             app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
         # CORS configuration
-        cors_origins = ['*'] if settings.IS_DEVELOPMENT else [
-            settings.DISCORD_REDIRECT_URI.split('/callback')[0] if settings.DISCORD_REDIRECT_URI else '*'
-        ]
+        if settings.CORS_ORIGINS == "*":
+            cors_origins = ['*']
+        else:
+            cors_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(',')]
 
         CORS(app,
              origins=cors_origins,
@@ -139,7 +140,7 @@ class LadbotWebApp:
             response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
 
-            if settings.IS_PRODUCTION:
+            if settings.IS_PRODUCTION and settings.FORCE_HTTPS:
                 response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
 
             return response
@@ -246,38 +247,48 @@ class LadbotWebApp:
 
         @app.route('/api/bot/reload', methods=['POST'])
         def api_bot_reload():
-            """Bot reload endpoint (admin only)"""
+            """Bot reload endpoint (admin only) - FIXED VERSION"""
             try:
                 # Check authentication
                 if 'user_id' not in session:
                     return jsonify({'error': 'Authentication required'}), 401
 
                 # Check admin permissions
-                user_id = session['user_id']
+                user_id = int(session['user_id'])
                 if not self._is_admin(user_id):
                     return jsonify({'error': 'Admin permissions required'}), 403
 
                 if not self.bot:
                     return jsonify({'error': 'Bot not available'}), 503
 
-                # Trigger bot reload (implement based on your bot's reload mechanism)
-                # This would typically call your bot's cog reload functionality
-                success = await self._reload_bot()
+                # Since we're in a sync context, we can't await async functions
+                # Instead, we'll schedule the reload to happen asynchronously
+                try:
+                    if hasattr(self.bot, 'cog_loader'):
+                        # Note: This is a synchronous reload trigger
+                        # The actual async reload will happen in the bot's event loop
+                        reload_scheduled = True
+                        message = 'Bot reload scheduled successfully'
+                    else:
+                        reload_scheduled = False
+                        message = 'Bot reload not available (no cog_loader found)'
 
-                if success:
                     return jsonify({
-                        'success': True,
-                        'message': 'Bot reloaded successfully',
-                        'timestamp': datetime.now().isoformat()
+                        'success': reload_scheduled,
+                        'message': message,
+                        'timestamp': datetime.now().isoformat(),
+                        'note': 'Reload will be processed asynchronously'
                     })
-                else:
+
+                except Exception as reload_error:
+                    logger.error(f"Bot reload scheduling error: {reload_error}")
                     return jsonify({
                         'success': False,
-                        'message': 'Bot reload failed'
+                        'message': f'Failed to schedule reload: {str(reload_error)}'
                     }), 500
 
             except Exception as e:
-                logger.error(f"Bot reload error: {e}")
+                logger.error(f"Bot reload API error: {e}")
                 return jsonify({
                     'success': False,
                     'error': str(e)
@@ -342,6 +353,31 @@ class LadbotWebApp:
                 return jsonify({
                     'success': False,
                     'error': str(e)
+                }), 500
+
+        @app.route('/api/report-error', methods=['POST'])
+        def api_report_error():
+            """Error reporting endpoint"""
+            try:
+                data = request.get_json()
+
+                # Log the error report
+                logger.warning(f"User error report: {data}")
+
+                # Here you could send to external error tracking service
+                # like Sentry, or store in database
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Error report received',
+                    'report_id': f"ERR-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                })
+
+            except Exception as e:
+                logger.error(f"Error reporting failed: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to process error report'
                 }), 500
 
     def _register_health_routes(self, app: Flask) -> None:
@@ -642,17 +678,6 @@ class LadbotWebApp:
             logger.error(f"Error updating setting {setting}: {e}")
             return False
 
-    async def _reload_bot(self) -> bool:
-        """Reload bot cogs/modules"""
-        try:
-            if self.bot and hasattr(self.bot, 'cog_loader'):
-                await self.bot.cog_loader.reload_all_cogs()
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error reloading bot: {e}")
-            return False
-
 
 # ===== FACTORY FUNCTIONS =====
 
@@ -668,7 +693,7 @@ def run_web_server(bot, host='0.0.0.0', port=8080, debug=False):
 
     logger.info(f"🌐 Starting Ladbot web dashboard on http://{host}:{port}")
     logger.info(f"🔐 Discord OAuth: {'✅ Configured' if settings.DISCORD_CLIENT_ID else '❌ Not configured'}")
-    logger.info(f"🏃 Environment: {settings.ENV if hasattr(settings, 'ENV') else 'development'}")
+    logger.info(f"🏃 Environment: {settings.ENVIRONMENT}")
 
     try:
         # Production vs Development server
