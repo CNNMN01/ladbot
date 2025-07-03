@@ -8,7 +8,7 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex align-items-center">
-                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary me-3">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary me-3">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
                 <div>
@@ -453,22 +453,42 @@ function saveSettings() {
     saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     saveBtn.disabled = true;
 
-    // Save to server - FIXED API CALL
+    // ROBUST GUILD ID HANDLING - FIXED
+    const guildId = {{ guild.id if guild and guild.id else 'null' }};
+
+    // Debug logging
+    console.log('Guild object:', {{ guild | tojson | safe }});
+    console.log('Guild ID:', guildId);
+    console.log('Settings to save:', settings);
+
+    if (!guildId || guildId === null) {
+        showToast('Error: Guild ID not found. Please refresh the page and try again.', 'error');
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+        return;
+    }
+
+    // Save to server - ROBUST API CALL
     fetch('/api/settings/update', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            guild_id: {{ guild.id }},
+            guild_id: guildId,
             settings: settings
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             showToast('Settings saved successfully! Changes will take effect immediately.', 'success');
-            console.log('Settings saved:', data);
+            console.log('Settings saved successfully:', data);
         } else {
             showToast('Error: ' + (data.error || 'Failed to save settings'), 'error');
             console.error('Save failed:', data);
@@ -476,7 +496,7 @@ function saveSettings() {
     })
     .catch(error => {
         console.error('Error saving settings:', error);
-        showToast('Failed to save settings. Please check your connection and try again.', 'error');
+        showToast('Failed to save settings: ' + error.message, 'error');
     })
     .finally(() => {
         // Restore button state
@@ -532,8 +552,15 @@ function showToast(message, type = 'success') {
 
 // Load current settings on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Guild settings page loaded for guild {{ guild.id }}');
-    console.log('Current settings:', {{ settings | tojson }});
+    console.log('Guild settings page loaded for guild {{ guild.id if guild and guild.id else "UNKNOWN" }}');
+    console.log('Current settings:', {{ settings | tojson | safe }});
+
+    // Validate guild data
+    const guildId = {{ guild.id if guild and guild.id else 'null' }};
+    if (!guildId || guildId === null) {
+        console.error('WARNING: Guild ID is missing!');
+        showToast('Warning: Guild data may not be loaded properly. Try refreshing the page.', 'info');
+    }
 });
 
 // Auto-save draft every 30 seconds (optional feature)

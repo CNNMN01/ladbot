@@ -1,11 +1,13 @@
 """
-Enhanced security decorators with comprehensive admin checking
+Enhanced security decorators with comprehensive admin checking and web dashboard integration
 """
 
 import functools
 from discord.ext import commands
 from typing import Callable
 import logging
+from pathlib import Path
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,7 @@ def dangerous_command():
 
 
 def guild_setting_enabled(setting_name: str):
-    """Decorator to check if a guild setting is enabled - ENHANCED VERSION"""
+    """Decorator to check if a guild setting is enabled - ENHANCED VERSION WITH WEB DASHBOARD INTEGRATION"""
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -97,12 +99,52 @@ def guild_setting_enabled(setting_name: str):
                 # Get the setting with multiple fallback methods
                 setting_enabled = True  # Default to enabled
 
-                if hasattr(ctx.bot, 'get_setting'):
-                    setting_enabled = ctx.bot.get_setting(guild_id, setting_name, True)
-                elif hasattr(ctx.bot, 'data_manager') and hasattr(ctx.bot.data_manager, 'get_guild_setting'):
-                    setting_enabled = ctx.bot.data_manager.get_guild_setting(guild_id, setting_name, True)
-                else:
-                    logger.debug(f"No get_setting method found, defaulting {setting_name} to True")
+                if guild_id:
+                    # Method 1: Read from web dashboard files (PRIMARY METHOD)
+                    try:
+                        # Use same path structure as web dashboard
+                        data_dir = Path(__file__).parent.parent.parent / "data"
+                        settings_file = data_dir / "guild_settings" / f"{guild_id}.json"
+
+                        if settings_file.exists():
+                            with open(settings_file, 'r') as f:
+                                guild_settings = json.load(f)
+                                setting_enabled = guild_settings.get(setting_name, True)
+
+                            logger.debug(
+                                f"Guild {guild_id} setting {setting_name}: {setting_enabled} (from web dashboard file)")
+                        else:
+                            logger.debug(
+                                f"No web dashboard settings file found for guild {guild_id}, using fallback methods")
+
+                            # Method 2: Fallback to bot methods
+                            if hasattr(ctx.bot, 'get_setting'):
+                                setting_enabled = ctx.bot.get_setting(guild_id, setting_name, True)
+                                logger.debug(
+                                    f"Guild {guild_id} setting {setting_name}: {setting_enabled} (from bot.get_setting)")
+                            elif hasattr(ctx.bot, 'data_manager') and hasattr(ctx.bot.data_manager,
+                                                                              'get_guild_setting'):
+                                setting_enabled = ctx.bot.data_manager.get_guild_setting(guild_id, setting_name, True)
+                                logger.debug(
+                                    f"Guild {guild_id} setting {setting_name}: {setting_enabled} (from data_manager)")
+                            else:
+                                logger.debug(f"No get_setting method found, defaulting {setting_name} to True")
+
+                    except Exception as e:
+                        logger.debug(f"Error reading setting from web dashboard file: {e}")
+                        # Fallback to bot methods
+                        try:
+                            if hasattr(ctx.bot, 'get_setting'):
+                                setting_enabled = ctx.bot.get_setting(guild_id, setting_name, True)
+                                logger.debug(
+                                    f"Guild {guild_id} setting {setting_name}: {setting_enabled} (fallback bot method)")
+                            elif hasattr(ctx.bot, 'data_manager') and hasattr(ctx.bot.data_manager,
+                                                                              'get_guild_setting'):
+                                setting_enabled = ctx.bot.data_manager.get_guild_setting(guild_id, setting_name, True)
+                                logger.debug(
+                                    f"Guild {guild_id} setting {setting_name}: {setting_enabled} (fallback data manager)")
+                        except Exception as e2:
+                            logger.debug(f"Fallback methods also failed: {e2}")
 
                 # If disabled, show message and block command
                 if not setting_enabled:
@@ -114,7 +156,7 @@ def guild_setting_enabled(setting_name: str):
                     )
                     embed.add_field(
                         name="Re-enable Command",
-                        value=f"`{ctx.prefix}settings {setting_name} on`",
+                        value=f"`{ctx.prefix}settings {setting_name} on`\nor use the web dashboard",
                         inline=False
                     )
                     await ctx.send(embed=embed)
