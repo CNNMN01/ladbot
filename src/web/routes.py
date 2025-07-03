@@ -694,98 +694,47 @@ def register_routes(app):
 
     @app.route('/api/settings/update', methods=['POST'])
     def update_settings():
-        """Update bot settings via API - WORKS FOR SERVER ADMINS"""
+        """Update bot settings via API - USING UNIFIED SERVICE"""
         if not require_auth():
             return jsonify({'error': 'Authentication required'}), 401
 
         try:
-            # Get guild_id first to check permissions
             settings_data = request.get_json()
-            if not settings_data:
-                logger.error("No JSON data received")
-                return jsonify({'error': 'No data provided'}), 400
-
             guild_id = settings_data.get('guild_id')
+            settings = settings_data.get('settings', {})
+
             if not guild_id:
-                logger.error(f"Guild ID missing from request data: {settings_data}")
                 return jsonify({'error': 'Guild ID required'}), 400
 
-            # Check guild-specific permissions instead of global admin
             if not require_guild_admin(guild_id):
-                return jsonify({'error': 'You need admin permissions in this server'}), 403
+                return jsonify({'error': 'Access denied'}), 403
 
-            settings = settings_data.get('settings', {})
-            logger.info(f"Guild ID: {guild_id}, Settings: {settings}")
-
-            if not settings:
-                return jsonify({'error': 'No settings provided'}), 400
-
-            # Get the bot instance
-            if not app.bot:
-                return jsonify({'error': 'Bot not available'}), 503
+            # Import the unified settings service
+            from utils.settings_service import settings_service
 
             success_count = 0
             failed_settings = []
 
+            # Use the unified service to save each setting
             for setting_name, value in settings.items():
-                try:
-                    # Direct file approach (simplest method)
-                    import json as json_module
-
-                    data_dir = Path(__file__).parent.parent.parent / "data"
-                    settings_dir = data_dir / "guild_settings"
-                    settings_dir.mkdir(exist_ok=True)
-                    settings_file = settings_dir / f"{guild_id}.json"
-
-                    # Load existing settings
-                    current_settings = {}
-                    if settings_file.exists():
-                        with open(settings_file, 'r') as f:
-                            current_settings = json_module.load(f)
-
-                    # Update the setting
-                    current_settings[setting_name] = value
-                    current_settings['last_updated'] = datetime.now().isoformat()
-                    current_settings['guild_id'] = guild_id
-
-                    # Save back to file
-                    with open(settings_file, 'w') as f:
-                        json_module.dump(current_settings, f, indent=2)
-
+                success = settings_service.set_guild_setting(guild_id, setting_name, value)
+                if success:
                     success_count += 1
-                    logger.info(f"✅ Updated setting {setting_name} = {value} for guild {guild_id}")
-
-                    # Clear any cached values
-                    if hasattr(app.bot, 'settings_cache'):
-                        cache_key = f"{guild_id}_{setting_name}"
-                        app.bot.settings_cache.pop(cache_key, None)
-
-                except Exception as e:
-                    logger.error(f"❌ Failed to update setting {setting_name}: {e}")
+                else:
                     failed_settings.append(setting_name)
 
-            # Return response
-            if success_count > 0:
-                return jsonify({
-                    'success': True,
-                    'message': f'Successfully updated {success_count} settings',
-                    'updated_count': success_count,
-                    'timestamp': datetime.now().isoformat()
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'error': f'Failed to update settings: {", ".join(failed_settings)}'
-                }), 500
+            logger.info(f"🌐 WEB DASHBOARD: Updated {success_count} settings for guild {guild_id}")
+
+            return jsonify({
+                'success': True,
+                'message': f'Updated {success_count} settings successfully',
+                'failed_settings': failed_settings,
+                'timestamp': datetime.now().isoformat()
+            })
 
         except Exception as e:
             logger.error(f"Settings update error: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/settings/backup')
     def backup_settings():

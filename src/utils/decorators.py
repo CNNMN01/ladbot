@@ -88,52 +88,26 @@ def dangerous_command():
 
 
 def guild_setting_enabled(setting_name: str):
-    """Decorator to check if a guild setting is enabled - FIXED VERSION"""
+    """Decorator to check if a guild setting is enabled - SIMPLIFIED VERSION"""
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(self, ctx, *args, **kwargs):
             guild_id = ctx.guild.id if ctx.guild else None
 
+            if not guild_id:
+                # No guild context, allow command
+                return await func(self, ctx, *args, **kwargs)
+
             try:
-                # Get the setting with multiple fallback methods
-                setting_enabled = True  # Default to enabled
+                # Import the unified settings service
+                from utils.settings_service import settings_service
 
-                if guild_id:
-                    # Method 1: Use bot's own data manager (PRIMARY - FIXED)
-                    try:
-                        if hasattr(ctx.bot, 'get_setting'):
-                            setting_enabled = ctx.bot.get_setting(guild_id, setting_name, True)
-                            logger.debug(
-                                f"Guild {guild_id} setting {setting_name}: {setting_enabled} (from bot.get_setting)")
-                        elif hasattr(ctx.bot, 'data_manager') and hasattr(ctx.bot.data_manager, 'get_guild_setting'):
-                            setting_enabled = ctx.bot.data_manager.get_guild_setting(guild_id, setting_name, True)
-                            logger.debug(
-                                f"Guild {guild_id} setting {setting_name}: {setting_enabled} (from data_manager)")
-                        else:
-                            # Fallback: Direct file read using bot's data directory
-                            if hasattr(ctx.bot, 'data_manager') and hasattr(ctx.bot.data_manager, 'data_dir'):
-                                data_dir = ctx.bot.data_manager.data_dir
-                            else:
-                                # Absolute fallback for Railway
-                                data_dir = Path("/app/data")
+                # Get setting using the unified service
+                setting_enabled = settings_service.get_guild_setting(guild_id, setting_name, True)
 
-                            settings_file = data_dir / "guild_settings" / f"{guild_id}.json"
-
-                            if settings_file.exists():
-                                import json
-                                with open(settings_file, 'r') as f:
-                                    guild_settings = json.load(f)
-                                    setting_enabled = guild_settings.get(setting_name, True)
-                                logger.debug(
-                                    f"Guild {guild_id} setting {setting_name}: {setting_enabled} (from direct file read)")
-                            else:
-                                logger.debug(
-                                    f"No settings file found at {settings_file}, defaulting {setting_name} to True")
-
-                    except Exception as e:
-                        logger.debug(f"Error reading setting {setting_name}: {e}")
-                        setting_enabled = True  # Default to enabled on error
+                logger.info(
+                    f"🔍 COMMAND CHECK: {ctx.command.name} for guild {guild_id} - {setting_name}={setting_enabled}")
 
                 # If disabled, show message and block command
                 if not setting_enabled:
@@ -155,7 +129,7 @@ def guild_setting_enabled(setting_name: str):
                 return await func(self, ctx, *args, **kwargs)
 
             except Exception as e:
-                logger.error(f"Error checking guild setting {setting_name}: {e}")
+                logger.error(f"❌ Error checking guild setting {setting_name}: {e}")
                 # On error, allow command to run (fail-safe)
                 return await func(self, ctx, *args, **kwargs)
 

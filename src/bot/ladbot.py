@@ -305,12 +305,22 @@ class LadBot(commands.Bot):
     # ===== SETTINGS METHODS - ENHANCED FOR WEB DASHBOARD =====
 
     def get_setting(self, guild_id: int, setting_name: str, default=True):
-        """Get a guild setting (main method used by decorators)"""
-        return self.data_manager.get_guild_setting(guild_id, setting_name, default)
+        """Get a guild setting using unified service"""
+        try:
+            from utils.settings_service import settings_service
+            return settings_service.get_guild_setting(guild_id, setting_name, default)
+        except Exception as e:
+            logger.error(f"Error getting setting {setting_name}: {e}")
+            return default
 
     def set_setting(self, guild_id: int, setting_name: str, value):
-        """Set a guild setting (main method used by commands)"""
-        return self.data_manager.set_guild_setting(guild_id, setting_name, value)
+        """Set a guild setting using unified service"""
+        try:
+            from utils.settings_service import settings_service
+            return settings_service.set_guild_setting(guild_id, setting_name, value)
+        except Exception as e:
+            logger.error(f"Error setting {setting_name}: {e}")
+            return False
 
     def reload_guild_settings(self, guild_id: int):
         """Reload settings from file (for web dashboard updates)"""
