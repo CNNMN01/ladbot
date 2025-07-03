@@ -107,7 +107,13 @@ class LadBot(commands.Bot):
             def __init__(self, settings, bot_instance):
                 self.settings = settings
                 self.bot = bot_instance
-                self.data_dir = Path("data")
+
+                # FORCE absolute path for Railway/production
+                if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
+                    self.data_dir = Path("/app/data")
+                else:
+                    self.data_dir = Path("data")
+
                 self.data_dir.mkdir(exist_ok=True)
 
                 # Create subdirectories
@@ -117,7 +123,7 @@ class LadBot(commands.Bot):
 
                 self.last_cache_clear = datetime.now()
 
-                logger.info("📊 Data manager initialized")
+                logger.info(f"📊 Data manager initialized with path: {self.data_dir}")
 
             def get_guild_setting(self, guild_id: int, setting_name: str, default=True):
                 """Get a guild-specific setting - FIXED FOR WEB DASHBOARD"""
