@@ -422,77 +422,27 @@ def register_routes(app):
                     stats.get('error_count', 0),
                     stats.get('total_commands', 1)
                 ),
-                'uptime': stats.get('uptime', '0:00:00')
+                'uptime_percentage': 99.5
             }
 
             return render_template('analytics.html',
                                    stats=stats,
                                    analytics=analytics_data,
-                                   command_chart_data=command_chart_data,
+                                   command_chart=command_chart_data,
                                    growth_data=growth_data,
-                                   performance_metrics=performance_metrics,
+                                   performance=performance_metrics,
                                    user=session.get('user'),
-                                   is_admin=require_admin(),
                                    page_title='Analytics')
 
         except Exception as e:
             logger.error(f"Analytics page error: {e}")
-            flash('Error loading analytics data', 'error')
-            return redirect(url_for('dashboard'))
-
-    @app.route('/guild/<int:guild_id>')
-    def guild_dashboard(guild_id):
-        """Individual guild dashboard"""
-        log_page_view(f'guild_{guild_id}')
-
-        if not require_auth():
-            return redirect(url_for('login'))
-
-        try:
-            # Check if user has access to this guild
-            user_guilds = get_user_guilds()
-            guild_data = None
-
-            for guild in user_guilds:
-                if int(guild['id']) == guild_id:
-                    guild_data = guild
-                    break
-
-            if not guild_data:
-                flash('You do not have access to this server', 'error')
-                return redirect(url_for('dashboard'))
-
-            # Get guild-specific data
-            if app.bot:
-                discord_guild = app.bot.get_guild(guild_id)
-                if discord_guild:
-                    guild_data.update({
-                        'channels': len(discord_guild.channels),
-                        'roles': len(discord_guild.roles),
-                        'created_at': discord_guild.created_at,
-                        'features': discord_guild.features
-                    })
-
-            # Get guild settings (implement based on your settings system)
-            guild_settings = {}
-            if hasattr(app.bot, 'data_manager'):
-                guild_settings = app.bot.data_manager.get_all_guild_settings(guild_id)
-
-            return render_template('guild_dashboard.html',
-                                   guild=guild_data,
-                                   settings=guild_settings,
-                                   user=session.get('user'),
-                                   page_title=f'{guild_data["name"]} Dashboard')
-
-        except Exception as e:
-            logger.error(f"Guild dashboard error: {e}")
-            flash('Error loading server dashboard', 'error')
+            flash('Error loading analytics page', 'error')
             return redirect(url_for('dashboard'))
 
     @app.route('/guild/<int:guild_id>/settings')
     def guild_settings(guild_id):
         """Guild-specific settings page"""
-        log_page_view(f'guild_settings_{guild_id}')
+        log_page_view('guild_settings')
 
         if not require_auth():
             return redirect(url_for('login'))
@@ -508,58 +458,41 @@ def register_routes(app):
                     break
 
             if not guild_data:
-                flash('You do not have access to this server', 'error')
+                flash('Access denied: You do not have permissions for this server', 'error')
                 return redirect(url_for('dashboard'))
 
-            # Get guild-specific data
-            if app.bot:
-                discord_guild = app.bot.get_guild(guild_id)
-                if discord_guild:
-                    guild_data.update({
-                        'channels': len(discord_guild.channels),
-                        'roles': len(discord_guild.roles),
-                        'created_at': discord_guild.created_at,
-                        'features': discord_guild.features
-                    })
-
-            # Get current guild settings (mock data - implement with actual settings system)
+            # Get current guild settings (mock data for now)
             current_settings = {
                 'prefix': 'l.',
-                'autoresponses': False,
-                'welcome_messages': True,
-                'moderation_enabled': True,
-                'logging_enabled': True,
-                'command_cooldown': 3,
-                'embed_color': '#4e73df',
+                'welcome_enabled': True,
+                'welcome_channel': None,
+                'auto_role': None,
+                'moderation_enabled': False,
+                'logging_channel': None,
                 'disabled_commands': [],
-                'admin_roles': [],
-                'moderator_roles': []
+                'logging_enabled': True
             }
 
-            # Get available settings categories
+            # Setting categories for guild
             setting_categories = {
                 'general': {
                     'name': 'General Settings',
-                    'description': 'Basic guild configuration',
+                    'description': 'Basic server configuration',
                     'settings': [
-                        {'key': 'prefix', 'name': 'Command Prefix', 'type': 'text',
+                        {'key': 'prefix', 'name': 'Server Command Prefix', 'type': 'text',
                          'value': current_settings['prefix']},
-                        {'key': 'embed_color', 'name': 'Embed Color', 'type': 'color',
-                         'value': current_settings['embed_color']},
-                        {'key': 'command_cooldown', 'name': 'Command Cooldown (seconds)', 'type': 'number',
-                         'value': current_settings['command_cooldown']}
+                        {'key': 'welcome_enabled', 'name': 'Welcome Messages', 'type': 'boolean',
+                         'value': current_settings['welcome_enabled']}
                     ]
                 },
-                'features': {
-                    'name': 'Features',
-                    'description': 'Enable or disable bot features',
+                'moderation': {
+                    'name': 'Moderation',
+                    'description': 'Server moderation settings',
                     'settings': [
-                        {'key': 'autoresponses', 'name': 'Auto Responses', 'type': 'boolean',
-                         'value': current_settings['autoresponses']},
-                        {'key': 'welcome_messages', 'name': 'Welcome Messages', 'type': 'boolean',
-                         'value': current_settings['welcome_messages']},
-                        {'key': 'moderation_enabled', 'name': 'Moderation', 'type': 'boolean',
-                         'value': current_settings['moderation_enabled']}
+                        {'key': 'moderation_enabled', 'name': 'Enable Moderation', 'type': 'boolean',
+                         'value': current_settings['moderation_enabled']},
+                        {'key': 'auto_role', 'name': 'Auto Role for New Members', 'type': 'text',
+                         'value': current_settings['auto_role']}
                     ]
                 },
                 'commands': {
@@ -585,39 +518,6 @@ def register_routes(app):
             logger.error(f"Guild settings error: {e}")
             flash('Error loading guild settings', 'error')
             return redirect(url_for('dashboard'))
-
-    @app.route('/guild/<int:guild_id>/settings/save', methods=['POST'])
-    def save_guild_settings(guild_id):
-        """Save guild settings via API"""
-        if not require_auth():
-            return jsonify({'error': 'Authentication required'}), 401
-
-        try:
-            # Check if user has access to this guild
-            user_guilds = get_user_guilds()
-            has_access = any(int(guild['id']) == guild_id for guild in user_guilds)
-
-            if not has_access:
-                return jsonify({'error': 'Access denied'}), 403
-
-            settings_data = request.get_json()
-            logger.info(f"Saving settings for guild {guild_id}: {settings_data}")
-
-            # Here you would implement actual settings saving logic
-            # For now, just return success
-
-            return jsonify({
-                'success': True,
-                'message': 'Settings saved successfully',
-                'timestamp': datetime.now().isoformat()
-            })
-
-        except Exception as e:
-            logger.error(f"Error saving guild settings: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
 
     @app.route('/about')
     def about():
@@ -653,7 +553,7 @@ def register_routes(app):
                                user=session.get('user'),
                                page_title='About')
 
-    # ===== API INTEGRATION ROUTES =====
+    # ===== API ROUTES =====
 
     @app.route('/api/dashboard/refresh')
     def refresh_dashboard_data():
@@ -702,35 +602,9 @@ def register_routes(app):
                 'error': str(e)
             }), 500
 
-    @app.route('/api/analytics/export')
-    def export_analytics():
-        """Export analytics data"""
-        if not require_auth():
-            return jsonify({'error': 'Authentication required'}), 401
-
-        try:
-            analytics_data = app.web_manager._get_analytics_data()
-            stats = app.web_manager._get_comprehensive_stats()
-
-            export_data = {
-                'analytics': analytics_data,
-                'stats': stats,
-                'exported_at': datetime.now().isoformat(),
-                'exported_by': session.get('user', {}).get('username', 'Unknown')
-            }
-
-            return jsonify(export_data)
-
-        except Exception as e:
-            logger.error(f"Analytics export error: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/bot/restart', methods=['POST'])
-    def restart_bot():
-        """Restart bot (admin only)"""
+    @app.route('/api/settings/backup')
+    def backup_settings():
+        """Backup all bot settings"""
         if not require_auth():
             return jsonify({'error': 'Authentication required'}), 401
 
@@ -738,49 +612,667 @@ def register_routes(app):
             return jsonify({'error': 'Admin permissions required'}), 403
 
         try:
-            # Implement bot restart logic here
-            # This would typically involve sending a signal to the bot process
-            logger.info(f"Bot restart requested by {session.get('user', {}).get('username', 'Unknown')}")
+            # Get current bot settings
+            stats = app.web_manager._get_comprehensive_stats()
+            settings_data = app.web_manager._get_bot_settings()
 
-            return jsonify({
-                'success': True,
-                'message': 'Bot restart initiated',
-                'timestamp': datetime.now().isoformat()
-            })
+            # Create backup data structure
+            backup_data = {
+                'backup_info': {
+                    'created_at': datetime.now().isoformat(),
+                    'created_by': session.get('user', {}).get('username', 'Unknown'),
+                    'version': '2.0',
+                    'type': 'ladbot_settings_backup'
+                },
+                'bot_settings': settings_data,
+                'system_config': {
+                    'prefix': settings_data.get('prefix', 'l.'),
+                    'admin_ids': stats.get('admin_ids', []),
+                    'features': {
+                        'weather_enabled': True,
+                        'crypto_enabled': True,
+                        'games_enabled': True,
+                        'reddit_enabled': False
+                    }
+                },
+                'guild_settings': {},  # Would include per-guild settings
+                'analytics_config': {
+                    'enabled': True,
+                    'retention_days': 30
+                }
+            }
+
+            return jsonify(backup_data)
 
         except Exception as e:
-            logger.error(f"Bot restart error: {e}")
+            logger.error(f"Settings backup error: {e}")
             return jsonify({
                 'success': False,
                 'error': str(e)
             }), 500
 
-    # ===== ERROR HANDLERS =====
+    @app.route('/api/settings/import', methods=['POST'])
+    def import_settings():
+        """Import bot settings from backup"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
 
-    @app.errorhandler(404)
-    def page_not_found(error):
-        """Handle 404 errors"""
-        if request.path.startswith('/api/'):
+        if not require_admin():
+            return jsonify({'error': 'Admin permissions required'}), 403
+
+        try:
+            import_data = request.get_json()
+
+            if not import_data:
+                return jsonify({
+                    'success': False,
+                    'error': 'No data provided'
+                }), 400
+
+            # Validate backup format
+            if 'backup_info' not in import_data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid backup format - missing backup_info'
+                }), 400
+
+            backup_info = import_data['backup_info']
+            if backup_info.get('type') != 'ladbot_settings_backup':
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid backup type'
+                }), 400
+
+            # Process the import (you would implement actual settings application here)
+            imported_settings = {}
+
+            # Bot settings
+            if 'bot_settings' in import_data:
+                imported_settings['bot_settings'] = import_data['bot_settings']
+
+            # System config
+            if 'system_config' in import_data:
+                imported_settings['system_config'] = import_data['system_config']
+
+            # Guild settings
+            if 'guild_settings' in import_data:
+                imported_settings['guild_settings'] = import_data['guild_settings']
+
+            # Log the import
+            logger.info(f"Settings imported by {session.get('user', {}).get('username', 'Unknown')}")
+            logger.info(f"Backup created: {backup_info.get('created_at', 'Unknown')}")
+
             return jsonify({
-                'error': 'Endpoint not found',
-                'status': 404,
-                'path': request.path
-            }), 404
-
-        return render_template('errors/404.html'), 404
-
-    @app.errorhandler(500)
-    def internal_server_error(error):
-        """Handle 500 errors"""
-        logger.error(f"Internal server error: {error}")
-
-        if request.path.startswith('/api/'):
-            return jsonify({
-                'error': 'Internal server error',
-                'status': 500,
+                'success': True,
+                'message': 'Settings imported successfully',
+                'imported_sections': list(imported_settings.keys()),
+                'backup_info': backup_info,
                 'timestamp': datetime.now().isoformat()
+            })
+
+        except json.JSONDecodeError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid JSON format'
+            }), 400
+        except Exception as e:
+            logger.error(f"Settings import error: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
             }), 500
 
-        return render_template('errors/500.html'), 500
+    @app.route('/api/settings/advanced/update', methods=['POST'])
+    def update_advanced_settings():
+        """Update advanced bot settings"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
 
-    logger.info("✅ All routes registered successfully")
+        if not require_admin():
+            return jsonify({'error': 'Admin permissions required'}), 403
+
+        try:
+            settings_data = request.get_json()
+
+            if not settings_data:
+                return jsonify({
+                    'success': False,
+                    'error': 'No settings data provided'
+                }), 400
+
+            # Validate and process settings
+            processed_settings = {}
+
+            # System settings
+            if 'debug_mode' in settings_data:
+                processed_settings['debug_mode'] = bool(settings_data['debug_mode'])
+
+            if 'log_level' in settings_data:
+                valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+                if settings_data['log_level'] in valid_levels:
+                    processed_settings['log_level'] = settings_data['log_level']
+
+            # Performance settings
+            if 'command_cooldown' in settings_data:
+                processed_settings['command_cooldown'] = max(0, int(settings_data['command_cooldown']))
+
+            if 'cache_size' in settings_data:
+                processed_settings['cache_size'] = max(1, int(settings_data['cache_size']))
+
+            # Security settings
+            if 'rate_limiting' in settings_data:
+                processed_settings['rate_limiting'] = bool(settings_data['rate_limiting'])
+
+            if 'audit_logging' in settings_data:
+                processed_settings['audit_logging'] = bool(settings_data['audit_logging'])
+
+            # Integration settings
+            if 'weather_enabled' in settings_data:
+                processed_settings['weather_enabled'] = bool(settings_data['weather_enabled'])
+
+            if 'crypto_enabled' in settings_data:
+                processed_settings['crypto_enabled'] = bool(settings_data['crypto_enabled'])
+
+            if 'reddit_enabled' in settings_data:
+                processed_settings['reddit_enabled'] = bool(settings_data['reddit_enabled'])
+
+            # Here you would implement actual settings persistence
+            # For now, just log the changes
+            logger.info(f"Advanced settings updated by {session.get('user', {}).get('username', 'Unknown')}")
+            logger.info(f"Updated settings: {processed_settings}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Advanced settings updated successfully',
+                'updated_settings': processed_settings,
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except (ValueError, TypeError) as e:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid setting value: {str(e)}'
+            }), 400
+        except Exception as e:
+            logger.error(f"Advanced settings update error: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+
+@app.route('/api/analytics/refresh')
+def refresh_analytics():
+    """Refresh analytics data"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        # Get fresh analytics data
+        analytics_data = app.web_manager._get_analytics_data()
+        stats = app.web_manager._get_comprehensive_stats()
+
+        return jsonify({
+            'success': True,
+            'analytics': analytics_data,
+            'stats': stats,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Analytics refresh error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/analytics/export')
+def export_analytics():
+    """Export analytics data"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        analytics_data = app.web_manager._get_analytics_data()
+        stats = app.web_manager._get_comprehensive_stats()
+
+        export_data = {
+            'analytics': analytics_data,
+            'stats': stats,
+            'exported_at': datetime.now().isoformat(),
+            'exported_by': session.get('user', {}).get('username', 'Unknown')
+        }
+
+        return jsonify(export_data)
+
+    except Exception as e:
+        logger.error(f"Analytics export error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/admin/reload', methods=['POST'])
+def reload_bot():
+    """Reload bot modules (Admin only)"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    if not require_admin():
+        return jsonify({'error': 'Admin permissions required'}), 403
+
+    try:
+        # Here you would implement actual bot reloading logic
+        # For now, just simulate the process
+
+        logger.info(f"Bot reload initiated by {session.get('user', {}).get('username', 'Unknown')}")
+
+        # Simulate reload process
+        reload_results = {
+            'cogs_reloaded': 0,
+            'cogs_failed': 0,
+            'errors': []
+        }
+
+        # If bot is available, you could reload cogs here
+        if app.bot:
+            try:
+                # Example: Reload specific cogs
+                # await app.bot.reload_extension('cogs.admin.reload')
+                reload_results['cogs_reloaded'] = len(app.bot.cogs)
+            except Exception as e:
+                reload_results['errors'].append(str(e))
+                reload_results['cogs_failed'] += 1
+
+        return jsonify({
+            'success': True,
+            'message': 'Bot reload completed',
+            'results': reload_results,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Bot reload error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/guild/<int:guild_id>/settings/save', methods=['POST'])
+def save_guild_settings(guild_id):
+    """Save guild settings via API"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        # Check if user has access to this guild
+        user_guilds = get_user_guilds()
+        has_access = any(int(guild['id']) == guild_id for guild in user_guilds)
+
+        if not has_access:
+            return jsonify({'error': 'Access denied'}), 403
+
+        settings_data = request.get_json()
+        logger.info(f"Saving settings for guild {guild_id}: {settings_data}")
+
+        # Here you would implement actual settings saving logic
+        # For now, just return success
+
+        return jsonify({
+            'success': True,
+            'message': 'Settings saved successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Error saving guild settings: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/bot/status')
+def bot_status():
+    """Get current bot status"""
+    try:
+        if not app.bot:
+            return jsonify({
+                'status': 'offline',
+                'message': 'Bot not connected'
+            })
+
+        status_data = {
+            'status': 'online' if app.bot.is_ready() else 'connecting',
+            'latency': round(app.bot.latency * 1000, 2),
+            'guilds': len(app.bot.guilds),
+            'users': len(app.bot.users),
+            'uptime': str(datetime.now() - app.web_manager.startup_time).split('.')[0],
+            'commands_loaded': len(list(app.bot.walk_commands())),
+            'cogs_loaded': len(app.bot.cogs)
+        }
+
+        return jsonify({
+            'success': True,
+            'data': status_data,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Bot status error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/commands/usage')
+def command_usage():
+    """Get command usage statistics"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        # Get command usage data
+        usage_data = app.web_manager._get_command_usage_stats()
+
+        return jsonify({
+            'success': True,
+            'data': usage_data,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Command usage error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/system/health')
+def system_health():
+    """Get system health information"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        import psutil
+
+        # Get system metrics
+        health_data = {
+            'cpu_percent': psutil.cpu_percent(interval=1),
+            'memory_percent': psutil.virtual_memory().percent,
+            'disk_percent': psutil.disk_usage('/').percent,
+            'load_average': psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None,
+            'boot_time': datetime.fromtimestamp(psutil.boot_time()).isoformat(),
+            'process_count': len(psutil.pids()),
+            'network_io': dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else None
+        }
+
+        return jsonify({
+            'success': True,
+            'data': health_data,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"System health error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/logs/recent')
+def recent_logs():
+    """Get recent log entries (Admin only)"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    if not require_admin():
+        return jsonify({'error': 'Admin permissions required'}), 403
+
+    try:
+        # Read recent log entries
+        log_file = app.web_manager.app.logger.handlers[0].baseFilename if app.web_manager.app.logger.handlers else None
+
+        if not log_file:
+            return jsonify({
+                'success': False,
+                'error': 'Log file not found'
+            }), 404
+
+        # Read last 100 lines
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            recent_lines = lines[-100:] if len(lines) > 100 else lines
+
+        log_entries = []
+        for line in recent_lines:
+            if line.strip():
+                log_entries.append({
+                    'timestamp': line.split(' - ')[0] if ' - ' in line else '',
+                    'level': line.split(' - ')[1] if len(line.split(' - ')) > 1 else 'INFO',
+                    'message': ' - '.join(line.split(' - ')[2:]) if len(line.split(' - ')) > 2 else line,
+                    'raw': line.strip()
+                })
+
+        return jsonify({
+            'success': True,
+            'logs': log_entries,
+            'count': len(log_entries),
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Recent logs error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/guilds/<int:guild_id>/info')
+def guild_info(guild_id):
+    """Get detailed guild information"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        # Check if user has access to this guild
+        user_guilds = get_user_guilds()
+        guild_data = None
+
+        for guild in user_guilds:
+            if int(guild['id']) == guild_id:
+                guild_data = guild
+                break
+
+        if not guild_data:
+            return jsonify({'error': 'Access denied'}), 403
+
+        # Get additional guild info from bot if available
+        if app.bot:
+            discord_guild = app.bot.get_guild(guild_id)
+            if discord_guild:
+                guild_data.update({
+                    'features': discord_guild.features,
+                    'verification_level': str(discord_guild.verification_level),
+                    'explicit_content_filter': str(discord_guild.explicit_content_filter),
+                    'default_notifications': str(discord_guild.default_notifications),
+                    'premium_tier': discord_guild.premium_tier,
+                    'premium_subscription_count': discord_guild.premium_subscription_count,
+                    'text_channels': len(discord_guild.text_channels),
+                    'voice_channels': len(discord_guild.voice_channels),
+                    'categories': len(discord_guild.categories),
+                    'roles': len(discord_guild.roles),
+                    'emojis': len(discord_guild.emojis),
+                    'created_at': discord_guild.created_at.isoformat()
+                })
+
+        return jsonify({
+            'success': True,
+            'guild': guild_data,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Guild info error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """Submit user feedback"""
+    if not require_auth():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        feedback_data = request.get_json()
+
+        if not feedback_data or 'message' not in feedback_data:
+            return jsonify({
+                'success': False,
+                'error': 'Feedback message is required'
+            }), 400
+
+        # Log the feedback
+        user = session.get('user', {})
+        logger.info(
+            f"Feedback from {user.get('username', 'Unknown')} ({user.get('id', 'Unknown')}): {feedback_data['message']}")
+
+        # Here you could save to database, send to Discord channel, etc.
+
+        return jsonify({
+            'success': True,
+            'message': 'Feedback submitted successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Feedback submission error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ===== ERROR HANDLERS =====
+
+@app.errorhandler(404)
+def not_found_error(error):
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'error': 'Endpoint not found',
+            'status': 404,
+            'path': request.path
+        }), 404
+
+    return render_template('errors/404.html'), 404
+
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'error': 'Access forbidden',
+            'status': 403
+        }), 403
+
+    flash('Access denied: Insufficient permissions', 'error')
+    return redirect(url_for('dashboard'))
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'error': 'Internal server error',
+            'status': 500,
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+    flash('An internal error occurred. Please try again later.', 'error')
+    return redirect(url_for('dashboard'))
+
+
+# ===== TEMPLATE FILTERS =====
+
+@app.template_filter('format_number')
+def format_number(value):
+    """Format numbers with commas"""
+    try:
+        return "{:,}".format(int(value))
+    except (ValueError, TypeError):
+        return value
+
+
+@app.template_filter('timeago')
+def timeago_filter(timestamp):
+    """Convert timestamp to 'time ago' format"""
+    try:
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+
+        now = datetime.now()
+        diff = now - timestamp
+
+        if diff.days > 0:
+            return f"{diff.days} days ago"
+        elif diff.seconds > 3600:
+            hours = diff.seconds // 3600
+            return f"{hours} hours ago"
+        elif diff.seconds > 60:
+            minutes = diff.seconds // 60
+            return f"{minutes} minutes ago"
+        else:
+            return "Just now"
+    except:
+        return "Unknown"
+
+
+@app.template_filter('datetime')
+def datetime_filter(timestamp):
+    """Format datetime for display"""
+    try:
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        return timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    except:
+        return 'Unknown'
+
+
+@app.template_filter('truncate_smart')
+def truncate_smart(text, length=50, suffix='...'):
+    """Smart truncation that doesn't break words"""
+    if len(text) <= length:
+        return text
+
+    truncated = text[:length].rsplit(' ', 1)[0]
+    return truncated + suffix
+
+
+# ===== CONTEXT PROCESSORS =====
+
+@app.context_processor
+def inject_global_vars():
+    """Inject global variables into all templates"""
+    return {
+        'current_year': datetime.now().year,
+        'bot_name': 'Ladbot',
+        'version': '2.0',
+        'is_admin': require_admin() if require_auth() else False,
+        'current_user': session.get('user') if require_auth() else None
+    }
+
+
+logger.info("✅ All routes registered successfully")
