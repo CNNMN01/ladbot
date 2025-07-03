@@ -321,27 +321,48 @@ class LadBot(commands.Bot):
             logger.error(f"Error reloading settings for guild {guild_id}: {e}")
             return False
 
-    # ===== COG LOADING =====
+    # ===== COG LOADING - ENHANCED =====
 
     async def load_all_cogs(self):
-        """Load all cogs with comprehensive error handling"""
-        cogs_dir = Path("cogs")
-        old_cogs_dir = Path("Cogs")  # Backwards compatibility
+        """Load all cogs with comprehensive error handling and multiple directory support"""
+        # Try multiple possible cog directory locations
+        possible_dirs = [
+            Path("src/cogs"),  # New structure in src
+            Path("cogs"),  # Standard structure
+            Path("Cogs")  # Legacy structure
+        ]
+
+        cogs_dir = None
+        for dir_path in possible_dirs:
+            if dir_path.exists():
+                cogs_dir = dir_path
+                logger.info(f"📁 Found cogs directory: {cogs_dir}")
+                break
+
+        if not cogs_dir:
+            logger.error(f"❌ No cogs directory found! Searched: {[str(p) for p in possible_dirs]}")
+            return
 
         loaded = 0
         failed = 0
         failed_cogs = []
 
-        # Check for cogs directory structure
-        if cogs_dir.exists():
+        # Check for new structure (subdirectories)
+        if any(item.is_dir() and not item.name.startswith("_") for item in cogs_dir.iterdir()):
             # New structure: cogs organized in subdirectories
+            logger.info("📂 Using new cog structure (subdirectories)")
             for category_dir in cogs_dir.iterdir():
                 if category_dir.is_dir() and not category_dir.name.startswith("_"):
                     for cog_file in category_dir.glob("*.py"):
                         if cog_file.name.startswith("_"):
                             continue
 
-                        cog_name = f"cogs.{category_dir.name}.{cog_file.stem}"
+                        # Determine import path based on directory structure
+                        if cogs_dir.name == "cogs" and cogs_dir.parent.name == "src":
+                            cog_name = f"src.cogs.{category_dir.name}.{cog_file.stem}"
+                        else:
+                            cog_name = f"cogs.{category_dir.name}.{cog_file.stem}"
+
                         try:
                             await self.load_extension(cog_name)
                             logger.info(f"✅ Loaded: {cog_name}")
@@ -351,13 +372,21 @@ class LadBot(commands.Bot):
                             failed += 1
                             failed_cogs.append((cog_name, str(e)))
 
-        elif old_cogs_dir.exists():
+        else:
             # Old structure: all cogs in one directory
-            for cog_file in old_cogs_dir.glob("*.py"):
+            logger.info("📂 Using legacy cog structure (flat directory)")
+            for cog_file in cogs_dir.glob("*.py"):
                 if cog_file.name.startswith("_"):
                     continue
 
-                cog_name = f"Cogs.{cog_file.stem}"
+                # Determine import path
+                if cogs_dir.name == "Cogs":
+                    cog_name = f"Cogs.{cog_file.stem}"
+                elif cogs_dir.name == "cogs" and cogs_dir.parent.name == "src":
+                    cog_name = f"src.cogs.{cog_file.stem}"
+                else:
+                    cog_name = f"cogs.{cog_file.stem}"
+
                 try:
                     await self.load_extension(cog_name)
                     logger.info(f"✅ Loaded: {cog_name}")
@@ -372,6 +401,10 @@ class LadBot(commands.Bot):
 
         if failed_cogs:
             logger.warning(f"Failed cogs: {', '.join([name for name, _ in failed_cogs])}")
+
+        # Log available commands after loading
+        command_count = len([cmd for cmd in self.commands])
+        logger.info(f"🎯 {command_count} commands now available")
 
     def start_background_tasks(self):
         """Start background tasks"""
@@ -422,7 +455,7 @@ class LadBot(commands.Bot):
     # ===== BOT EVENTS =====
 
     async def on_ready(self):
-        """Enhanced on_ready event with comprehensive startup"""
+        """Enhanced on_ready event with comprehensive startup and cog loading"""
         # Set start time for uptime calculation
         self.start_time = datetime.now()
 
@@ -438,6 +471,10 @@ class LadBot(commands.Bot):
         self.unique_commands_used = len(self.command_usage)
         self.total_tracked_commands = self.total_commands_used
 
+        # ===== LOAD ALL COGS - THIS WAS MISSING! =====
+        logger.info("🎮 Loading all cogs...")
+        await self.load_all_cogs()
+
         # Start background tasks
         self.start_background_tasks()
 
@@ -447,10 +484,11 @@ class LadBot(commands.Bot):
         logger.info(f"📊 Connected to {len(self.guilds)} guilds")
         logger.info(f"📈 Serving {sum(guild.member_count for guild in self.guilds)} users")
         logger.info(f"🎮 {len(self.commands)} commands available")
+        logger.info(f"🔧 {len(self.extensions)} cogs loaded")
         logger.info(f"⚡ Current latency: {current_latency}ms")
 
         # Add to recent activity
-        self.add_activity("Bot started", f"Connected to {len(self.guilds)} servers")
+        self.add_activity("Bot started", f"Connected to {len(self.guilds)} servers with {len(self.commands)} commands")
 
     async def load_command_stats(self):
         """Load command statistics from file"""
