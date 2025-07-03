@@ -800,479 +800,461 @@ def register_routes(app):
                 'error': str(e)
             }), 500
 
+        @app.route('/api/analytics/refresh')
+        def refresh_analytics():
+            """Refresh analytics data"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
-@app.route('/api/analytics/refresh')
-def refresh_analytics():
-    """Refresh analytics data"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
-
-    try:
-        # Get fresh analytics data
-        analytics_data = app.web_manager._get_analytics_data()
-        stats = app.web_manager._get_comprehensive_stats()
-
-        return jsonify({
-            'success': True,
-            'analytics': analytics_data,
-            'stats': stats,
-            'timestamp': datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        logger.error(f"Analytics refresh error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/analytics/export')
-def export_analytics():
-    """Export analytics data"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
-
-    try:
-        analytics_data = app.web_manager._get_analytics_data()
-        stats = app.web_manager._get_comprehensive_stats()
-
-        export_data = {
-            'analytics': analytics_data,
-            'stats': stats,
-            'exported_at': datetime.now().isoformat(),
-            'exported_by': session.get('user', {}).get('username', 'Unknown')
-        }
-
-        return jsonify(export_data)
-
-    except Exception as e:
-        logger.error(f"Analytics export error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/admin/reload', methods=['POST'])
-def reload_bot():
-    """Reload bot modules (Admin only)"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
-
-    if not require_admin():
-        return jsonify({'error': 'Admin permissions required'}), 403
-
-    try:
-        # Here you would implement actual bot reloading logic
-        # For now, just simulate the process
-
-        logger.info(f"Bot reload initiated by {session.get('user', {}).get('username', 'Unknown')}")
-
-        # Simulate reload process
-        reload_results = {
-            'cogs_reloaded': 0,
-            'cogs_failed': 0,
-            'errors': []
-        }
-
-        # If bot is available, you could reload cogs here
-        if app.bot:
             try:
-                # Example: Reload specific cogs
-                # await app.bot.reload_extension('cogs.admin.reload')
-                reload_results['cogs_reloaded'] = len(app.bot.cogs)
+                # Get fresh analytics data
+                analytics_data = app.web_manager._get_analytics_data()
+                stats = app.web_manager._get_comprehensive_stats()
+
+                return jsonify({
+                    'success': True,
+                    'analytics': analytics_data,
+                    'stats': stats,
+                    'timestamp': datetime.now().isoformat()
+                })
+
             except Exception as e:
-                reload_results['errors'].append(str(e))
-                reload_results['cogs_failed'] += 1
+                logger.error(f"Analytics refresh error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-        return jsonify({
-            'success': True,
-            'message': 'Bot reload completed',
-            'results': reload_results,
-            'timestamp': datetime.now().isoformat()
-        })
+        @app.route('/api/analytics/export')
+        def export_analytics():
+            """Export analytics data"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
-    except Exception as e:
-        logger.error(f"Bot reload error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+            try:
+                analytics_data = app.web_manager._get_analytics_data()
+                stats = app.web_manager._get_comprehensive_stats()
 
+                export_data = {
+                    'analytics': analytics_data,
+                    'stats': stats,
+                    'exported_at': datetime.now().isoformat(),
+                    'exported_by': session.get('user', {}).get('username', 'Unknown')
+                }
 
-@app.route('/guild/<int:guild_id>/settings/save', methods=['POST'])
-def save_guild_settings(guild_id):
-    """Save guild settings via API"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
+                return jsonify(export_data)
 
-    try:
-        # Check if user has access to this guild
-        user_guilds = get_user_guilds()
-        has_access = any(int(guild['id']) == guild_id for guild in user_guilds)
+            except Exception as e:
+                logger.error(f"Analytics export error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-        if not has_access:
-            return jsonify({'error': 'Access denied'}), 403
+        @app.route('/api/admin/reload', methods=['POST'])
+        def reload_bot():
+            """Reload bot modules (Admin only)"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
-        settings_data = request.get_json()
-        logger.info(f"Saving settings for guild {guild_id}: {settings_data}")
+            if not require_admin():
+                return jsonify({'error': 'Admin permissions required'}), 403
 
-        # Here you would implement actual settings saving logic
-        # For now, just return success
+            try:
+                # Here you would implement actual bot reloading logic
+                # For now, just simulate the process
 
-        return jsonify({
-            'success': True,
-            'message': 'Settings saved successfully',
-            'timestamp': datetime.now().isoformat()
-        })
+                logger.info(f"Bot reload initiated by {session.get('user', {}).get('username', 'Unknown')}")
 
-    except Exception as e:
-        logger.error(f"Error saving guild settings: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+                # Simulate reload process
+                reload_results = {
+                    'cogs_reloaded': 0,
+                    'cogs_failed': 0,
+                    'errors': []
+                }
 
+                # If bot is available, you could reload cogs here
+                if app.bot:
+                    try:
+                        # Example: Reload specific cogs
+                        # await app.bot.reload_extension('cogs.admin.reload')
+                        reload_results['cogs_reloaded'] = len(app.bot.cogs)
+                    except Exception as e:
+                        reload_results['errors'].append(str(e))
+                        reload_results['cogs_failed'] += 1
 
-@app.route('/api/bot/status')
-def bot_status():
-    """Get current bot status"""
-    try:
-        if not app.bot:
-            return jsonify({
-                'status': 'offline',
-                'message': 'Bot not connected'
-            })
-
-        status_data = {
-            'status': 'online' if app.bot.is_ready() else 'connecting',
-            'latency': round(app.bot.latency * 1000, 2),
-            'guilds': len(app.bot.guilds),
-            'users': len(app.bot.users),
-            'uptime': str(datetime.now() - app.web_manager.startup_time).split('.')[0],
-            'commands_loaded': len(list(app.bot.walk_commands())),
-            'cogs_loaded': len(app.bot.cogs)
-        }
-
-        return jsonify({
-            'success': True,
-            'data': status_data,
-            'timestamp': datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        logger.error(f"Bot status error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/commands/usage')
-def command_usage():
-    """Get command usage statistics"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
-
-    try:
-        # Get command usage data
-        usage_data = app.web_manager._get_command_usage_stats()
-
-        return jsonify({
-            'success': True,
-            'data': usage_data,
-            'timestamp': datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        logger.error(f"Command usage error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/system/health')
-def system_health():
-    """Get system health information"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
-
-    try:
-        import psutil
-
-        # Get system metrics
-        health_data = {
-            'cpu_percent': psutil.cpu_percent(interval=1),
-            'memory_percent': psutil.virtual_memory().percent,
-            'disk_percent': psutil.disk_usage('/').percent,
-            'load_average': psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None,
-            'boot_time': datetime.fromtimestamp(psutil.boot_time()).isoformat(),
-            'process_count': len(psutil.pids()),
-            'network_io': dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else None
-        }
-
-        return jsonify({
-            'success': True,
-            'data': health_data,
-            'timestamp': datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        logger.error(f"System health error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/logs/recent')
-def recent_logs():
-    """Get recent log entries (Admin only)"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
-
-    if not require_admin():
-        return jsonify({'error': 'Admin permissions required'}), 403
-
-    try:
-        # Read recent log entries
-        log_file = app.web_manager.app.logger.handlers[0].baseFilename if app.web_manager.app.logger.handlers else None
-
-        if not log_file:
-            return jsonify({
-                'success': False,
-                'error': 'Log file not found'
-            }), 404
-
-        # Read last 100 lines
-        with open(log_file, 'r') as f:
-            lines = f.readlines()
-            recent_lines = lines[-100:] if len(lines) > 100 else lines
-
-        log_entries = []
-        for line in recent_lines:
-            if line.strip():
-                log_entries.append({
-                    'timestamp': line.split(' - ')[0] if ' - ' in line else '',
-                    'level': line.split(' - ')[1] if len(line.split(' - ')) > 1 else 'INFO',
-                    'message': ' - '.join(line.split(' - ')[2:]) if len(line.split(' - ')) > 2 else line,
-                    'raw': line.strip()
+                return jsonify({
+                    'success': True,
+                    'message': 'Bot reload completed',
+                    'results': reload_results,
+                    'timestamp': datetime.now().isoformat()
                 })
 
-        return jsonify({
-            'success': True,
-            'logs': log_entries,
-            'count': len(log_entries),
-            'timestamp': datetime.now().isoformat()
-        })
+            except Exception as e:
+                logger.error(f"Bot reload error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-    except Exception as e:
-        logger.error(f"Recent logs error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        @app.route('/guild/<int:guild_id>/settings/save', methods=['POST'])
+        def save_guild_settings(guild_id):
+            """Save guild settings via API"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
+            try:
+                # Check if user has access to this guild
+                user_guilds = get_user_guilds()
+                has_access = any(int(guild['id']) == guild_id for guild in user_guilds)
 
-@app.route('/api/guilds/<int:guild_id>/info')
-def guild_info(guild_id):
-    """Get detailed guild information"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
+                if not has_access:
+                    return jsonify({'error': 'Access denied'}), 403
 
-    try:
-        # Check if user has access to this guild
-        user_guilds = get_user_guilds()
-        guild_data = None
+                settings_data = request.get_json()
+                logger.info(f"Saving settings for guild {guild_id}: {settings_data}")
 
-        for guild in user_guilds:
-            if int(guild['id']) == guild_id:
-                guild_data = guild
-                break
+                # Here you would implement actual settings saving logic
+                # For now, just return success
 
-        if not guild_data:
-            return jsonify({'error': 'Access denied'}), 403
-
-        # Get additional guild info from bot if available
-        if app.bot:
-            discord_guild = app.bot.get_guild(guild_id)
-            if discord_guild:
-                guild_data.update({
-                    'features': discord_guild.features,
-                    'verification_level': str(discord_guild.verification_level),
-                    'explicit_content_filter': str(discord_guild.explicit_content_filter),
-                    'default_notifications': str(discord_guild.default_notifications),
-                    'premium_tier': discord_guild.premium_tier,
-                    'premium_subscription_count': discord_guild.premium_subscription_count,
-                    'text_channels': len(discord_guild.text_channels),
-                    'voice_channels': len(discord_guild.voice_channels),
-                    'categories': len(discord_guild.categories),
-                    'roles': len(discord_guild.roles),
-                    'emojis': len(discord_guild.emojis),
-                    'created_at': discord_guild.created_at.isoformat()
+                return jsonify({
+                    'success': True,
+                    'message': 'Settings saved successfully',
+                    'timestamp': datetime.now().isoformat()
                 })
 
-        return jsonify({
-            'success': True,
-            'guild': guild_data,
-            'timestamp': datetime.now().isoformat()
-        })
+            except Exception as e:
+                logger.error(f"Error saving guild settings: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-    except Exception as e:
-        logger.error(f"Guild info error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        @app.route('/api/bot/status')
+        def bot_status():
+            """Get current bot status"""
+            try:
+                if not app.bot:
+                    return jsonify({
+                        'status': 'offline',
+                        'message': 'Bot not connected'
+                    })
 
+                status_data = {
+                    'status': 'online' if app.bot.is_ready() else 'connecting',
+                    'latency': round(app.bot.latency * 1000, 2),
+                    'guilds': len(app.bot.guilds),
+                    'users': len(app.bot.users),
+                    'uptime': str(datetime.now() - app.web_manager.startup_time).split('.')[0],
+                    'commands_loaded': len(list(app.bot.walk_commands())),
+                    'cogs_loaded': len(app.bot.cogs)
+                }
 
-@app.route('/api/feedback', methods=['POST'])
-def submit_feedback():
-    """Submit user feedback"""
-    if not require_auth():
-        return jsonify({'error': 'Authentication required'}), 401
+                return jsonify({
+                    'success': True,
+                    'data': status_data,
+                    'timestamp': datetime.now().isoformat()
+                })
 
-    try:
-        feedback_data = request.get_json()
+            except Exception as e:
+                logger.error(f"Bot status error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-        if not feedback_data or 'message' not in feedback_data:
-            return jsonify({
-                'success': False,
-                'error': 'Feedback message is required'
-            }), 400
+        @app.route('/api/commands/usage')
+        def command_usage():
+            """Get command usage statistics"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
-        # Log the feedback
-        user = session.get('user', {})
-        logger.info(
-            f"Feedback from {user.get('username', 'Unknown')} ({user.get('id', 'Unknown')}): {feedback_data['message']}")
+            try:
+                # Get command usage data
+                usage_data = app.web_manager._get_command_usage_stats()
 
-        # Here you could save to database, send to Discord channel, etc.
+                return jsonify({
+                    'success': True,
+                    'data': usage_data,
+                    'timestamp': datetime.now().isoformat()
+                })
 
-        return jsonify({
-            'success': True,
-            'message': 'Feedback submitted successfully',
-            'timestamp': datetime.now().isoformat()
-        })
+            except Exception as e:
+                logger.error(f"Command usage error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-    except Exception as e:
-        logger.error(f"Feedback submission error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        @app.route('/api/system/health')
+        def system_health():
+            """Get system health information"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
+            try:
+                import psutil
 
-# ===== ERROR HANDLERS =====
+                # Get system metrics
+                health_data = {
+                    'cpu_percent': psutil.cpu_percent(interval=1),
+                    'memory_percent': psutil.virtual_memory().percent,
+                    'disk_percent': psutil.disk_usage('/').percent,
+                    'load_average': psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None,
+                    'boot_time': datetime.fromtimestamp(psutil.boot_time()).isoformat(),
+                    'process_count': len(psutil.pids()),
+                    'network_io': dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else None
+                }
 
-@app.errorhandler(404)
-def not_found_error(error):
-    if request.path.startswith('/api/'):
-        return jsonify({
-            'error': 'Endpoint not found',
-            'status': 404,
-            'path': request.path
-        }), 404
+                return jsonify({
+                    'success': True,
+                    'data': health_data,
+                    'timestamp': datetime.now().isoformat()
+                })
 
-    return render_template('errors/404.html'), 404
+            except Exception as e:
+                logger.error(f"System health error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
+        @app.route('/api/logs/recent')
+        def recent_logs():
+            """Get recent log entries (Admin only)"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
-@app.errorhandler(403)
-def forbidden_error(error):
-    if request.path.startswith('/api/'):
-        return jsonify({
-            'error': 'Access forbidden',
-            'status': 403
-        }), 403
+            if not require_admin():
+                return jsonify({'error': 'Admin permissions required'}), 403
 
-    flash('Access denied: Insufficient permissions', 'error')
-    return redirect(url_for('dashboard'))
+            try:
+                # Read recent log entries
+                log_file = app.web_manager.app.logger.handlers[
+                    0].baseFilename if app.web_manager.app.logger.handlers else None
 
+                if not log_file:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Log file not found'
+                    }), 404
 
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"Internal server error: {error}")
+                # Read last 100 lines
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    recent_lines = lines[-100:] if len(lines) > 100 else lines
 
-    if request.path.startswith('/api/'):
-        return jsonify({
-            'error': 'Internal server error',
-            'status': 500,
-            'timestamp': datetime.now().isoformat()
-        }), 500
+                log_entries = []
+                for line in recent_lines:
+                    if line.strip():
+                        log_entries.append({
+                            'timestamp': line.split(' - ')[0] if ' - ' in line else '',
+                            'level': line.split(' - ')[1] if len(line.split(' - ')) > 1 else 'INFO',
+                            'message': ' - '.join(line.split(' - ')[2:]) if len(line.split(' - ')) > 2 else line,
+                            'raw': line.strip()
+                        })
 
-    flash('An internal error occurred. Please try again later.', 'error')
-    return redirect(url_for('dashboard'))
+                return jsonify({
+                    'success': True,
+                    'logs': log_entries,
+                    'count': len(log_entries),
+                    'timestamp': datetime.now().isoformat()
+                })
 
+            except Exception as e:
+                logger.error(f"Recent logs error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-# ===== TEMPLATE FILTERS =====
+        @app.route('/api/guilds/<int:guild_id>/info')
+        def guild_info(guild_id):
+            """Get detailed guild information"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
-@app.template_filter('format_number')
-def format_number(value):
-    """Format numbers with commas"""
-    try:
-        return "{:,}".format(int(value))
-    except (ValueError, TypeError):
-        return value
+            try:
+                # Check if user has access to this guild
+                user_guilds = get_user_guilds()
+                guild_data = None
 
+                for guild in user_guilds:
+                    if int(guild['id']) == guild_id:
+                        guild_data = guild
+                        break
 
-@app.template_filter('timeago')
-def timeago_filter(timestamp):
-    """Convert timestamp to 'time ago' format"""
-    try:
-        if isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                if not guild_data:
+                    return jsonify({'error': 'Access denied'}), 403
 
-        now = datetime.now()
-        diff = now - timestamp
+                # Get additional guild info from bot if available
+                if app.bot:
+                    discord_guild = app.bot.get_guild(guild_id)
+                    if discord_guild:
+                        guild_data.update({
+                            'features': discord_guild.features,
+                            'verification_level': str(discord_guild.verification_level),
+                            'explicit_content_filter': str(discord_guild.explicit_content_filter),
+                            'default_notifications': str(discord_guild.default_notifications),
+                            'premium_tier': discord_guild.premium_tier,
+                            'premium_subscription_count': discord_guild.premium_subscription_count,
+                            'text_channels': len(discord_guild.text_channels),
+                            'voice_channels': len(discord_guild.voice_channels),
+                            'categories': len(discord_guild.categories),
+                            'roles': len(discord_guild.roles),
+                            'emojis': len(discord_guild.emojis),
+                            'created_at': discord_guild.created_at.isoformat()
+                        })
 
-        if diff.days > 0:
-            return f"{diff.days} days ago"
-        elif diff.seconds > 3600:
-            hours = diff.seconds // 3600
-            return f"{hours} hours ago"
-        elif diff.seconds > 60:
-            minutes = diff.seconds // 60
-            return f"{minutes} minutes ago"
-        else:
-            return "Just now"
-    except:
-        return "Unknown"
+                return jsonify({
+                    'success': True,
+                    'guild': guild_data,
+                    'timestamp': datetime.now().isoformat()
+                })
 
+            except Exception as e:
+                logger.error(f"Guild info error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
-@app.template_filter('datetime')
-def datetime_filter(timestamp):
-    """Format datetime for display"""
-    try:
-        if isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        return timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    except:
-        return 'Unknown'
+        @app.route('/api/feedback', methods=['POST'])
+        def submit_feedback():
+            """Submit user feedback"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
 
+            try:
+                feedback_data = request.get_json()
 
-@app.template_filter('truncate_smart')
-def truncate_smart(text, length=50, suffix='...'):
-    """Smart truncation that doesn't break words"""
-    if len(text) <= length:
-        return text
+                if not feedback_data or 'message' not in feedback_data:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Feedback message is required'
+                    }), 400
 
-    truncated = text[:length].rsplit(' ', 1)[0]
-    return truncated + suffix
+                # Log the feedback
+                user = session.get('user', {})
+                logger.info(
+                    f"Feedback from {user.get('username', 'Unknown')} ({user.get('id', 'Unknown')}): {feedback_data['message']}")
 
+                # Here you could save to database, send to Discord channel, etc.
 
-# ===== CONTEXT PROCESSORS =====
+                return jsonify({
+                    'success': True,
+                    'message': 'Feedback submitted successfully',
+                    'timestamp': datetime.now().isoformat()
+                })
 
-@app.context_processor
-def inject_global_vars():
-    """Inject global variables into all templates"""
-    return {
-        'current_year': datetime.now().year,
-        'bot_name': 'Ladbot',
-        'version': '2.0',
-        'is_admin': require_admin() if require_auth() else False,
-        'current_user': session.get('user') if require_auth() else None
-    }
+            except Exception as e:
+                logger.error(f"Feedback submission error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
 
+        # ===== ERROR HANDLERS =====
 
-logger.info("✅ All routes registered successfully")
+        @app.errorhandler(404)
+        def not_found_error(error):
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'Endpoint not found',
+                    'status': 404,
+                    'path': request.path
+                }), 404
+
+            return render_template('errors/404.html'), 404
+
+        @app.errorhandler(403)
+        def forbidden_error(error):
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'Access forbidden',
+                    'status': 403
+                }), 403
+
+            flash('Access denied: Insufficient permissions', 'error')
+            return redirect(url_for('dashboard'))
+
+        @app.errorhandler(500)
+        def internal_error(error):
+            logger.error(f"Internal server error: {error}")
+
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'Internal server error',
+                    'status': 500,
+                    'timestamp': datetime.now().isoformat()
+                }), 500
+
+            flash('An internal error occurred. Please try again later.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # ===== TEMPLATE FILTERS =====
+
+        @app.template_filter('format_number')
+        def format_number(value):
+            """Format numbers with commas"""
+            try:
+                return "{:,}".format(int(value))
+            except (ValueError, TypeError):
+                return value
+
+        @app.template_filter('timeago')
+        def timeago_filter(timestamp):
+            """Convert timestamp to 'time ago' format"""
+            try:
+                if isinstance(timestamp, str):
+                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+
+                now = datetime.now()
+                diff = now - timestamp
+
+                if diff.days > 0:
+                    return f"{diff.days} days ago"
+                elif diff.seconds > 3600:
+                    hours = diff.seconds // 3600
+                    return f"{hours} hours ago"
+                elif diff.seconds > 60:
+                    minutes = diff.seconds // 60
+                    return f"{minutes} minutes ago"
+                else:
+                    return "Just now"
+            except:
+                return "Unknown"
+
+        @app.template_filter('datetime')
+        def datetime_filter(timestamp):
+            """Format datetime for display"""
+            try:
+                if isinstance(timestamp, str):
+                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                return timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                return 'Unknown'
+
+        @app.template_filter('truncate_smart')
+        def truncate_smart(text, length=50, suffix='...'):
+            """Smart truncation that doesn't break words"""
+            if len(text) <= length:
+                return text
+
+            truncated = text[:length].rsplit(' ', 1)[0]
+            return truncated + suffix
+
+        # ===== CONTEXT PROCESSORS =====
+
+        @app.context_processor
+        def inject_global_vars():
+            """Inject global variables into all templates"""
+            return {
+                'current_year': datetime.now().year,
+                'bot_name': 'Ladbot',
+                'version': '2.0',
+                'is_admin': require_admin() if require_auth() else False,
+                'current_user': session.get('user') if require_auth() else None
+            }
+
+        logger.info("✅ All routes registered successfully")
