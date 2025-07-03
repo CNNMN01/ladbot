@@ -577,7 +577,7 @@ def register_routes(app):
 
     @app.route('/api/settings/update', methods=['POST'])
     def update_settings():
-        """Update bot settings via API"""
+        """Update bot settings via API - ACTUALLY IMPLEMENTED"""
         if not require_auth():
             return jsonify({'error': 'Authentication required'}), 401
 
@@ -586,14 +586,85 @@ def register_routes(app):
 
         try:
             settings_data = request.get_json()
-            # Implement settings update logic here
-            # For now, just return success
+            logger.info(f"Received settings update: {settings_data}")
 
-            return jsonify({
-                'success': True,
-                'message': 'Settings updated successfully',
-                'timestamp': datetime.now().isoformat()
-            })
+            # Validate required fields
+            guild_id = settings_data.get('guild_id')
+            settings = settings_data.get('settings', {})
+
+            if not guild_id:
+                return jsonify({'error': 'Guild ID required'}), 400
+
+            if not settings:
+                return jsonify({'error': 'No settings provided'}), 400
+
+            # Get the bot instance
+            if not app.bot:
+                return jsonify({'error': 'Bot not available'}), 503
+
+            success_count = 0
+            failed_settings = []
+
+            for setting_name, value in settings.items():
+                try:
+                    saved = False
+
+                    # Method 1: Use bot's settings manager (if available)
+                    if hasattr(app.bot, 'settings_manager'):
+                        saved = app.bot.settings_manager.set_setting(guild_id, setting_name, value)
+
+                    # Method 2: Direct file approach (fallback)
+                    if not saved:
+                        data_dir = Path(__file__).parent.parent.parent / "data"
+                        settings_dir = data_dir / "guild_settings"
+                        settings_dir.mkdir(exist_ok=True)
+                        settings_file = settings_dir / f"{guild_id}.json"
+
+                        # Load existing settings
+                        current_settings = {}
+                        if settings_file.exists():
+                            with open(settings_file, 'r') as f:
+                                current_settings = json.load(f)
+
+                        # Update the setting
+                        current_settings[setting_name] = value
+                        current_settings['last_updated'] = datetime.now().isoformat()
+                        current_settings['guild_id'] = guild_id
+
+                        # Save back to file
+                        with open(settings_file, 'w') as f:
+                            json.dump(current_settings, f, indent=2)
+
+                        saved = True
+
+                    if saved:
+                        success_count += 1
+                        logger.info(f"✅ Updated setting {setting_name} = {value} for guild {guild_id}")
+
+                        # Clear any cached values
+                        if hasattr(app.bot, 'settings_cache'):
+                            cache_key = f"{guild_id}_{setting_name}"
+                            app.bot.settings_cache.pop(cache_key, None)
+                    else:
+                        failed_settings.append(setting_name)
+
+                except Exception as e:
+                    logger.error(f"❌ Failed to update setting {setting_name}: {e}")
+                    failed_settings.append(setting_name)
+
+            # Return response
+            if success_count > 0:
+                return jsonify({
+                    'success': True,
+                    'message': f'Successfully updated {success_count} settings',
+                    'updated_count': success_count,
+                    'timestamp': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to update settings: {", ".join(failed_settings)}'
+                }), 500
 
         except Exception as e:
             logger.error(f"Settings update error: {e}")
