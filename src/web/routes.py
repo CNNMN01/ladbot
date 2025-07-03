@@ -577,7 +577,7 @@ def register_routes(app):
 
     @app.route('/api/settings/update', methods=['POST'])
     def update_settings():
-        """Update bot settings via API - ACTUALLY IMPLEMENTED"""
+        """Update bot settings via API - PROPERLY IMPLEMENTED"""
         if not require_auth():
             return jsonify({'error': 'Authentication required'}), 401
 
@@ -588,11 +588,19 @@ def register_routes(app):
             settings_data = request.get_json()
             logger.info(f"Received settings update: {settings_data}")
 
+            # Debug logging
+            if not settings_data:
+                logger.error("No JSON data received")
+                return jsonify({'error': 'No data provided'}), 400
+
             # Validate required fields
             guild_id = settings_data.get('guild_id')
             settings = settings_data.get('settings', {})
 
+            logger.info(f"Guild ID: {guild_id}, Settings: {settings}")
+
             if not guild_id:
+                logger.error(f"Guild ID missing from request data: {settings_data}")
                 return jsonify({'error': 'Guild ID required'}), 400
 
             if not settings:
@@ -607,46 +615,37 @@ def register_routes(app):
 
             for setting_name, value in settings.items():
                 try:
-                    saved = False
+                    # Direct file approach (simplest method)
+                    from pathlib import Path
+                    import json as json_module
 
-                    # Method 1: Use bot's settings manager (if available)
-                    if hasattr(app.bot, 'settings_manager'):
-                        saved = app.bot.settings_manager.set_setting(guild_id, setting_name, value)
+                    data_dir = Path(__file__).parent.parent.parent / "data"
+                    settings_dir = data_dir / "guild_settings"
+                    settings_dir.mkdir(exist_ok=True)
+                    settings_file = settings_dir / f"{guild_id}.json"
 
-                    # Method 2: Direct file approach (fallback)
-                    if not saved:
-                        data_dir = Path(__file__).parent.parent.parent / "data"
-                        settings_dir = data_dir / "guild_settings"
-                        settings_dir.mkdir(exist_ok=True)
-                        settings_file = settings_dir / f"{guild_id}.json"
+                    # Load existing settings
+                    current_settings = {}
+                    if settings_file.exists():
+                        with open(settings_file, 'r') as f:
+                            current_settings = json_module.load(f)
 
-                        # Load existing settings
-                        current_settings = {}
-                        if settings_file.exists():
-                            with open(settings_file, 'r') as f:
-                                current_settings = json.load(f)
+                    # Update the setting
+                    current_settings[setting_name] = value
+                    current_settings['last_updated'] = datetime.now().isoformat()
+                    current_settings['guild_id'] = guild_id
 
-                        # Update the setting
-                        current_settings[setting_name] = value
-                        current_settings['last_updated'] = datetime.now().isoformat()
-                        current_settings['guild_id'] = guild_id
+                    # Save back to file
+                    with open(settings_file, 'w') as f:
+                        json_module.dump(current_settings, f, indent=2)
 
-                        # Save back to file
-                        with open(settings_file, 'w') as f:
-                            json.dump(current_settings, f, indent=2)
+                    success_count += 1
+                    logger.info(f"✅ Updated setting {setting_name} = {value} for guild {guild_id}")
 
-                        saved = True
-
-                    if saved:
-                        success_count += 1
-                        logger.info(f"✅ Updated setting {setting_name} = {value} for guild {guild_id}")
-
-                        # Clear any cached values
-                        if hasattr(app.bot, 'settings_cache'):
-                            cache_key = f"{guild_id}_{setting_name}"
-                            app.bot.settings_cache.pop(cache_key, None)
-                    else:
-                        failed_settings.append(setting_name)
+                    # Clear any cached values
+                    if hasattr(app.bot, 'settings_cache'):
+                        cache_key = f"{guild_id}_{setting_name}"
+                        app.bot.settings_cache.pop(cache_key, None)
 
                 except Exception as e:
                     logger.error(f"❌ Failed to update setting {setting_name}: {e}")
@@ -665,6 +664,15 @@ def register_routes(app):
                     'success': False,
                     'error': f'Failed to update settings: {", ".join(failed_settings)}'
                 }), 500
+
+        except Exception as e:
+            logger.error(f"Settings update error: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
 
         except Exception as e:
             logger.error(f"Settings update error: {e}")
