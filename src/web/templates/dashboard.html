@@ -115,7 +115,7 @@
                         <i class="fas fa-circle status-offline"></i> Offline
                     {% endif %}
                 </h4>
-                <small class="text-muted">Last updated: {{ moment().format('LT') }}</small>
+                <small class="text-muted">Last updated: now</small>
             </div>
         </div>
     </div>
@@ -144,7 +144,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <p class="stat-label mb-1">Total Users</p>
-                            <h2 class="stat-number">{{ stats.users or 0 | format_number }}</h2>
+                            <h2 class="stat-number">{{ (stats.users or 0) | format_number if (stats.users or 0) < 1000000 else ((stats.users or 0) / 1000) | round | int ~ 'K' }}</h2>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-users fa-2x opacity-75"></i>
@@ -205,7 +205,7 @@
                             <div class="activity-item">
                                 <h6 class="mb-1">{{ activity.action }}</h6>
                                 <p class="text-muted small mb-1">{{ activity.details }}</p>
-                                <small class="text-muted">{{ activity.timestamp | timeago }}</small>
+                                <small class="text-muted">{{ activity.timestamp | timeago if activity.timestamp else 'Just now' }}</small>
                             </div>
                             {% endfor %}
                         </div>
@@ -270,7 +270,7 @@
                 </div>
             </div>
 
-            <!-- System Health -->
+            <!-- System Health - FIXED CALCULATION -->
             <div class="card shadow mb-4">
                 <div class="card-header">
                     <h6 class="m-0 font-weight-bold text-primary">
@@ -282,31 +282,34 @@
                         <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="small">Memory Usage</span>
-                                <span class="small">{{ system_health.memory_usage }}%</span>
+                                <span class="small">{{ system_health.memory_usage or 0 }}%</span>
                             </div>
                             <div class="progress" style="height: 8px;">
                                 <div class="progress-bar" role="progressbar"
-                                     style="width: {{ system_health.memory_usage }}%"></div>
+                                     style="width: {{ system_health.memory_usage or 0 }}%"></div>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="small">Response Time</span>
-                                <span class="small">{{ system_health.response_time }}ms</span>
+                                <span class="small">{{ system_health.response_time or 0 }}ms</span>
                             </div>
                             <div class="progress" style="height: 8px;">
+                                {% set response_percentage = ((1000 - (system_health.response_time or 0)) / 10) %}
+                                {% set response_percentage = response_percentage if response_percentage >= 10 else 10 %}
+                                {% set response_percentage = response_percentage if response_percentage <= 100 else 100 %}
                                 <div class="progress-bar bg-info" role="progressbar"
-                                     style="width: {{ (100 - (system_health.response_time / 10)) | max(10) }}%"></div>
+                                     style="width: {{ response_percentage }}%"></div>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="small">Uptime</span>
-                                <span class="small">{{ system_health.uptime_percentage }}%</span>
+                                <span class="small">{{ system_health.uptime_percentage or 99 }}%</span>
                             </div>
                             <div class="progress" style="height: 8px;">
                                 <div class="progress-bar bg-success" role="progressbar"
-                                     style="width: {{ system_health.uptime_percentage }}%"></div>
+                                     style="width: {{ system_health.uptime_percentage or 99 }}%"></div>
                             </div>
                         </div>
                     {% else %}
@@ -362,28 +365,44 @@ setInterval(function() {
     fetch('/api/dashboard/refresh')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
+            if (data.success && data.stats) {
                 // Update stats without full page reload
-                document.querySelector('.stat-number').textContent = data.stats.guilds || 0;
-                // Add more selective updates as needed
+                const guildsEl = document.querySelector('.stat-number');
+                if (guildsEl && data.stats.guilds !== undefined) {
+                    guildsEl.textContent = data.stats.guilds || 0;
+                }
+
+                // Update timestamp
+                const timestampEl = document.querySelector('.real-time-data small');
+                if (timestampEl) {
+                    timestampEl.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+                }
             }
         })
-        .catch(error => console.log('Refresh failed:', error));
+        .catch(error => console.log('Dashboard refresh failed:', error));
 }, 30000);
 
 // Reload bot function for admin users
 function reloadBot() {
     if (confirm('Are you sure you want to reload the bot? This may cause temporary downtime.')) {
+        const btn = event.target;
+        ladbotUtils.setButtonLoading(btn, true);
+
         fetch('/api/admin/reload', {method: 'POST'})
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Bot reload initiated successfully!');
+                    ladbotUtils.showToast('Bot reload initiated successfully!', 'success');
                 } else {
-                    alert('Failed to reload bot: ' + data.error);
+                    ladbotUtils.showToast('Failed to reload bot: ' + (data.error || 'Unknown error'), 'error');
                 }
             })
-            .catch(error => alert('Error: ' + error));
+            .catch(error => {
+                ladbotUtils.showToast('Error reloading bot: ' + error.message, 'error');
+            })
+            .finally(() => {
+                ladbotUtils.setButtonLoading(btn, false);
+            });
     }
 }
 </script>
