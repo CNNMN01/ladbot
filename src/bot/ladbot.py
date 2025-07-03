@@ -1,7 +1,7 @@
 """
 ENHANCED LADBOT DISCORD BOT CLASS
 Production-ready Discord bot with comprehensive web dashboard integration,
-real-time analytics, and advanced error handling
+real-time analytics, PostgreSQL database storage, and advanced error handling
 """
 
 import asyncio
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class LadBot(commands.Bot):
-    """Enhanced Ladbot with comprehensive web integration and analytics"""
+    """Enhanced Ladbot with comprehensive web integration and database storage"""
 
     def __init__(self):
         """Initialize the bot with enhanced tracking and web integration"""
@@ -83,11 +83,15 @@ class LadBot(commands.Bot):
         self.loaded_cogs = 0
         self.total_tracked_commands = 0
 
+        # ===== DATABASE INTEGRATION =====
+        self.db_manager = None
+        self.database_ready = False
+
         # ===== DATA MANAGEMENT =====
-        self.data_manager = self._create_data_manager()
+        self.data_manager = self._create_data_manager()  # Keep for analytics/backups
         self.cog_loader = self._create_cog_loader()
 
-        # Settings cache for performance
+        # Settings cache for performance (now database-backed)
         self.settings_cache = {}
         self.guild_settings = {}  # Compatibility alias
 
@@ -98,17 +102,43 @@ class LadBot(commands.Bot):
         self.update_stats_task = self.update_stats_loop
         self.cleanup_task = self.cleanup_loop
 
-        logger.info("🔧 Enhanced Ladbot initialized with web integration")
+        logger.info("🔧 Enhanced Ladbot initialized with database integration")
+
+    async def setup_hook(self):
+        """Called when the bot is starting up - Initialize database and load cogs"""
+        try:
+            # Initialize database connection
+            from utils.database import db_manager
+            self.db_manager = db_manager
+
+            logger.info("🗄️ Initializing database connection...")
+            db_success = await self.db_manager.initialize()
+            if not db_success:
+                logger.error("❌ Database initialization failed - bot may not function properly")
+            else:
+                self.database_ready = True
+                logger.info("✅ Database connection established")
+
+            # Load all cogs
+            logger.info("🎮 Loading cogs...")
+            await self.load_all_cogs()
+
+            # Start background tasks
+            self.start_background_tasks()
+
+            logger.info("🎮 Bot setup completed successfully")
+        except Exception as e:
+            logger.error(f"❌ Error in setup_hook: {e}")
 
     def _create_data_manager(self):
-        """Create a comprehensive data manager for web integration"""
+        """Create a data manager for analytics and backups (non-settings data)"""
 
         class EnhancedDataManager:
             def __init__(self, settings, bot_instance):
                 self.settings = settings
                 self.bot = bot_instance
 
-                # FORCE absolute path for Railway/production
+                # Force absolute path for Railway/production
                 if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
                     self.data_dir = Path("/app/data")
                 else:
@@ -118,62 +148,11 @@ class LadBot(commands.Bot):
 
                 # Create subdirectories
                 (self.data_dir / "analytics").mkdir(exist_ok=True)
-                (self.data_dir / "guild_settings").mkdir(exist_ok=True)
                 (self.data_dir / "backups").mkdir(exist_ok=True)
 
                 self.last_cache_clear = datetime.now()
 
                 logger.info(f"📊 Data manager initialized with path: {self.data_dir}")
-
-            def get_guild_setting(self, guild_id: int, setting_name: str, default=True):
-                """Get a guild-specific setting - FIXED FOR WEB DASHBOARD"""
-                try:
-                    # Use same path structure as web dashboard
-                    settings_file = self.data_dir / "guild_settings" / f"{guild_id}.json"
-
-                    if settings_file.exists():
-                        with open(settings_file, 'r') as f:
-                            guild_settings = json.load(f)
-                            return guild_settings.get(setting_name, default)
-
-                    return default
-
-                except Exception as e:
-                    logger.error(f"Error getting guild setting {setting_name} for {guild_id}: {e}")
-                    return default
-
-            def set_guild_setting(self, guild_id: int, setting_name: str, value):
-                """Set a guild-specific setting - FIXED FOR WEB DASHBOARD"""
-                try:
-                    # Use same path structure as web dashboard
-                    settings_file = self.data_dir / "guild_settings" / f"{guild_id}.json"
-
-                    # Load existing settings
-                    settings_data = {}
-                    if settings_file.exists():
-                        with open(settings_file, 'r') as f:
-                            settings_data = json.load(f)
-
-                    # Update the setting
-                    settings_data[setting_name] = value
-                    settings_data['last_updated'] = datetime.now().isoformat()
-                    settings_data['guild_id'] = guild_id
-
-                    # Save back to file
-                    with open(settings_file, 'w') as f:
-                        json.dump(settings_data, f, indent=2)
-
-                    # Update cache
-                    cache_key = f"{guild_id}_{setting_name}"
-                    if hasattr(self.bot, 'settings_cache'):
-                        self.bot.settings_cache[cache_key] = value
-
-                    logger.info(f"✅ Set {setting_name} = {value} for guild {guild_id}")
-                    return True
-
-                except Exception as e:
-                    logger.error(f"❌ Error setting {setting_name} for guild {guild_id}: {e}")
-                    return False
 
             def save_analytics_data(self, data):
                 """Save analytics data to file"""
@@ -209,18 +188,9 @@ class LadBot(commands.Bot):
 
                     backup_data = {
                         'timestamp': datetime.now().isoformat(),
-                        'guild_settings': {},
                         'analytics': self.get_analytics_data(),
                         'command_usage': dict(self.bot.command_usage)
                     }
-
-                    # Backup all guild settings
-                    guild_settings_dir = self.data_dir / "guild_settings"
-                    if guild_settings_dir.exists():
-                        for settings_file in guild_settings_dir.glob("*.json"):
-                            guild_id = settings_file.stem
-                            with open(settings_file, 'r') as f:
-                                backup_data['guild_settings'][guild_id] = json.load(f)
 
                     with open(backup_file, 'w') as f:
                         json.dump(backup_data, f, indent=2)
@@ -302,40 +272,90 @@ class LadBot(commands.Bot):
 
         return CogLoader(self)
 
-    # ===== SETTINGS METHODS - ENHANCED FOR WEB DASHBOARD =====
+    # ===== SETTINGS METHODS - DATABASE INTEGRATION =====
 
-    def get_setting(self, guild_id: int, setting_name: str, default=True):
-        """Get a guild setting using unified service"""
+    async def get_setting(self, guild_id: int, setting_name: str, default=True):
+        """Get a guild setting from database"""
+        if not self.database_ready or not self.db_manager:
+            logger.warning(f"Database not ready, returning default for {setting_name}")
+            return default
+
         try:
-            from utils.settings_service import settings_service
-            return settings_service.get_guild_setting(guild_id, setting_name, default)
+            return await self.db_manager.get_guild_setting(guild_id, setting_name, default)
         except Exception as e:
             logger.error(f"Error getting setting {setting_name}: {e}")
             return default
 
-    def set_setting(self, guild_id: int, setting_name: str, value):
-        """Set a guild setting using unified service"""
+    async def set_setting(self, guild_id: int, setting_name: str, value):
+        """Set a guild setting in database"""
+        if not self.database_ready or not self.db_manager:
+            logger.warning(f"Database not ready, cannot set {setting_name}")
+            return False
+
         try:
-            from utils.settings_service import settings_service
-            return settings_service.set_guild_setting(guild_id, setting_name, value)
+            success = await self.db_manager.set_guild_setting(guild_id, setting_name, value)
+            if success:
+                # Clear cache for this setting
+                cache_key = f"{guild_id}_{setting_name}"
+                self.settings_cache.pop(cache_key, None)
+            return success
         except Exception as e:
             logger.error(f"Error setting {setting_name}: {e}")
             return False
 
+    async def get_all_guild_settings(self, guild_id: int):
+        """Get all settings for a guild from database"""
+        if not self.database_ready or not self.db_manager:
+            return {}
+
+        try:
+            return await self.db_manager.get_all_guild_settings(guild_id)
+        except Exception as e:
+            logger.error(f"Error getting all settings for guild {guild_id}: {e}")
+            return {}
+
     def reload_guild_settings(self, guild_id: int):
-        """Reload settings from file (for web dashboard updates)"""
+        """Clear settings cache for a guild (database is always current)"""
         try:
             # Clear cache for this guild
-            if hasattr(self, 'settings_cache'):
-                keys_to_remove = [k for k in self.settings_cache.keys() if k.startswith(f"{guild_id}_")]
-                for key in keys_to_remove:
-                    del self.settings_cache[key]
+            keys_to_remove = [k for k in self.settings_cache.keys() if k.startswith(f"{guild_id}_")]
+            for key in keys_to_remove:
+                del self.settings_cache[key]
 
-            logger.info(f"🔄 Reloaded settings cache for guild {guild_id}")
+            logger.info(f"🔄 Cleared settings cache for guild {guild_id}")
             return True
         except Exception as e:
-            logger.error(f"Error reloading settings for guild {guild_id}: {e}")
+            logger.error(f"Error clearing cache for guild {guild_id}: {e}")
             return False
+
+    # ===== COMPATIBILITY METHODS =====
+
+    def get_guild_setting(self, guild_id: int, setting_name: str, default=True):
+        """Sync wrapper for get_setting (for compatibility with sync code)"""
+        if not self.database_ready:
+            return default
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.get_setting(guild_id, setting_name, default))
+        except Exception as e:
+            logger.error(f"Error in sync get_guild_setting: {e}")
+            return default
+
+    def set_guild_setting(self, guild_id: int, setting_name: str, value):
+        """Sync wrapper for set_setting (for compatibility with sync code)"""
+        if not self.database_ready:
+            return False
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.set_setting(guild_id, setting_name, value))
+        except Exception as e:
+            logger.error(f"Error in sync set_guild_setting: {e}")
+            return False
+
+    @property
+    def prefix(self):
+        """Bot prefix for compatibility"""
+        return self.command_prefix
 
     # ===== COG LOADING - ENHANCED =====
 
@@ -487,13 +507,6 @@ class LadBot(commands.Bot):
         self.unique_commands_used = len(self.command_usage)
         self.total_tracked_commands = self.total_commands_used
 
-        # ===== LOAD ALL COGS - THIS WAS MISSING! =====
-        logger.info("🎮 Loading all cogs...")
-        await self.load_all_cogs()
-
-        # Start background tasks
-        self.start_background_tasks()
-
         # Log comprehensive startup info
         logger.info("🎮 ========== LADBOT READY ==========")
         logger.info(f"🤖 Bot: {self.user} (ID: {self.user.id})")
@@ -501,6 +514,7 @@ class LadBot(commands.Bot):
         logger.info(f"📈 Serving {sum(guild.member_count for guild in self.guilds)} users")
         logger.info(f"🎮 {len(self.commands)} commands available")
         logger.info(f"🔧 {len(self.extensions)} cogs loaded")
+        logger.info(f"🗄️ Database ready: {self.database_ready}")
         logger.info(f"⚡ Current latency: {current_latency}ms")
 
         # Add to recent activity
@@ -628,7 +642,8 @@ class LadBot(commands.Bot):
                 'memory_usage': self.memory_usage,
                 'cpu_usage': self.cpu_usage,
                 'latency': round(self.latency * 1000, 2),
-                'uptime_seconds': (datetime.now() - self.startup_time).total_seconds()
+                'uptime_seconds': (datetime.now() - self.startup_time).total_seconds(),
+                'database_ready': self.database_ready
             }
 
             self.data_manager.save_analytics_data(analytics_data)
@@ -686,6 +701,7 @@ class LadBot(commands.Bot):
                 'bot_status': 'online' if self.is_ready() else 'starting',
                 'loaded_cogs': len(self.extensions),
                 'average_latency': self.average_latency,
+                'database_ready': self.database_ready,
                 'recent_activity': list(self.recent_activity)[-10:],  # Last 10 activities
                 'last_updated': datetime.now().isoformat()
             }
@@ -695,6 +711,7 @@ class LadBot(commands.Bot):
             return {
                 'guilds': 0, 'users': 0, 'commands': 0, 'latency': 0,
                 'uptime': '0:00:00', 'bot_status': 'error',
+                'database_ready': False,
                 'error_message': str(e)
             }
 
@@ -715,6 +732,10 @@ class LadBot(commands.Bot):
 
             # Create final backup
             self.data_manager.backup_settings()
+
+            # Close database connections
+            if self.db_manager:
+                await self.db_manager.close()
 
             # Add shutdown activity
             self.add_activity("Bot shutdown", "Clean shutdown initiated")

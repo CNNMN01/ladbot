@@ -88,7 +88,7 @@ def dangerous_command():
 
 
 def guild_setting_enabled(setting_name: str):
-    """Decorator to check if a guild setting is enabled - SIMPLIFIED VERSION"""
+    """Decorator to check if a guild setting is enabled - DATABASE VERSION"""
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -100,14 +100,10 @@ def guild_setting_enabled(setting_name: str):
                 return await func(self, ctx, *args, **kwargs)
 
             try:
-                # Import the unified settings service
-                from utils.settings_service import settings_service
+                # Get setting from database
+                setting_enabled = await ctx.bot.get_setting(guild_id, setting_name, True)
 
-                # Get setting using the unified service
-                setting_enabled = settings_service.get_guild_setting(guild_id, setting_name, True)
-
-                logger.info(
-                    f"🔍 COMMAND CHECK: {ctx.command.name} for guild {guild_id} - {setting_name}={setting_enabled}")
+                logger.info(f"🔍 DB CHECK: {ctx.command.name} for guild {guild_id} - {setting_name}={setting_enabled}")
 
                 # If disabled, show message and block command
                 if not setting_enabled:

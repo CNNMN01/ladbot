@@ -144,3 +144,4 @@ PyJWT>=2.8.0
 # pip install -r requirements.txt --upgrade
 #
 # ===============================================
+asyncpg>=0.29.0

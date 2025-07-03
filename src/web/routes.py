@@ -10,6 +10,7 @@ import traceback
 from typing import Dict, Any, Optional, List
 import json
 from pathlib import Path
+from utils.database import db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -558,7 +559,7 @@ def register_routes(app):
 
     @app.route('/guild/<int:guild_id>/settings')
     def guild_settings(guild_id):
-        """Guild-specific settings page"""
+        """Guild-specific settings page - DATABASE VERSION"""
         log_page_view('guild_settings')
 
         if not require_auth():
@@ -578,56 +579,46 @@ def register_routes(app):
                 flash('Access denied: You do not have permissions for this server', 'error')
                 return redirect(url_for('dashboard'))
 
-            # Get current guild settings (mock data for now)
-            current_settings = {
+            # ✅ NEW: Get current settings from database
+            import asyncio
+
+            async def get_settings():
+                return await db_manager.get_all_guild_settings(guild_id)
+
+            current_settings = asyncio.run(get_settings())
+
+            # Provide defaults for missing settings
+            default_settings = {
                 'prefix': 'l.',
-                'welcome_enabled': True,
-                'welcome_channel': None,
-                'auto_role': None,
-                'moderation_enabled': False,
-                'logging_channel': None,
-                'disabled_commands': [],
-                'logging_enabled': True
+                'autoresponses': True,
+                'weather': True,
+                'crypto': True,
+                'games': True,
+                'reddit': True,
+                'help': True,
+                'ping': True,
+                'jokes': True,
+                '8ball': True,
+                'roll': True,
+                'ascii': True,
+                'minesweeper': True,
+                'feedback': True,
+                'bible': True,
+                'dino': True,
+                'convert': True,
+                'knockknock': True,
+                'laugh': True,
+                'say': True,
             }
 
-            # Setting categories for guild
-            setting_categories = {
-                'general': {
-                    'name': 'General Settings',
-                    'description': 'Basic server configuration',
-                    'settings': [
-                        {'key': 'prefix', 'name': 'Server Command Prefix', 'type': 'text',
-                         'value': current_settings['prefix']},
-                        {'key': 'welcome_enabled', 'name': 'Welcome Messages', 'type': 'boolean',
-                         'value': current_settings['welcome_enabled']}
-                    ]
-                },
-                'moderation': {
-                    'name': 'Moderation',
-                    'description': 'Server moderation settings',
-                    'settings': [
-                        {'key': 'moderation_enabled', 'name': 'Enable Moderation', 'type': 'boolean',
-                         'value': current_settings['moderation_enabled']},
-                        {'key': 'auto_role', 'name': 'Auto Role for New Members', 'type': 'text',
-                         'value': current_settings['auto_role']}
-                    ]
-                },
-                'commands': {
-                    'name': 'Command Settings',
-                    'description': 'Manage bot commands',
-                    'settings': [
-                        {'key': 'disabled_commands', 'name': 'Disabled Commands', 'type': 'multiselect',
-                         'value': current_settings['disabled_commands']},
-                        {'key': 'logging_enabled', 'name': 'Command Logging', 'type': 'boolean',
-                         'value': current_settings['logging_enabled']}
-                    ]
-                }
-            }
+            # Merge defaults with current settings
+            for key, default_value in default_settings.items():
+                if key not in current_settings:
+                    current_settings[key] = default_value
 
             return render_template('guild_settings.html',
                                    guild=guild_data,
-                                   current_settings=current_settings,
-                                   setting_categories=setting_categories,
+                                   settings=current_settings,
                                    user=session.get('user'),
                                    page_title=f'{guild_data["name"]} Settings')
 
@@ -694,7 +685,7 @@ def register_routes(app):
 
     @app.route('/api/settings/update', methods=['POST'])
     def update_settings():
-        """Update bot settings via API - USING UNIFIED SERVICE"""
+        """Update bot settings via API - DATABASE VERSION"""
         if not require_auth():
             return jsonify({'error': 'Authentication required'}), 401
 
@@ -709,80 +700,32 @@ def register_routes(app):
             if not require_guild_admin(guild_id):
                 return jsonify({'error': 'Access denied'}), 403
 
-            # Import the unified settings service
-            from utils.settings_service import settings_service
+            # Use database to save settings
+            import asyncio
 
-            success_count = 0
-            failed_settings = []
+            async def save_settings():
+                success = await db_manager.set_all_guild_settings(guild_id, settings)
+                return success
 
-            # Use the unified service to save each setting
-            for setting_name, value in settings.items():
-                success = settings_service.set_guild_setting(guild_id, setting_name, value)
-                if success:
-                    success_count += 1
-                else:
-                    failed_settings.append(setting_name)
+            # Run async function in sync context
+            success = asyncio.run(save_settings())
 
-            logger.info(f"🌐 WEB DASHBOARD: Updated {success_count} settings for guild {guild_id}")
-
-            return jsonify({
-                'success': True,
-                'message': f'Updated {success_count} settings successfully',
-                'failed_settings': failed_settings,
-                'timestamp': datetime.now().isoformat()
-            })
+            if success:
+                logger.info(f"🌐 WEB DASHBOARD: Updated {len(settings)} settings for guild {guild_id} in database")
+                return jsonify({
+                    'success': True,
+                    'message': f'Updated {len(settings)} settings successfully',
+                    'timestamp': datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to save settings to database'
+                }), 500
 
         except Exception as e:
             logger.error(f"Settings update error: {e}")
             return jsonify({'error': str(e)}), 500
-
-    @app.route('/api/settings/backup')
-    def backup_settings():
-        """Backup all bot settings"""
-        if not require_auth():
-            return jsonify({'error': 'Authentication required'}), 401
-
-        if not require_admin():
-            return jsonify({'error': 'Admin permissions required'}), 403
-        try:
-            # Get current bot settings
-            stats = app.web_manager._get_comprehensive_stats()
-            settings_data = app.web_manager._get_bot_settings()
-
-            # Create backup data structure
-            backup_data = {
-                'backup_info': {
-                    'created_at': datetime.now().isoformat(),
-                    'created_by': session.get('user', {}).get('username', 'Unknown'),
-                    'version': '2.0',
-                    'type': 'ladbot_settings_backup'
-                },
-                'bot_settings': settings_data,
-                'system_config': {
-                    'prefix': settings_data.get('prefix', 'l.'),
-                    'admin_ids': stats.get('admin_ids', []),
-                    'features': {
-                        'weather_enabled': True,
-                        'crypto_enabled': True,
-                        'games_enabled': True,
-                        'reddit_enabled': False
-                    }
-                },
-                'guild_settings': {},  # Would include per-guild settings
-                'analytics_config': {
-                    'enabled': True,
-                    'retention_days': 30
-                }
-            }
-
-            return jsonify(backup_data)
-
-        except Exception as e:
-            logger.error(f"Settings backup error: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
 
         @app.route('/api/settings/import', methods=['POST'])
         def import_settings():
