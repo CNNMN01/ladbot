@@ -88,8 +88,8 @@ class AutoResponseSystem(commands.Cog):
 
         return False
 
-    def _should_respond(self, message):
-        """Determine if we should check for auto-responses"""
+    async def _should_respond(self, message):
+        """Determine if we should check for auto-responses - FIXED WITH AWAIT"""
         # Never respond to bots
         if message.author.bot:
             return False
@@ -102,8 +102,8 @@ class AutoResponseSystem(commands.Cog):
         if self._is_command(message.content):
             return False
 
-        # Check if autoresponses are enabled for this guild
-        if not self.bot.get_setting(message.guild.id, "autoresponses"):
+        # Check if autoresponses are enabled for this guild - FIXED WITH AWAIT
+        if not await self.bot.get_setting(message.guild.id, "autoresponses"):
             return False
 
         # Anti-spam: max 1 response per 3 seconds per channel
@@ -137,9 +137,9 @@ class AutoResponseSystem(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Handle auto-responses"""
+        """Handle auto-responses - FIXED WITH AWAIT"""
         try:
-            if not self._should_respond(message):
+            if not await self._should_respond(message):
                 return
 
             responses = self._load_responses(message.guild.id)
@@ -180,7 +180,7 @@ class AutoResponseSystem(commands.Cog):
         await self._show_help(ctx)
 
     async def _show_help(self, ctx):
-        """Show help for autoresponse commands"""
+        """Show help for autoresponse commands - FIXED WITH AWAIT"""
         embed = discord.Embed(
             title="🤖 Auto-Response System",
             description="Manage automatic responses for your server",
@@ -189,7 +189,7 @@ class AutoResponseSystem(commands.Cog):
 
         # Show current status
         responses = self._load_responses(ctx.guild.id)
-        enabled = self.bot.get_setting(ctx.guild.id, "autoresponses")
+        enabled = await self.bot.get_setting(ctx.guild.id, "autoresponses")  # FIXED WITH AWAIT
 
         embed.add_field(
             name="📊 Status",
@@ -227,7 +227,7 @@ class AutoResponseSystem(commands.Cog):
         await self._add_response(ctx, trigger, response)
 
     async def _add_response(self, ctx, trigger: str, response: str):
-        """Internal method to add a response"""
+        """Internal method to add a response - FIXED WITH AWAIT"""
         # Validation
         if len(trigger) > 100:
             return await ctx.send("❌ Trigger must be 100 characters or less.")
@@ -270,8 +270,8 @@ class AutoResponseSystem(commands.Cog):
             embed.add_field(name="Trigger", value=f"`{trigger}`", inline=True)
             embed.add_field(name="Response", value=response[:100] + ("..." if len(response) > 100 else ""), inline=False)
 
-            # Show if system is enabled
-            enabled = self.bot.get_setting(ctx.guild.id, "autoresponses")
+            # Show if system is enabled - FIXED WITH AWAIT
+            enabled = await self.bot.get_setting(ctx.guild.id, "autoresponses")
             if not enabled:
                 embed.add_field(
                     name="⚠️ Notice",
@@ -331,7 +331,7 @@ class AutoResponseSystem(commands.Cog):
         await self._list_responses(ctx)
 
     async def _list_responses(self, ctx):
-        """Internal method to list responses"""
+        """Internal method to list responses - FIXED WITH AWAIT"""
         responses = self._load_responses(ctx.guild.id)
 
         if not responses:
@@ -342,8 +342,8 @@ class AutoResponseSystem(commands.Cog):
             color=0x00ff00
         )
 
-        # Show current status
-        enabled = self.bot.get_setting(ctx.guild.id, "autoresponses")
+        # Show current status - FIXED WITH AWAIT
+        enabled = await self.bot.get_setting(ctx.guild.id, "autoresponses")
         embed.add_field(
             name="📊 System Status",
             value=f"{'✅ Enabled' if enabled else '❌ Disabled'}",
@@ -427,55 +427,26 @@ class AutoResponseSystem(commands.Cog):
         await self._toggle_system(ctx)
 
     async def _toggle_system(self, ctx):
-        """Internal method to toggle system"""
+        """Internal method to toggle system - FIXED WITH AWAIT"""
         try:
-            # Get current setting
-            current = self.bot.get_setting(ctx.guild.id, "autoresponses")
+            # Get current setting - FIXED WITH AWAIT
+            current = await self.bot.get_setting(ctx.guild.id, "autoresponses")
             new_state = not current
 
-            # Try to save the new setting using multiple methods
-            saved = False
+            # Update the setting using database - SIMPLIFIED TO USE BOT METHOD
+            success = await self.bot.set_setting(ctx.guild.id, "autoresponses", new_state)
 
-            # Method 1: Try bot's set_setting method
-            if hasattr(self.bot, 'set_setting'):
-                try:
-                    self.bot.set_setting(ctx.guild.id, "autoresponses", new_state)
-                    saved = True
-                except Exception as e:
-                    logger.debug(f"Method 1 failed: {e}")
+            if not success:
+                embed = discord.Embed(
+                    title="❌ Toggle Failed",
+                    description="Failed to update auto-response setting in database.",
+                    color=0xff0000
+                )
+                await ctx.send(embed=embed)
+                return
 
-            # Method 2: Try updating cache directly
-            if hasattr(self.bot, 'settings_cache'):
-                try:
-                    if ctx.guild.id not in self.bot.settings_cache:
-                        self.bot.settings_cache[ctx.guild.id] = {}
-                    self.bot.settings_cache[ctx.guild.id]["autoresponses"] = new_state
-                    saved = True
-                except Exception as e:
-                    logger.debug(f"Method 2 failed: {e}")
-
-            # Method 3: Direct file save
-            try:
-                settings_file = self.bot.data_manager.data_dir / f"guild_settings_{ctx.guild.id}.json"
-
-                # Load existing settings
-                settings_data = {}
-                if settings_file.exists():
-                    with open(settings_file, 'r') as f:
-                        settings_data = json.load(f)
-
-                # Update setting
-                settings_data["autoresponses"] = new_state
-
-                # Save back to file
-                with open(settings_file, 'w') as f:
-                    json.dump(settings_data, f, indent=2)
-                saved = True
-            except Exception as e:
-                logger.debug(f"Method 3 failed: {e}")
-
-            # Verify the setting actually changed by checking it again
-            updated_setting = self.bot.get_setting(ctx.guild.id, "autoresponses")
+            # Verify the setting actually changed by checking it again - FIXED WITH AWAIT
+            updated_setting = await self.bot.get_setting(ctx.guild.id, "autoresponses")
 
             if updated_setting == new_state:
                 # Setting actually changed - show success
@@ -504,6 +475,8 @@ class AutoResponseSystem(commands.Cog):
                         value="Responses are saved but won't trigger until re-enabled",
                         inline=False
                     )
+
+                logger.info(f"🗄️ DATABASE: Auto-responses {status} for guild {ctx.guild.id}")
             else:
                 # Setting didn't actually change - show error
                 embed = discord.Embed(

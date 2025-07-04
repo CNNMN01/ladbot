@@ -1,420 +1,340 @@
 {% extends "base.html" %}
 
-{% block title %}{{ guild.name }} Settings - Ladbot Dashboard{% endblock %}
+{% block title %}{{ guild.name }} Settings - Ladbot{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex align-items-center">
-                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary me-3">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
-                </a>
-                <div>
-                    <h3>
-                        {% if guild.icon %}
-                            <img src="{{ guild.icon }}" class="rounded-circle me-2" width="40" height="40">
-                        {% else %}
-                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
-                                <i class="fas fa-server text-white"></i>
-                            </div>
-                        {% endif %}
-                        {{ guild.name }} Settings
-                    </h3>
-                    <p class="text-muted mb-0">Configure bot behavior for this server</p>
-                </div>
-            </div>
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-server me-2"></i>{{ guild.name }} Settings
+        </h1>
+        <div>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
         </div>
+    </div>
+
+    <!-- Database Status Indicator -->
+    <div class="alert alert-info" role="alert">
+        <i class="fas fa-database me-2"></i>
+        <strong>Database Integration Active:</strong> Settings are stored in PostgreSQL and sync immediately with the Discord bot.
     </div>
 
     <!-- Settings Form -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-cogs"></i> Server Configuration
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <form id="guildSettingsForm">
-                        <!-- Basic Settings -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-wrench"></i> Basic Settings
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">Command Prefix</label>
-                                            <input type="text" class="form-control" name="prefix"
-                                                   value="{{ settings.prefix or 'l.' }}"
-                                                   placeholder="l." maxlength="5">
-                                            <small class="text-muted">The prefix used for bot commands</small>
-                                        </div>
+    <form id="guildSettingsForm">
 
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="welcome_messages"
-                                                   id="welcome_messages" {{ 'checked' if settings.welcome_messages else '' }}>
-                                            <label class="form-check-label" for="welcome_messages">
-                                                <strong>Welcome Messages</strong><br>
-                                                <small class="text-muted">Send welcome messages to new members</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="autoresponses"
-                                                   id="autoresponses" {{ 'checked' if settings.autoresponses else '' }}>
-                                            <label class="form-check-label" for="autoresponses">
-                                                <strong>Auto Responses</strong><br>
-                                                <small class="text-muted">Enable automatic responses to messages</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-gamepad"></i> Command Categories
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="weather"
-                                                   id="weather" {{ 'checked' if settings.weather else '' }}>
-                                            <label class="form-check-label" for="weather">
-                                                <strong>Weather Commands</strong><br>
-                                                <small class="text-muted">Enable weather information commands</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="crypto"
-                                                   id="crypto" {{ 'checked' if settings.crypto else '' }}>
-                                            <label class="form-check-label" for="crypto">
-                                                <strong>Crypto Commands</strong><br>
-                                                <small class="text-muted">Enable cryptocurrency price commands</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="games"
-                                                   id="games" {{ 'checked' if settings.games else '' }}>
-                                            <label class="form-check-label" for="games">
-                                                <strong>Game Commands</strong><br>
-                                                <small class="text-muted">Enable interactive games and entertainment</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="reddit"
-                                                   id="reddit" {{ 'checked' if settings.reddit else '' }}>
-                                            <label class="form-check-label" for="reddit">
-                                                <strong>Reddit Commands</strong><br>
-                                                <small class="text-muted">Enable Reddit browsing commands</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Utility Commands -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-tools"></i> Utility Commands
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="help"
-                                                   id="help" {{ 'checked' if settings.help else '' }}>
-                                            <label class="form-check-label" for="help">
-                                                <strong>Help Commands</strong><br>
-                                                <small class="text-muted">Enable help and command information</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="ping"
-                                                   id="ping" {{ 'checked' if settings.ping else '' }}>
-                                            <label class="form-check-label" for="ping">
-                                                <strong>Ping Commands</strong><br>
-                                                <small class="text-muted">Enable bot latency testing</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="info"
-                                                   id="info" {{ 'checked' if settings.info else '' }}>
-                                            <label class="form-check-label" for="info">
-                                                <strong>Info Commands</strong><br>
-                                                <small class="text-muted">Enable bot and server information</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="tools"
-                                                   id="tools" {{ 'checked' if settings.tools else '' }}>
-                                            <label class="form-check-label" for="tools">
-                                                <strong>Tool Commands</strong><br>
-                                                <small class="text-muted">Enable utility tools and converters</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-laugh"></i> Entertainment Commands
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="jokes"
-                                                   id="jokes" {{ 'checked' if settings.jokes else '' }}>
-                                            <label class="form-check-label" for="jokes">
-                                                <strong>Joke Commands</strong><br>
-                                                <small class="text-muted">Enable random jokes and humor</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="eightball"
-                                                   id="eightball" {{ 'checked' if settings.eightball else '' }}>
-                                            <label class="form-check-label" for="eightball">
-                                                <strong>8Ball Commands</strong><br>
-                                                <small class="text-muted">Enable magic 8-ball predictions</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="roll"
-                                                   id="roll" {{ 'checked' if settings.roll else '' }}>
-                                            <label class="form-check-label" for="roll">
-                                                <strong>Dice Roll Commands</strong><br>
-                                                <small class="text-muted">Enable dice rolling and random generators</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="ascii_art"
-                                                   id="ascii_art" {{ 'checked' if settings.ascii_art else '' }}>
-                                            <label class="form-check-label" for="ascii_art">
-                                                <strong>ASCII Art</strong><br>
-                                                <small class="text-muted">Enable text-to-ASCII art generation</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Information Commands -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-info-circle"></i> Information Commands
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="bible"
-                                                   id="bible" {{ 'checked' if settings.bible else '' }}>
-                                            <label class="form-check-label" for="bible">
-                                                <strong>Bible Verses</strong><br>
-                                                <small class="text-muted">Enable Bible verse lookup commands</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="dinosaurs"
-                                                   id="dinosaurs" {{ 'checked' if settings.dinosaurs else '' }}>
-                                            <label class="form-check-label" for="dinosaurs">
-                                                <strong>Dinosaur Facts</strong><br>
-                                                <small class="text-muted">Enable dinosaur information commands</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="feedback"
-                                                   id="feedback" {{ 'checked' if settings.feedback else '' }}>
-                                            <label class="form-check-label" for="feedback">
-                                                <strong>Feedback Commands</strong><br>
-                                                <small class="text-muted">Enable user feedback submission</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-shield-alt"></i> Moderation Settings
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="moderation_enabled"
-                                                   id="moderation_enabled" {{ 'checked' if settings.moderation_enabled else '' }}>
-                                            <label class="form-check-label" for="moderation_enabled">
-                                                <strong>Moderation Tools</strong><br>
-                                                <small class="text-muted">Enable moderation commands for admins</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="spam_protection"
-                                                   id="spam_protection" {{ 'checked' if settings.spam_protection else '' }}>
-                                            <label class="form-check-label" for="spam_protection">
-                                                <strong>Spam Protection</strong><br>
-                                                <small class="text-muted">Enable spam detection and prevention</small>
-                                            </label>
-                                        </div>
-
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" name="auto_delete_commands"
-                                                   id="auto_delete_commands" {{ 'checked' if settings.auto_delete_commands else '' }}>
-                                            <label class="form-check-label" for="auto_delete_commands">
-                                                <strong>Auto-Delete Commands</strong><br>
-                                                <small class="text-muted">Automatically delete command messages</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Advanced Settings -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-cog"></i> Advanced Settings
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                <div class="mb-3">
-                                                    <label class="form-label">Command Cooldown (seconds)</label>
-                                                    <input type="number" class="form-control" name="command_cooldown"
-                                                           value="{{ settings.command_cooldown or 3 }}"
-                                                           min="0" max="60">
-                                                    <small class="text-muted">Cooldown between command uses per user</small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="mb-3">
-                                                    <label class="form-label">Embed Color</label>
-                                                    <input type="color" class="form-control form-control-color" name="embed_color"
-                                                           value="{{ settings.embed_color or '#4e73df' }}">
-                                                    <small class="text-muted">Default color for bot embeds</small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-check mt-4">
-                                                    <input class="form-check-input" type="checkbox" name="logging_enabled"
-                                                           id="logging_enabled" {{ 'checked' if settings.logging_enabled else '' }}>
-                                                    <label class="form-check-label" for="logging_enabled">
-                                                        <strong>Enable Logging</strong><br>
-                                                        <small class="text-muted">Log command usage and events</small>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Save Button -->
-                        <div class="row">
-                            <div class="col-12">
-                                <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">
-                                        <i class="fas fa-save"></i> Save Settings
-                                    </button>
-                                    <button type="button" class="btn btn-secondary btn-lg" onclick="resetForm()">
-                                        <i class="fas fa-undo"></i> Reset to Defaults
-                                    </button>
-                                    <button type="button" class="btn btn-info btn-lg" onclick="loadDefaults()">
-                                        <i class="fas fa-refresh"></i> Load Defaults
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
+        <!-- Basic Server Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Server Information
+                </h5>
             </div>
-        </div>
-    </div>
-
-    <!-- Server Info Card -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-server"></i> Server Information
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <strong>Server Name:</strong><br>
-                            <span class="text-muted">{{ guild.name }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <strong>Member Count:</strong><br>
-                            <span class="text-muted">{{ guild.member_count or 'Unknown' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <strong>Server ID:</strong><br>
-                            <span class="text-muted font-monospace">{{ guild.id }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <strong>Owner:</strong><br>
-                            <span class="text-muted">{{ 'You' if guild.is_owner else 'Server Owner' }}</span>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Server Name:</strong> {{ guild.name }}</p>
+                        <p><strong>Server ID:</strong> {{ guild.id }}</p>
+                        <p><strong>Member Count:</strong> {{ guild.member_count }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="prefix" class="form-label">Command Prefix</label>
+                            <input type="text" class="form-control" name="prefix" id="prefix"
+                                   value="{{ settings.get('prefix', 'l.') }}" maxlength="5">
+                            <div class="form-text">The prefix used for bot commands (e.g., l.help)</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+
+        <!-- Admin Commands -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-shield-alt me-2"></i>Admin Commands
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="settings" id="settings" {{ 'checked' if settings.get('settings', True) }}>
+                            <label class="form-check-label" for="settings">
+                                <strong>Settings Management</strong> - Configure bot settings
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="reload" id="reload" {{ 'checked' if settings.get('reload', True) }}>
+                            <label class="form-check-label" for="reload">
+                                <strong>Reload Cogs</strong> - Restart bot modules
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="logs" id="logs" {{ 'checked' if settings.get('logs', True) }}>
+                            <label class="form-check-label" for="logs">
+                                <strong>View Logs</strong> - Check bot logs
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="console" id="console" {{ 'checked' if settings.get('console', True) }}>
+                            <label class="form-check-label" for="console">
+                                <strong>Admin Console</strong> - Execute admin commands
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="autoresponse" id="autoresponse" {{ 'checked' if settings.get('autoresponse', True) }}>
+                            <label class="form-check-label" for="autoresponse">
+                                <strong>Auto-Responses</strong> - Manage automatic responses
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="feedback" id="feedback" {{ 'checked' if settings.get('feedback', True) }}>
+                            <label class="form-check-label" for="feedback">
+                                <strong>Feedback System</strong> - User feedback commands
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Entertainment Commands -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-gamepad me-2"></i>Entertainment Commands
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="8ball" id="8ball" {{ 'checked' if settings.get('8ball', True) }}>
+                            <label class="form-check-label" for="8ball">
+                                <strong>Magic 8-Ball</strong> - Ask the magic 8-ball questions
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="jokes" id="jokes" {{ 'checked' if settings.get('jokes', True) }}>
+                            <label class="form-check-label" for="jokes">
+                                <strong>Jokes & Humor</strong> - Random jokes and puns
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="laugh" id="laugh" {{ 'checked' if settings.get('laugh', True) }}>
+                            <label class="form-check-label" for="laugh">
+                                <strong>Laugh Reactions</strong> - Bot laugh responses
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="knockknock" id="knockknock" {{ 'checked' if settings.get('knockknock', True) }}>
+                            <label class="form-check-label" for="knockknock">
+                                <strong>Knock-Knock Jokes</strong> - Interactive knock-knock jokes
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="minesweeper" id="minesweeper" {{ 'checked' if settings.get('minesweeper', True) }}>
+                            <label class="form-check-label" for="minesweeper">
+                                <strong>Minesweeper Game</strong> - Interactive minesweeper
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="ascii" id="ascii" {{ 'checked' if settings.get('ascii', True) }}>
+                            <label class="form-check-label" for="ascii">
+                                <strong>ASCII Art</strong> - Generate ASCII art from text
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="roll" id="roll" {{ 'checked' if settings.get('roll', True) }}>
+                            <label class="form-check-label" for="roll">
+                                <strong>Dice Rolling</strong> - Roll dice with various configurations
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="games" id="games" {{ 'checked' if settings.get('games', True) }}>
+                            <label class="form-check-label" for="games">
+                                <strong>General Games</strong> - Other gaming commands
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Utility Commands -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2"></i>Utility Commands
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="weather" id="weather" {{ 'checked' if settings.get('weather', True) }}>
+                            <label class="form-check-label" for="weather">
+                                <strong>Weather Information</strong> - Get weather for any location
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="convert" id="convert" {{ 'checked' if settings.get('convert', True) }}>
+                            <label class="form-check-label" for="convert">
+                                <strong>Unit Conversion</strong> - Convert between units
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="ping" id="ping" {{ 'checked' if settings.get('ping', True) }}>
+                            <label class="form-check-label" for="ping">
+                                <strong>Ping & Latency</strong> - Check bot response time
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="help" id="help" {{ 'checked' if settings.get('help', True) }}>
+                            <label class="form-check-label" for="help">
+                                <strong>Help Commands</strong> - Show command help and usage
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="say" id="say" {{ 'checked' if settings.get('say', True) }}>
+                            <label class="form-check-label" for="say">
+                                <strong>Say Command</strong> - Make the bot repeat text
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Information Commands -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Information Commands
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="crypto" id="crypto" {{ 'checked' if settings.get('crypto', True) }}>
+                            <label class="form-check-label" for="crypto">
+                                <strong>Cryptocurrency Prices</strong> - Get real-time crypto data
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="reddit" id="reddit" {{ 'checked' if settings.get('reddit', True) }}>
+                            <label class="form-check-label" for="reddit">
+                                <strong>Reddit Content</strong> - Browse Reddit posts
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="bible" id="bible" {{ 'checked' if settings.get('bible', True) }}>
+                            <label class="form-check-label" for="bible">
+                                <strong>Bible Verses</strong> - Look up Bible passages
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="dino" id="dino" {{ 'checked' if settings.get('dino', True) }}>
+                            <label class="form-check-label" for="dino">
+                                <strong>Dinosaur Facts</strong> - Learn about dinosaurs
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Settings -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>System Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="command_cooldown" class="form-label">Command Cooldown (seconds)</label>
+                            <input type="number" class="form-control" name="command_cooldown" id="command_cooldown"
+                                   value="{{ settings.get('command_cooldown', 3) }}" min="0" max="60">
+                            <div class="form-text">Cooldown between commands to prevent spam</div>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="welcome_messages" id="welcome_messages" {{ 'checked' if settings.get('welcome_messages', True) }}>
+                            <label class="form-check-label" for="welcome_messages">
+                                <strong>Welcome Messages</strong> - Send welcome messages to new members
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="spam_protection" id="spam_protection" {{ 'checked' if settings.get('spam_protection', True) }}>
+                            <label class="form-check-label" for="spam_protection">
+                                <strong>Spam Protection</strong> - Prevent command spam
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="embed_color" class="form-label">Embed Color</label>
+                            <input type="color" class="form-control form-control-color" name="embed_color" id="embed_color"
+                                   value="{{ settings.get('embed_color', '#4e73df') }}">
+                            <div class="form-text">Default color for bot embeds</div>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="logging_enabled" id="logging_enabled" {{ 'checked' if settings.get('logging_enabled', True) }}>
+                            <label class="form-check-label" for="logging_enabled">
+                                <strong>Command Logging</strong> - Log command usage
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="auto_delete_commands" id="auto_delete_commands" {{ 'checked' if settings.get('auto_delete_commands', False) }}>
+                            <label class="form-check-label" for="auto_delete_commands">
+                                <strong>Auto-Delete Commands</strong> - Automatically delete command messages
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Buttons -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="button" class="btn btn-info me-md-2" onclick="testDatabase()">
+                        <i class="fas fa-database me-2"></i>Test Database
+                    </button>
+                    <button type="button" class="btn btn-secondary me-md-2" onclick="resetForm()">
+                        <i class="fas fa-undo me-2"></i>Reset
+                    </button>
+                    <button type="button" class="btn btn-warning me-md-2" onclick="loadDefaults()">
+                        <i class="fas fa-cog me-2"></i>Load Defaults
+                    </button>
+                    <button type="submit" class="btn btn-success" id="saveBtn">
+                        <i class="fas fa-save me-2"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </form>
 </div>
 
-<!-- Success/Error Messages -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    <div id="saveToast" class="toast" role="alert">
-        <div class="toast-header">
-            <i class="fas fa-cogs me-2"></i>
-            <strong class="me-auto">Settings</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-        </div>
-        <div class="toast-body">
-            Settings saved successfully!
-        </div>
-    </div>
-</div>
+<!-- Toast Container -->
+<div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 1050;"></div>
 
 <script>
 // Form submission handler
@@ -450,16 +370,15 @@ function saveSettings() {
     // Show loading state
     const saveBtn = document.getElementById('saveBtn');
     const originalText = saveBtn.innerHTML;
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving to Database...';
     saveBtn.disabled = true;
 
-    // ROBUST GUILD ID HANDLING - FIXED
+    // Get guild ID
     const guildId = {{ guild.id if guild and guild.id else 'null' }};
 
     // Debug logging
-    console.log('Guild object:', {{ guild | tojson | safe }});
     console.log('Guild ID:', guildId);
-    console.log('Settings to save:', settings);
+    console.log('Settings to save to database:', settings);
 
     if (!guildId || guildId === null) {
         showToast('Error: Guild ID not found. Please refresh the page and try again.', 'error');
@@ -468,7 +387,7 @@ function saveSettings() {
         return;
     }
 
-    // Save to server - ROBUST API CALL
+    // Save to database via API
     fetch('/api/settings/update', {
         method: 'POST',
         headers: {
@@ -487,21 +406,48 @@ function saveSettings() {
     })
     .then(data => {
         if (data.success) {
-            showToast('Settings saved successfully! Changes will take effect immediately.', 'success');
-            console.log('Settings saved successfully:', data);
+            showToast('✅ Settings saved to database! Changes apply immediately to Discord bot.', 'success');
+            console.log('Database save successful:', data);
         } else {
-            showToast('Error: ' + (data.error || 'Failed to save settings'), 'error');
-            console.error('Save failed:', data);
+            showToast('❌ Database Error: ' + (data.error || 'Failed to save settings'), 'error');
+            console.error('Database save failed:', data);
         }
     })
     .catch(error => {
-        console.error('Error saving settings:', error);
-        showToast('Failed to save settings: ' + error.message, 'error');
+        console.error('Error saving to database:', error);
+        showToast('❌ Failed to save settings to database: ' + error.message, 'error');
     })
     .finally(() => {
         // Restore button state
         saveBtn.innerHTML = originalText;
         saveBtn.disabled = false;
+    });
+}
+
+function testDatabase() {
+    const testBtn = document.querySelector('button[onclick="testDatabase()"]');
+    const originalText = testBtn.innerHTML;
+    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    testBtn.disabled = true;
+
+    fetch('/api/test-database')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('✅ Database connection successful!', 'success');
+            console.log('Database test result:', data);
+        } else {
+            showToast('❌ Database connection failed!', 'error');
+            console.error('Database test failed:', data);
+        }
+    })
+    .catch(error => {
+        console.error('Database test error:', error);
+        showToast('❌ Database test failed: ' + error.message, 'error');
+    })
+    .finally(() => {
+        testBtn.innerHTML = originalText;
+        testBtn.disabled = false;
     });
 }
 
@@ -518,36 +464,52 @@ function loadDefaults() {
             checkbox.checked = true;
         });
 
-        // Reset text inputs to defaults
+        // Reset other inputs to defaults
         document.querySelector('input[name="prefix"]').value = 'l.';
         document.querySelector('input[name="command_cooldown"]').value = '3';
         document.querySelector('input[name="embed_color"]').value = '#4e73df';
 
-        showToast('Default settings loaded. Click Save to apply changes.', 'info');
+        // Uncheck auto_delete_commands (default false)
+        document.querySelector('input[name="auto_delete_commands"]').checked = false;
+
+        showToast('ℹ️ Default settings loaded. Click Save to apply changes.', 'info');
     }
 }
 
 function showToast(message, type = 'success') {
-    const toast = document.getElementById('saveToast');
-    const toastBody = toast.querySelector('.toast-body');
-    const toastHeader = toast.querySelector('.toast-header');
-
-    toastBody.textContent = message;
-
-    // Change color and icon based on type
-    if (type === 'error') {
-        toast.className = 'toast bg-danger text-white';
-        toastHeader.querySelector('i').className = 'fas fa-exclamation-triangle me-2';
-    } else if (type === 'info') {
-        toast.className = 'toast bg-info text-white';
-        toastHeader.querySelector('i').className = 'fas fa-info-circle me-2';
-    } else {
-        toast.className = 'toast bg-success text-white';
-        toastHeader.querySelector('i').className = 'fas fa-check-circle me-2';
+    // Create toast if it doesn't exist
+    let toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        toastContainer.className = 'position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '1050';
+        document.body.appendChild(toastContainer);
     }
 
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
+    // Create toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'info' ? 'info' : 'success'} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+
+    toastContainer.appendChild(toastEl);
+
+    // Show toast
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+
+    // Remove from DOM after hiding
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        toastEl.remove();
+    });
 }
 
 // Load current settings on page load
@@ -559,53 +521,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const guildId = {{ guild.id if guild and guild.id else 'null' }};
     if (!guildId || guildId === null) {
         console.error('WARNING: Guild ID is missing!');
-        showToast('Warning: Guild data may not be loaded properly. Try refreshing the page.', 'info');
+        showToast('⚠️ Warning: Guild data may not be loaded properly. Try refreshing the page.', 'error');
     }
-});
-
-// Auto-save draft every 30 seconds (optional feature)
-let autoSaveTimer;
-document.querySelectorAll('input, select').forEach(input => {
-    input.addEventListener('change', function() {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(() => {
-            console.log('Auto-draft saved locally');
-            // Could implement localStorage draft saving here
-        }, 30000);
-    });
 });
 </script>
 
-<style>
-.form-check-label strong {
-    color: #495057;
-}
-
-.card-header h6 {
-    color: #5a5c69;
-}
-
-.form-control:focus, .form-check-input:focus {
-    border-color: #4e73df;
-    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
-}
-
-.btn-primary {
-    background-color: #4e73df;
-    border-color: #4e73df;
-}
-
-.btn-primary:hover {
-    background-color: #2e59d9;
-    border-color: #2653d4;
-}
-
-.toast {
-    min-width: 300px;
-}
-
-.font-monospace {
-    font-family: 'Courier New', Courier, monospace;
-}
-</style>
 {% endblock %}

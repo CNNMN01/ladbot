@@ -1,5 +1,5 @@
 """
-Guild Settings Management Commands - Fixed with ONLY Real Commands
+Guild Settings Management Commands - Fixed with Database Integration
 Handles all setting operations with comprehensive error handling
 """
 
@@ -104,8 +104,8 @@ class Settings(commands.Cog):
                 setting_status = []
                 for setting in settings:
                     if setting in self.available_settings:
-                        # Get current setting value
-                        current_value = self._get_setting_safe(ctx.guild.id, setting)
+                        # Get current setting value - FIXED WITH AWAIT
+                        current_value = await self._get_setting_safe(ctx.guild.id, setting)
                         status_emoji = "✅" if current_value else "❌"
                         setting_status.append(f"{status_emoji} `{setting}`")
 
@@ -156,7 +156,7 @@ class Settings(commands.Cog):
                 await self._show_invalid_option(ctx, option)
                 return
 
-            current_value = self._get_setting_safe(ctx.guild.id, option)
+            current_value = await self._get_setting_safe(ctx.guild.id, option)
             status = "Enabled" if current_value else "Disabled"
             color = 0x00ff00 if current_value else 0xff9900
             emoji = "✅" if current_value else "❌"
@@ -240,8 +240,8 @@ class Settings(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Update the setting using multiple fallback methods
-            success = self._set_setting_safe(ctx.guild.id, option, new_value)
+            # Update the setting using multiple fallback methods - FIXED WITH AWAIT
+            success = await self._set_setting_safe(ctx.guild.id, option, new_value)
 
             if not success:
                 embed = discord.Embed(
@@ -252,8 +252,8 @@ class Settings(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Verify the setting was actually changed
-            updated_value = self._get_setting_safe(ctx.guild.id, option)
+            # Verify the setting was actually changed - FIXED WITH AWAIT
+            updated_value = await self._get_setting_safe(ctx.guild.id, option)
             if updated_value != new_value:
                 logger.warning(f"Setting {option} not properly updated for guild {ctx.guild.id}")
 
@@ -371,10 +371,10 @@ class Settings(commands.Cog):
                 reaction, user = await self.bot.wait_for('reaction_add', timeout=30.0, check=check)
 
                 if str(reaction.emoji) == "✅":
-                    # Reset all settings to True (default enabled)
+                    # Reset all settings to True (default enabled) - FIXED WITH AWAIT
                     reset_count = 0
                     for setting in self.available_settings.keys():
-                        if self._set_setting_safe(ctx.guild.id, setting, True):
+                        if await self._set_setting_safe(ctx.guild.id, setting, True):
                             reset_count += 1
 
                     embed = discord.Embed(
@@ -415,12 +415,12 @@ class Settings(commands.Cog):
             logger.error(f"Error in reset settings: {e}")
             await ctx.send("❌ Error during settings reset.")
 
-    def _get_setting_safe(self, guild_id, setting_name, default=True):
-        """Safely get a setting with multiple fallback methods"""
+    async def _get_setting_safe(self, guild_id, setting_name, default=True):
+        """Safely get a setting with database integration - FIXED WITH AWAIT"""
         try:
-            # Method 1: Use bot's get_setting method if available
+            # Method 1: Use bot's get_setting method if available - FIXED WITH AWAIT
             if hasattr(self.bot, 'get_setting'):
-                return self.bot.get_setting(guild_id, setting_name, default)
+                return await self.bot.get_setting(guild_id, setting_name, default)
 
             # Method 2: Use data_manager if available
             if hasattr(self.bot, 'data_manager') and hasattr(self.bot.data_manager, 'get_guild_setting'):
@@ -437,15 +437,15 @@ class Settings(commands.Cog):
             logger.debug(f"Error getting setting {setting_name}: {e}")
             return default
 
-    def _set_setting_safe(self, guild_id, setting_name, value):
-        """Safely set a setting with multiple fallback methods"""
+    async def _set_setting_safe(self, guild_id, setting_name, value):
+        """Safely set a setting with database integration - FIXED WITH AWAIT"""
         try:
             success = False
 
-            # Method 1: Use bot's set_setting method if available
+            # Method 1: Use bot's set_setting method if available - FIXED WITH AWAIT
             if hasattr(self.bot, 'set_setting'):
                 try:
-                    result = self.bot.set_setting(guild_id, setting_name, value)
+                    result = await self.bot.set_setting(guild_id, setting_name, value)
                     success = success or result
                 except Exception as e:
                     logger.debug(f"Method 1 failed: {e}")

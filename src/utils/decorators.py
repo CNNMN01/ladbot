@@ -100,7 +100,7 @@ def guild_setting_enabled(setting_name: str):
                 return await func(self, ctx, *args, **kwargs)
 
             try:
-                # Get setting from database
+                # Get setting from database using await
                 setting_enabled = await ctx.bot.get_setting(guild_id, setting_name, True)
 
                 logger.info(f"🔍 DB CHECK: {ctx.command.name} for guild {guild_id} - {setting_name}={setting_enabled}")
