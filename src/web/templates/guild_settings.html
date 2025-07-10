@@ -314,6 +314,9 @@
         <div class="card">
             <div class="card-body">
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="button" class="btn btn-warning me-md-2" onclick="debugGuildId()">
+                        <i class="fas fa-bug me-2"></i>Debug Settings
+                    </button>
                     <button type="button" class="btn btn-info me-md-2" onclick="testDatabase()">
                         <i class="fas fa-database me-2"></i>Test Database
                     </button>
@@ -342,6 +345,29 @@ document.getElementById('guildSettingsForm').addEventListener('submit', function
     e.preventDefault();
     saveSettings();
 });
+
+function debugGuildId() {
+    const guildId = {{ guild.id if guild and guild.id else 'null' }};
+    console.log('Guild ID from template:', guildId);
+    console.log('Guild object:', {{ guild | tojson | safe }});
+
+    if (!guildId || guildId === null) {
+        alert('ERROR: Guild ID is null! This is the problem.');
+        return;
+    }
+
+    // Test the debug endpoint
+    fetch(`/api/debug/settings/${guildId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Database contents for this guild:', data);
+            alert(`Database contains: ${JSON.stringify(data.settings_in_database, null, 2)}`);
+        })
+        .catch(error => {
+            console.error('Debug failed:', error);
+            alert('Debug request failed: ' + error.message);
+        });
+}
 
 function saveSettings() {
     const form = document.getElementById('guildSettingsForm');

@@ -155,6 +155,54 @@ def register_routes(app):
                                    stats={}, featured_commands=[],
                                    oauth_enabled=False)
 
+    @app.route('/api/debug/settings/<int:guild_id>')
+    def debug_guild_settings(guild_id):
+        """Debug endpoint to see what's actually in the database"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        try:
+            def get_all_settings_sync():
+                """Synchronous wrapper for database access"""
+                if not app.bot or not hasattr(app.bot, 'loop'):
+                    return {'error': 'Bot not available'}
+
+                loop = app.bot.loop
+                if not loop.is_running():
+                    return {'error': 'Bot event loop not running'}
+
+                import concurrent.futures
+
+                future = concurrent.futures.Future()
+
+                async def get_settings():
+                    try:
+                        settings = await db_manager.get_all_guild_settings(guild_id)
+                        future.set_result(settings)
+                    except Exception as e:
+                        future.set_exception(e)
+
+                # Schedule in bot's event loop
+                asyncio.run_coroutine_threadsafe(get_settings(), loop)
+                return future.result(timeout=10)
+
+            settings = get_all_settings_sync()
+
+            if isinstance(settings, dict) and 'error' in settings:
+                return jsonify(settings), 500
+
+            return jsonify({
+                'guild_id': guild_id,
+                'settings_in_database': settings,
+                'database_type': 'sqlite' if db_manager.use_sqlite else 'postgresql',
+                'database_ready': db_manager.connection_healthy,
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"Debug endpoint error: {e}")
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/dashboard')
     def dashboard():
         """Enhanced main dashboard with comprehensive data"""
