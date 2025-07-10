@@ -155,7 +155,7 @@ class LadBot(commands.Bot):
             setting_enabled = await self.get_setting(ctx.guild.id, command_name, True)
 
             if not setting_enabled:
-                # Command is disabled - stop it and show message
+                # Command is disabled - show message and raise an exception to stop execution
                 embed = discord.Embed(
                     title="🚫 Command Disabled",
                     description=f"The `{command_name}` command has been disabled for this server.",
@@ -168,13 +168,15 @@ class LadBot(commands.Bot):
                 )
                 await ctx.send(embed=embed)
 
-                # Prevent the command from running
-                ctx.command.enabled = False
-                logger.info(f"🚫 Blocked disabled command: {command_name} in guild {ctx.guild.id}")
-                return
+                # ✅ FIXED: Raise an exception instead of disabling the command globally
+                from discord.ext.commands import CheckFailure
+                raise CheckFailure(f"Command {command_name} is disabled for this server")
 
             logger.debug(f"✅ Allowed command: {command_name} in guild {ctx.guild.id}")
 
+        except CheckFailure:
+            # Re-raise CheckFailure exceptions
+            raise
         except Exception as e:
             logger.error(f"Error in global command check: {e}")
             # On error, allow command (fail-safe)
