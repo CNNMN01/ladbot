@@ -10,11 +10,22 @@ from datetime import datetime, timedelta
 import traceback
 from typing import Dict, Any, Optional, List
 import json
+import sys
+import os
 from pathlib import Path
-from utils.database import db_manager
 import asyncio
 import concurrent.futures
 import psutil
+
+# Fix the import path issue
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.database import db_manager
+
+try:
+    from json import JSONDecodeError
+except ImportError:
+    # For Python versions < 3.5, JSONDecodeError doesn't exist
+    JSONDecodeError = ValueError
 
 logger = logging.getLogger(__name__)
 
@@ -773,69 +784,69 @@ def register_routes(app):
                     'error': 'No settings data provided'
                 }), 400
 
-                # Validate and process settings
-                processed_settings = {}
+            # Validate and process settings
+            processed_settings = {}
 
-                # System settings
-                if 'debug_mode' in settings_data:
-                    processed_settings['debug_mode'] = bool(settings_data['debug_mode'])
+            # System settings
+            if 'debug_mode' in settings_data:
+                processed_settings['debug_mode'] = bool(settings_data['debug_mode'])
 
-                if 'log_level' in settings_data:
-                    valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
-                    if settings_data['log_level'] in valid_levels:
-                        processed_settings['log_level'] = settings_data['log_level']
+            if 'log_level' in settings_data:
+                valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+                if settings_data['log_level'] in valid_levels:
+                    processed_settings['log_level'] = settings_data['log_level']
 
-                # Performance settings
-                if 'command_cooldown' in settings_data:
-                    try:
-                        cooldown = int(settings_data['command_cooldown'])
-                        if 0 <= cooldown <= 60:
-                            processed_settings['command_cooldown'] = cooldown
-                    except ValueError:
-                        pass
+            # Performance settings
+            if 'command_cooldown' in settings_data:
+                try:
+                    cooldown = int(settings_data['command_cooldown'])
+                    if 0 <= cooldown <= 60:
+                        processed_settings['command_cooldown'] = cooldown
+                except ValueError:
+                    pass
 
-                # Apply settings (this would need to be implemented based on how you want to store global settings)
-                logger.info(f"Advanced settings update: {processed_settings}")
+            # Apply settings (this would need to be implemented based on how you want to store global settings)
+            logger.info(f"Advanced settings update: {processed_settings}")
 
-                return jsonify({
-                    'success': True,
-                    'message': f'Updated {len(processed_settings)} advanced settings',
-                    'settings_updated': list(processed_settings.keys()),
-                    'timestamp': datetime.now().isoformat()
-                })
+            return jsonify({
+                'success': True,
+                'message': f'Updated {len(processed_settings)} advanced settings',
+                'settings_updated': list(processed_settings.keys()),
+                'timestamp': datetime.now().isoformat()
+            })
 
-            except Exception as e:
+        except Exception as e:
             logger.error(f"Advanced settings update error: {e}")
             return jsonify({
                 'success': False,
                 'error': str(e)
             }), 500
 
-        @app.route('/api/settings/import', methods=['POST'])
-        def import_settings():
-            """Import settings from uploaded file - FIXED VERSION"""
-            if not require_auth():
-                return jsonify({'error': 'Authentication required'}), 401
+    @app.route('/api/settings/import', methods=['POST'])
+    def import_settings():
+        """Import settings from uploaded file - FIXED VERSION"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
 
-            if not require_admin():
-                return jsonify({'error': 'Admin permissions required'}), 403
+        if not require_admin():
+            return jsonify({'error': 'Admin permissions required'}), 403
 
-            try:
-                # Get JSON data from request
-                import_data = request.get_json()
+        try:
+            # Get JSON data from request
+            import_data = request.get_json()
 
-                if not import_data:
-                    return jsonify({
-                        'success': False,
-                        'error': 'No import data provided. Please ensure the file is a valid JSON document.'
-                    }), 400
+            if not import_data:
+                return jsonify({
+                    'success': False,
+                    'error': 'No import data provided. Please ensure the file is a valid JSON document.'
+                }), 400
 
-                # Validate import data structure
-                if not isinstance(import_data, dict):
-                    return jsonify({
-                        'success': False,
-                        'error': 'Invalid format: Expected JSON object'
-                    }), 400
+            # Validate import data structure
+            if not isinstance(import_data, dict):
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid format: Expected JSON object'
+                }), 400
 
                 # Check for required fields
                 if 'backup_info' not in import_data:
@@ -885,19 +896,20 @@ def register_routes(app):
                     'timestamp': datetime.now().isoformat()
                 })
 
-            except json.JSONDecodeError:
-                return jsonify({
-                    'success': False,
-                    'error': 'Invalid JSON format. Please ensure the file is a valid JSON document.'
-                }), 400
-            except Exception as e:
-                logger.error(f"Settings import error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': f'Import failed: {str(e)}'
-                }), 500
+        except json.JSONDecodeError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid JSON format. Please ensure the file is a valid JSON document.'
+            }), 400
 
-        # ===== ADVANCED API ROUTES =====
+        except Exception as e:
+            logger.error(f"Settings import error: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Import failed: {str(e)}'
+            }), 500
+
+            # ===== ADVANCED API ROUTES =====
 
         @app.route('/api/analytics/refresh')
         def refresh_analytics():
