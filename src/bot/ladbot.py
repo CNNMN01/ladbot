@@ -136,26 +136,36 @@ class LadBot(commands.Bot):
     async def on_command(self, ctx):
         """Global command interceptor - checks database settings for ALL commands"""
         if not ctx.guild:
+            logger.debug(f"🔍 COMMAND CHECK: {ctx.command.name} - No guild context, allowing")
             return  # Allow DM commands
 
         if not self.database_ready:
+            logger.warning(f"🔍 COMMAND CHECK: {ctx.command.name} - Database not ready, allowing")
             return  # Allow commands if database not ready
 
         try:
             # Get the command name
             command_name = ctx.command.name
+            guild_id = ctx.guild.id
+
+            logger.info(f"🔍 COMMAND CHECK: Checking {command_name} for guild {guild_id}")
 
             # Special commands that should always work (admin/core commands)
             always_allowed = {'help', 'ping', 'settings', 'reload', 'logs', 'console', 'feedback'}
 
             if command_name in always_allowed:
+                logger.debug(f"🔍 COMMAND CHECK: {command_name} is always allowed")
                 return  # Allow these commands always
 
-            # Check if command is enabled in database
-            setting_enabled = await self.get_setting(ctx.guild.id, command_name, True)
+            # Check if command is enabled in database - ADD DETAILED LOGGING
+            logger.info(f"🔍 COMMAND CHECK: Querying database for {command_name} in guild {guild_id}")
+            setting_enabled = await self.get_setting(guild_id, command_name, True)
+            logger.info(f"🔍 COMMAND CHECK: Database returned {setting_enabled} for {command_name} in guild {guild_id}")
 
             if not setting_enabled:
-                # Command is disabled - show message and raise an exception to stop execution
+                # Command is disabled - show message and raise an exception
+                logger.info(f"🚫 BLOCKING COMMAND: {command_name} is disabled for guild {guild_id}")
+
                 embed = discord.Embed(
                     title="🚫 Command Disabled",
                     description=f"The `{command_name}` command has been disabled for this server.",
@@ -168,25 +178,38 @@ class LadBot(commands.Bot):
                 )
                 await ctx.send(embed=embed)
 
-                # ✅ FIXED: Raise an exception instead of disabling the command globally
+                # Raise an exception instead of disabling globally
                 from discord.ext.commands import CheckFailure
                 raise CheckFailure(f"Command {command_name} is disabled for this server")
 
-            logger.debug(f"✅ Allowed command: {command_name} in guild {ctx.guild.id}")
+            logger.info(f"✅ ALLOWING COMMAND: {command_name} is enabled for guild {guild_id}")
 
         except CheckFailure:
             # Re-raise CheckFailure exceptions
             raise
         except Exception as e:
-            logger.error(f"Error in global command check: {e}")
+            logger.error(f"❌ Error in global command check for {command_name}: {e}")
+            logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             # On error, allow command (fail-safe)
 
     # ===== SETTINGS METHODS - DATABASE INTEGRATION =====
 
     async def get_setting(self, guild_id: int, setting_name: str, default=True):
-        """Get a guild setting from database - FIXED VERSION"""
+        """Get a guild setting from database - FIXED VERSION WITH LOGGING"""
         if not self.database_ready or not self.db_manager:
-            logger.warning(f"Database not ready, returning default for {setting_name}")
+            logger.warning(f"🔍 GET_SETTING: Database not ready, returning default {default} for {setting_name}")
+            return default
+
+        try:
+            logger.debug(f"🔍 GET_SETTING: Querying database for {setting_name} in guild {guild_id}")
+
+            # Force database lookup every time for web dashboard changes
+            value = await self.db_manager.get_guild_setting(guild_id, setting_name, default)
+
+            logger.info(f"🔍 GET_SETTING: Database returned {setting_name}={value} for guild {guild_id}")
+            return value
+        except Exception as e:
+            logger.error(f"❌ GET_SETTING: Error getting setting {setting_name} for guild {guild_id}: {e}")
             return default
 
         try:
