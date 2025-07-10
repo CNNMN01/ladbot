@@ -11,6 +11,7 @@ import json
 import psutil
 import os
 from pathlib import Path
+from utils.database import db_manager
 from datetime import datetime, date, timedelta
 from collections import defaultdict, deque
 from typing import Dict, Any, Optional, List, Union
@@ -112,7 +113,7 @@ class LadBot(commands.Bot):
             self.db_manager = db_manager
 
             logger.info("🗄️ Initializing database connection...")
-            db_success = await self.db_manager.initialize()
+            db_success = await self.db_manager.initialize()  # This line should work the same
             if not db_success:
                 logger.error("❌ Database initialization failed - bot may not function properly")
             else:
@@ -275,19 +276,22 @@ class LadBot(commands.Bot):
     # ===== SETTINGS METHODS - DATABASE INTEGRATION =====
 
     async def get_setting(self, guild_id: int, setting_name: str, default=True):
-        """Get a guild setting from database"""
+        """Get a guild setting from database - FIXED VERSION"""
         if not self.database_ready or not self.db_manager:
             logger.warning(f"Database not ready, returning default for {setting_name}")
             return default
 
         try:
-            return await self.db_manager.get_guild_setting(guild_id, setting_name, default)
+            # Force database lookup every time for web dashboard changes
+            value = await self.db_manager.get_guild_setting(guild_id, setting_name, default)
+            logger.info(f"🔍 BOT: Got {setting_name}={value} for guild {guild_id} from database")
+            return value
         except Exception as e:
-            logger.error(f"Error getting setting {setting_name}: {e}")
+            logger.error(f"❌ BOT: Error getting setting {setting_name}: {e}")
             return default
 
     async def set_setting(self, guild_id: int, setting_name: str, value):
-        """Set a guild setting in database"""
+        """Set a guild setting in database - FIXED VERSION"""
         if not self.database_ready or not self.db_manager:
             logger.warning(f"Database not ready, cannot set {setting_name}")
             return False
@@ -295,12 +299,13 @@ class LadBot(commands.Bot):
         try:
             success = await self.db_manager.set_guild_setting(guild_id, setting_name, value)
             if success:
-                # Clear cache for this setting
+                # Clear any local cache
                 cache_key = f"{guild_id}_{setting_name}"
                 self.settings_cache.pop(cache_key, None)
+                logger.info(f"✅ BOT: Set {setting_name}={value} for guild {guild_id} in database")
             return success
         except Exception as e:
-            logger.error(f"Error setting {setting_name}: {e}")
+            logger.error(f"❌ BOT: Error setting {setting_name}: {e}")
             return False
 
     async def get_all_guild_settings(self, guild_id: int):

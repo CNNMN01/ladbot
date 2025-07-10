@@ -327,6 +327,46 @@ def register_routes(app):
             flash('Error loading settings page', 'error')
             return redirect(url_for('dashboard'))
 
+    @app.route('/api/test-database')
+    def test_database():
+        """Test database connection and operations"""
+        if not require_auth():
+            return jsonify({'error': 'Authentication required'}), 401
+
+        try:
+            async def test_db():
+                # Test connection and basic operations
+                health = await db_manager.health_check()
+
+                # Test write/read cycle
+                test_guild_id = 999999999  # Test guild ID
+                write_success = await db_manager.set_guild_setting(test_guild_id, 'test_setting', True)
+                read_value = await db_manager.get_guild_setting(test_guild_id, 'test_setting', False)
+
+                # Cleanup
+                await db_manager.delete_guild_settings(test_guild_id)
+
+                return health, write_success, read_value
+
+            import asyncio
+            health, write_success, read_value = asyncio.run(test_db())
+
+            return jsonify({
+                'success': True,
+                'health': health,
+                'write_test': write_success,
+                'read_test': read_value,
+                'connection_info': db_manager.get_connection_info()
+            })
+
+        except Exception as e:
+            logger.error(f"Database test error: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'connection_info': db_manager.get_connection_info()
+            }), 500
+
     @app.route('/advanced_settings')
     def advanced_settings():
         """Advanced settings page for admin users"""
@@ -685,7 +725,7 @@ def register_routes(app):
 
     @app.route('/api/settings/update', methods=['POST'])
     def update_settings():
-        """Update bot settings via API - DATABASE VERSION"""
+        """Update bot settings via API - FIXED VERSION"""
         if not require_auth():
             return jsonify({'error': 'Authentication required'}), 401
 
@@ -700,27 +740,40 @@ def register_routes(app):
             if not require_guild_admin(guild_id):
                 return jsonify({'error': 'Access denied'}), 403
 
-            # Use database to save settings
+            # Use async function properly
+            async def save_all_settings():
+                success_count = 0
+                total_count = len(settings)
+
+                for setting_name, value in settings.items():
+                    success = await db_manager.set_guild_setting(guild_id, setting_name, value)
+                    if success:
+                        success_count += 1
+                        logger.info(f"✅ WEB: Set {setting_name}={value} for guild {guild_id}")
+                    else:
+                        logger.error(f"❌ WEB: Failed to set {setting_name} for guild {guild_id}")
+
+                return success_count, total_count
+
+            # Run the async function
             import asyncio
+            success_count, total_count = asyncio.run(save_all_settings())
 
-            async def save_settings():
-                success = await db_manager.set_all_guild_settings(guild_id, settings)
-                return success
-
-            # Run async function in sync context
-            success = asyncio.run(save_settings())
-
-            if success:
-                logger.info(f"🌐 WEB DASHBOARD: Updated {len(settings)} settings for guild {guild_id} in database")
+            if success_count == total_count:
+                logger.info(f"🌐 WEB DASHBOARD: Updated {success_count}/{total_count} settings for guild {guild_id}")
                 return jsonify({
                     'success': True,
-                    'message': f'Updated {len(settings)} settings successfully',
+                    'message': f'Updated {success_count} settings successfully',
+                    'settings_applied': success_count,
+                    'total_settings': total_count,
                     'timestamp': datetime.now().isoformat()
                 })
             else:
                 return jsonify({
                     'success': False,
-                    'error': 'Failed to save settings to database'
+                    'error': f'Only {success_count}/{total_count} settings were saved',
+                    'settings_applied': success_count,
+                    'total_settings': total_count
                 }), 500
 
         except Exception as e:
@@ -859,6 +912,42 @@ def register_routes(app):
                 return jsonify({
                     'success': False,
                     'error': f'Import failed: {str(e)}'
+                }), 500
+
+        @app.route('/api/test-database')
+        def test_database():
+            """Test database connection and settings"""
+            if not require_auth():
+                return jsonify({'error': 'Authentication required'}), 401
+
+            try:
+                async def test_db():
+                    # Test connection
+                    test_guild_id = 123456789  # Test guild ID
+
+                    # Test write
+                    write_success = await db_manager.set_guild_setting(test_guild_id, 'test_setting', True)
+
+                    # Test read
+                    read_value = await db_manager.get_guild_setting(test_guild_id, 'test_setting', False)
+
+                    return write_success, read_value
+
+                import asyncio
+                write_success, read_value = asyncio.run(test_db())
+
+                return jsonify({
+                    'success': True,
+                    'database_url': db_manager.database_url[:50] + '...' if db_manager.database_url else 'None',
+                    'write_test': write_success,
+                    'read_test': read_value,
+                    'connection_ready': db_manager.pool is not None
+                })
+
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
                 }), 500
 
         @app.route('/api/settings/generate-sample', methods=['GET'])
