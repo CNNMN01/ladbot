@@ -1,7 +1,7 @@
 """
 Enhanced Routes for Ladbot Web Dashboard - Production Ready
 Complete integration with new app.py structure and real-time bot data
-FIXED: All async event loop issues resolved
+FIXED: All async event loop issues resolved and syntax errors corrected
 """
 
 from flask import render_template, session, redirect, url_for, request, jsonify, flash, current_app
@@ -383,118 +383,6 @@ def register_routes(app):
             flash('Error loading guild settings', 'error')
             return redirect(url_for('dashboard'))
 
-    @app.route('/advanced_settings')
-    def advanced_settings():
-        """Advanced settings page for admin users"""
-        log_page_view('advanced_settings')
-
-        if not require_auth():
-            return redirect(url_for('login'))
-
-        # Check if user is admin for advanced settings
-        if not require_admin():
-            flash('Access denied: Administrator permissions required', 'error')
-            return redirect(url_for('dashboard'))
-
-        try:
-            stats = app.web_manager._get_comprehensive_stats()
-            settings_data = app.web_manager._get_bot_settings()
-            user_guilds = get_user_guilds()
-
-            # Advanced settings structure
-            advanced_options = {
-                'system': {
-                    'name': 'System Configuration',
-                    'description': 'Core system settings',
-                    'settings': [
-                        {'key': 'debug_mode', 'name': 'Debug Mode', 'type': 'boolean', 'value': False},
-                        {'key': 'log_level', 'name': 'Logging Level', 'type': 'select',
-                         'options': ['DEBUG', 'INFO', 'WARNING', 'ERROR'], 'value': 'INFO'},
-                        {'key': 'command_cooldown', 'name': 'Global Command Cooldown (seconds)', 'type': 'number',
-                         'value': 3}
-                    ]
-                },
-                'performance': {
-                    'name': 'Performance Settings',
-                    'description': 'Optimize bot performance',
-                    'settings': [
-                        {'key': 'cache_enabled', 'name': 'Enable Caching', 'type': 'boolean', 'value': True},
-                        {'key': 'max_concurrent_commands', 'name': 'Max Concurrent Commands', 'type': 'number',
-                         'value': 10},
-                        {'key': 'cleanup_interval', 'name': 'Cleanup Interval (minutes)', 'type': 'number',
-                         'value': 60}
-                    ]
-                },
-                'security': {
-                    'name': 'Security Settings',
-                    'description': 'Security and moderation options',
-                    'settings': [
-                        {'key': 'rate_limiting', 'name': 'Enable Rate Limiting', 'type': 'boolean', 'value': True},
-                        {'key': 'admin_only_errors', 'name': 'Hide Error Details from Users', 'type': 'boolean',
-                         'value': True},
-                        {'key': 'audit_logging', 'name': 'Enable Audit Logging', 'type': 'boolean', 'value': False}
-                    ]
-                },
-                'integrations': {
-                    'name': 'External Integrations',
-                    'description': 'Third-party service settings',
-                    'settings': [
-                        {'key': 'weather_enabled', 'name': 'Weather API Integration', 'type': 'boolean', 'value': True},
-                        {'key': 'crypto_enabled', 'name': 'Cryptocurrency API', 'type': 'boolean', 'value': True},
-                        {'key': 'reddit_enabled', 'name': 'Reddit Integration', 'type': 'boolean', 'value': False}
-                    ]
-                }
-            }
-
-            return render_template('advanced_settings.html',
-                                   stats=stats,
-                                   settings=settings_data,
-                                   advanced_options=advanced_options,
-                                   user=session.get('user'),
-                                   user_guilds=user_guilds,
-                                   guilds=user_guilds,  # Fixed: Added for template compatibility
-                                   is_admin=True,
-                                   page_title='Advanced Settings')
-
-        except Exception as e:
-            logger.error(f"Advanced settings page error: {e}")
-            flash('Error loading advanced settings page', 'error')
-            return redirect(url_for('settings'))
-
-    @app.route('/analytics')
-    def analytics():
-        """Enhanced analytics page with comprehensive data"""
-        log_page_view('analytics')
-
-        if not require_auth():
-            return redirect(url_for('login'))
-
-        try:
-            stats = app.web_manager._get_comprehensive_stats()
-            analytics_data = app.web_manager._get_analytics_data()
-
-            # Prepare chart data
-            chart_data = {
-                'commands_over_time': analytics_data.get('commands_over_time', []),
-                'guild_growth': analytics_data.get('guild_growth', []),
-                'popular_commands': analytics_data.get('popular_commands', []),
-                'user_activity': analytics_data.get('user_activity', [])
-            }
-
-            return render_template('analytics.html',
-                                   stats=stats,
-                                   analytics=analytics_data,
-                                   chart_data=chart_data,
-                                   user=session.get('user'),
-                                   user_guilds=get_user_guilds(),
-                                   is_admin=require_admin(),
-                                   page_title='Analytics')
-
-        except Exception as e:
-            logger.error(f"Analytics page error: {e}")
-            flash('Error loading analytics page', 'error')
-            return redirect(url_for('dashboard'))
-
     @app.route('/about')
     def about():
         """Enhanced about page with dynamic bot information"""
@@ -692,117 +580,6 @@ def register_routes(app):
                 'connection_info': db_manager.get_connection_info() if 'db_manager' in globals() else None
             }), 500
 
-    @app.route('/api/settings/generate-sample', methods=['GET'])
-    def generate_sample_settings():
-        """Generate a sample settings file for testing (Admin only)"""
-        if not require_auth():
-            return jsonify({'error': 'Authentication required'}), 401
-
-        if not require_admin():
-            return jsonify({'error': 'Admin permissions required'}), 403
-
-        try:
-            # Create a sample settings structure
-            sample_settings = {
-                'backup_info': {
-                    'created_at': datetime.now().isoformat(),
-                    'created_by': session.get('user', {}).get('username', 'Sample Generator'),
-                    'version': '2.0',
-                    'type': 'ladbot_settings_backup',
-                    'description': 'Sample settings file for testing import functionality'
-                },
-                'bot_settings': {
-                    'prefix': 'l.',
-                    'debug_mode': False,
-                    'log_level': 'INFO'
-                },
-                'system_config': {
-                    'admin_ids': [123456789],
-                    'features': {
-                        'weather_enabled': True,
-                        'crypto_enabled': True,
-                        'games_enabled': True,
-                        'reddit_enabled': False
-                    }
-                },
-                'guild_settings': {
-                    'example_server_123': {
-                        'prefix': 'l.',
-                        'welcome_enabled': True,
-                        'moderation_enabled': False
-                    }
-                },
-                'analytics_config': {
-                    'enabled': True,
-                    'retention_days': 30
-                }
-            }
-
-            return jsonify(sample_settings)
-
-        except Exception as e:
-            logger.error(f"Sample settings generation error: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-    @app.route('/api/settings/advanced/update', methods=['POST'])
-    def update_advanced_settings():
-        """Update advanced bot settings"""
-        if not require_auth():
-            return jsonify({'error': 'Authentication required'}), 401
-
-        if not require_admin():
-            return jsonify({'error': 'Admin permissions required'}), 403
-
-        try:
-            settings_data = request.get_json()
-
-            if not settings_data:
-                return jsonify({
-                    'success': False,
-                    'error': 'No settings data provided'
-                }), 400
-
-            # Validate and process settings
-            processed_settings = {}
-
-            # System settings
-            if 'debug_mode' in settings_data:
-                processed_settings['debug_mode'] = bool(settings_data['debug_mode'])
-
-            if 'log_level' in settings_data:
-                valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
-                if settings_data['log_level'] in valid_levels:
-                    processed_settings['log_level'] = settings_data['log_level']
-
-            # Performance settings
-            if 'command_cooldown' in settings_data:
-                try:
-                    cooldown = int(settings_data['command_cooldown'])
-                    if 0 <= cooldown <= 60:
-                        processed_settings['command_cooldown'] = cooldown
-                except ValueError:
-                    pass
-
-            # Apply settings (this would need to be implemented based on how you want to store global settings)
-            logger.info(f"Advanced settings update: {processed_settings}")
-
-            return jsonify({
-                'success': True,
-                'message': f'Updated {len(processed_settings)} advanced settings',
-                'settings_updated': list(processed_settings.keys()),
-                'timestamp': datetime.now().isoformat()
-            })
-
-        except Exception as e:
-            logger.error(f"Advanced settings update error: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
     @app.route('/api/settings/import', methods=['POST'])
     def import_settings():
         """Import settings from uploaded file - FIXED VERSION"""
@@ -836,345 +613,194 @@ def register_routes(app):
                     'error': 'Invalid backup file: Missing backup_info section'
                 }), 400
 
-                # Process import (this would need to be implemented based on your requirements)
-                imported_items = 0
+            # Process import
+            imported_items = 0
 
-                # Process bot settings
-                if 'bot_settings' in import_data:
-                    bot_settings = import_data['bot_settings']
-                    # Apply bot settings here
-                    imported_items += len(bot_settings)
+            # Process bot settings
+            if 'bot_settings' in import_data:
+                bot_settings = import_data['bot_settings']
+                imported_items += len(bot_settings)
 
-                # Process guild settings
-                if 'guild_settings' in import_data:
-                    guild_settings = import_data['guild_settings']
+            # Process guild settings
+            if 'guild_settings' in import_data:
+                guild_settings = import_data['guild_settings']
 
-                    async def import_guild_settings():
-                        import_count = 0
-                        for guild_id_str, settings in guild_settings.items():
-                            try:
-                                # Extract numeric guild ID
-                                guild_id = int(guild_id_str.replace('example_server_', ''))
-                                success = await db_manager.set_all_guild_settings(guild_id, settings)
+                async def import_guild_settings():
+                    import_count = 0
+                    for guild_id_str, settings in guild_settings.items():
+                        try:
+                            # Extract numeric guild ID
+                            guild_id = int(guild_id_str.replace('example_server_', ''))
+
+                            # Import each setting individually
+                            for setting_name, value in settings.items():
+                                success = await db_manager.set_guild_setting(guild_id, setting_name, value)
                                 if success:
                                     import_count += 1
-                            except (ValueError, Exception) as e:
-                                logger.warning(f"Failed to import settings for {guild_id_str}: {e}")
-                        return import_count
+                        except (ValueError, Exception) as e:
+                            logger.warning(f"Failed to import settings for {guild_id_str}: {e}")
+                    return import_count
 
-                    guild_import_count = run_async_in_bot_loop(import_guild_settings())
-                    imported_items += guild_import_count
+                guild_import_count = run_async_in_bot_loop(import_guild_settings())
+                imported_items += guild_import_count
 
-                logger.info(f"Settings import completed: {imported_items} items imported")
+            logger.info(f"Settings import completed: {imported_items} items imported")
 
-                return jsonify({
-                    'success': True,
-                    'message': f'Successfully imported {imported_items} settings',
-                    'imported_items': imported_items,
-                    'backup_info': import_data.get('backup_info', {}),
-                    'timestamp': datetime.now().isoformat()
-                })
+            return jsonify({
+                'success': True,
+                'message': f'Successfully imported {imported_items} settings',
+                'imported_items': imported_items,
+                'backup_info': import_data.get('backup_info', {}),
+                'timestamp': datetime.now().isoformat()
+            })
 
-            except json.JSONDecodeError:
+        except json.JSONDecodeError:
             return jsonify({
                 'success': False,
                 'error': 'Invalid JSON format. Please ensure the file is a valid JSON document.'
             }), 400
         except Exception as e:
             logger.error(f"Settings import error: {e}")
-            logger.error(f"Import data type: {type(import_data) if 'import_data' in locals() else 'undefined'}")
-            if 'import_data' in locals() and isinstance(import_data, dict):
-                logger.error(f"Import data keys: {list(import_data.keys())}")
             return jsonify({
                 'success': False,
                 'error': f'Import failed: {str(e)}'
             }), 500
 
-            # ===== ERROR HANDLERS =====
-
-        @app.errorhandler(404)
-        def not_found_error(error):
-            """Enhanced 404 error handler"""
-            log_page_view('404_error')
-            return render_template('errors/404.html',
-                                   user=session.get('user'),
-                                   page_title='Page Not Found'), 404
-
-        @app.errorhandler(500)
-        def internal_error(error):
-            """Enhanced 500 error handler"""
-            log_page_view('500_error')
-            app.web_manager.error_count += 1
-            logger.error(f"Internal server error: {error}")
-            return render_template('errors/500.html',
-                                   user=session.get('user'),
-                                   page_title='Server Error'), 500
-
-        @app.errorhandler(403)
-        def forbidden_error(error):
-            """Enhanced 403 error handler"""
-            log_page_view('403_error')
-            return render_template('errors/403.html',
-                                   user=session.get('user'),
-                                   page_title='Access Denied'), 403
-
-        @app.errorhandler(Exception)
-        def handle_exception(e):
-            """Handle all unhandled exceptions"""
-            app.web_manager.error_count += 1
-            logger.error(f"Unhandled exception: {e}")
-            logger.error(traceback.format_exc())
-
-            # Return JSON error for API routes
-            if request.path.startswith('/api/'):
-                return jsonify({
-                    'success': False,
-                    'error': 'Internal server error',
-                    'timestamp': datetime.now().isoformat()
-                }), 500
-
-            # Return HTML error page for regular routes
-            flash('An unexpected error occurred. Please try again later.', 'error')
-            return redirect(url_for('dashboard'))
-
-        # ===== TEMPLATE FILTERS =====
-
-        @app.template_filter('format_number')
-        def format_number(value):
-            """Format numbers with commas"""
-            try:
-                return "{:,}".format(int(value))
-            except (ValueError, TypeError):
-                return value
-
-        @app.template_filter('timeago')
-        def timeago_filter(timestamp):
-            """Convert timestamp to 'time ago' format"""
-            try:
-                if isinstance(timestamp, str):
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-
-                now = datetime.now()
-                diff = now - timestamp
-
-                if diff.days > 0:
-                    return f"{diff.days} days ago"
-                elif diff.seconds > 3600:
-                    hours = diff.seconds // 3600
-                    return f"{hours} hours ago"
-                elif diff.seconds > 60:
-                    minutes = diff.seconds // 60
-                    return f"{minutes} minutes ago"
-                else:
-                    return "Just now"
-            except:
-                return "Unknown"
-
-        @app.template_filter('datetime')
-        def datetime_filter(timestamp):
-            """Format datetime for display"""
-            try:
-                if isinstance(timestamp, str):
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                return timestamp.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                return 'Unknown'
-
-        @app.template_filter('truncate_smart')
-        def truncate_smart(text, length=50, suffix='...'):
-            """Smart truncation that doesn't break words"""
-            if len(text) <= length:
-                return text
-
-            truncated = text[:length].rsplit(' ', 1)[0]
-            return truncated + suffix
-
-        @app.template_filter('percentage')
-        def percentage_filter(value, total):
-            """Calculate percentage"""
-            try:
-                if total == 0:
-                    return 0
-                return round((value / total) * 100, 1)
-            except:
-                return 0
-
-        @app.template_filter('file_size')
-        def file_size_filter(bytes_size):
-            """Format file size in human readable format"""
-            try:
-                bytes_size = int(bytes_size)
-                for unit in ['B', 'KB', 'MB', 'GB']:
-                    if bytes_size < 1024:
-                        return f"{bytes_size:.1f} {unit}"
-                    bytes_size /= 1024
-                return f"{bytes_size:.1f} TB"
-            except:
-                return "Unknown"
-
-        # ===== CONTEXT PROCESSORS =====
-
-        @app.context_processor
-        def inject_global_vars():
-            """Inject global variables into all templates"""
-            return {
-                'current_year': datetime.now().year,
-                'bot_name': 'Ladbot',
-                'version': '2.0',
-                'is_admin': require_admin() if require_auth() else False,
-                'current_user': session.get('user') if require_auth() else None,
-                'nav_guilds': get_user_guilds()[:5] if require_auth() else [],  # Limit to 5 for nav
-                'total_guilds': len(get_user_guilds()) if require_auth() else 0
+    @app.route('/api/health')
+    def api_health():
+        """Health check endpoint"""
+        try:
+            health_data = {
+                'status': 'healthy',
+                'timestamp': datetime.now().isoformat(),
+                'uptime': str(datetime.now() - app.web_manager.startup_time),
+                'bot_connected': app.bot is not None and app.bot.is_ready() if app.bot else False,
+                'database_healthy': db_manager.connection_healthy if 'db_manager' in globals() else False,
+                'requests_handled': app.web_manager.request_count,
+                'errors_count': app.web_manager.error_count
             }
 
-        @app.context_processor
-        def inject_stats():
-            """Inject basic stats into all templates"""
-            try:
-                basic_stats = app.web_manager._get_comprehensive_stats()
-                return {
-                    'global_stats': {
-                        'guilds': basic_stats.get('guilds', 0),
-                        'users': basic_stats.get('users', 0),
-                        'uptime': basic_stats.get('uptime', 'Unknown'),
-                        'commands_today': basic_stats.get('commands_today', 0)
-                    }
-                }
-            except Exception as e:
-                logger.warning(f"Failed to inject stats: {e}")
-                return {
-                    'global_stats': {
-                        'guilds': 0,
-                        'users': 0,
-                        'uptime': 'Unknown',
-                        'commands_today': 0
-                    }
-                }
+            return jsonify(health_data)
 
-        # ===== HELPER ROUTES FOR AJAX =====
+        except Exception as e:
+            return jsonify({
+                'status': 'unhealthy',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }), 500
 
-        @app.route('/api/guilds')
-        def api_user_guilds():
-            """Get user's accessible guilds via API"""
-            if not require_auth():
-                return jsonify({'error': 'Authentication required'}), 401
+    # ===== ERROR HANDLERS =====
 
-            try:
-                guilds = get_user_guilds()
-                return jsonify({
-                    'success': True,
-                    'guilds': guilds,
-                    'count': len(guilds),
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception as e:
-                logger.error(f"API guilds error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e)
-                }), 500
+    @app.errorhandler(404)
+    def not_found_error(error):
+        """Enhanced 404 error handler"""
+        log_page_view('404_error')
+        return render_template('errors/404.html',
+                               user=session.get('user'),
+                               page_title='Page Not Found'), 404
 
-        @app.route('/api/guild/<int:guild_id>/info')
-        def api_guild_info(guild_id):
-            """Get specific guild information"""
-            if not require_auth():
-                return jsonify({'error': 'Authentication required'}), 401
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Enhanced 500 error handler"""
+        log_page_view('500_error')
+        app.web_manager.error_count += 1
+        logger.error(f"Internal server error: {error}")
+        return render_template('errors/500.html',
+                               user=session.get('user'),
+                               page_title='Server Error'), 500
 
-            if not require_guild_admin(guild_id):
-                return jsonify({'error': 'Access denied'}), 403
+    @app.errorhandler(403)
+    def forbidden_error(error):
+        """Enhanced 403 error handler"""
+        log_page_view('403_error')
+        return render_template('errors/403.html',
+                               user=session.get('user'),
+                               page_title='Access Denied'), 403
 
-            try:
-                if not app.bot:
-                    return jsonify({'error': 'Bot not available'}), 503
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Handle all unhandled exceptions"""
+        app.web_manager.error_count += 1
+        logger.error(f"Unhandled exception: {e}")
+        logger.error(traceback.format_exc())
 
-                guild = app.bot.get_guild(guild_id)
-                if not guild:
-                    return jsonify({'error': 'Guild not found'}), 404
+        # Return JSON error for API routes
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'error': 'Internal server error',
+                'timestamp': datetime.now().isoformat()
+            }), 500
 
-                guild_info = {
-                    'id': str(guild.id),
-                    'name': guild.name,
-                    'icon': guild.icon.url if guild.icon else None,
-                    'member_count': guild.member_count,
-                    'created_at': guild.created_at.isoformat(),
-                    'owner_id': str(guild.owner_id),
-                    'verification_level': str(guild.verification_level),
-                    'features': guild.features,
-                    'premium_tier': guild.premium_tier,
-                    'premium_subscription_count': guild.premium_subscription_count or 0
-                }
+        # Return HTML error page for regular routes
+        flash('An unexpected error occurred. Please try again later.', 'error')
+        return redirect(url_for('dashboard'))
 
-                return jsonify({
-                    'success': True,
-                    'guild': guild_info,
-                    'timestamp': datetime.now().isoformat()
-                })
+    # ===== TEMPLATE FILTERS =====
 
-            except Exception as e:
-                logger.error(f"Guild info API error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e)
-                }), 500
+    @app.template_filter('format_number')
+    def format_number(value):
+        """Format numbers with commas"""
+        try:
+            return "{:,}".format(int(value))
+        except (ValueError, TypeError):
+            return value
 
-        @app.route('/api/health')
-        def api_health():
-            """Health check endpoint"""
-            try:
-                health_data = {
-                    'status': 'healthy',
-                    'timestamp': datetime.now().isoformat(),
-                    'uptime': str(datetime.now() - app.web_manager.startup_time),
-                    'bot_connected': app.bot is not None and app.bot.is_ready() if app.bot else False,
-                    'database_healthy': db_manager.connection_healthy if 'db_manager' in globals() else False,
-                    'requests_handled': app.web_manager.request_count,
-                    'errors_count': app.web_manager.error_count
-                }
+    @app.template_filter('timeago')
+    def timeago_filter(timestamp):
+        """Convert timestamp to 'time ago' format"""
+        try:
+            if isinstance(timestamp, str):
+                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
 
-                return jsonify(health_data)
+            now = datetime.now()
+            diff = now - timestamp
 
-            except Exception as e:
-                return jsonify({
-                    'status': 'unhealthy',
-                    'error': str(e),
-                    'timestamp': datetime.now().isoformat()
-                }), 500
+            if diff.days > 0:
+                return f"{diff.days} days ago"
+            elif diff.seconds > 3600:
+                hours = diff.seconds // 3600
+                return f"{hours} hours ago"
+            elif diff.seconds > 60:
+                minutes = diff.seconds // 60
+                return f"{minutes} minutes ago"
+            else:
+                return "Just now"
+        except:
+            return "Unknown"
 
-        # ===== DEVELOPMENT/DEBUG ROUTES =====
+    @app.template_filter('datetime')
+    def datetime_filter(timestamp):
+        """Format datetime for display"""
+        try:
+            if isinstance(timestamp, str):
+                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            return timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        except:
+            return 'Unknown'
 
-        if app.config.get('DEBUG', False):
-            @app.route('/api/debug/session')
-            def debug_session():
-                """Debug session data (only in debug mode)"""
-                if not require_admin():
-                    return jsonify({'error': 'Admin required'}), 403
+    @app.template_filter('truncate_smart')
+    def truncate_smart(text, length=50, suffix='...'):
+        """Smart truncation that doesn't break words"""
+        if len(text) <= length:
+            return text
 
-                return jsonify({
-                    'session_data': dict(session),
-                    'timestamp': datetime.now().isoformat()
-                })
+        truncated = text[:length].rsplit(' ', 1)[0]
+        return truncated + suffix
 
-            @app.route('/api/debug/stats')
-            def debug_stats():
-                """Debug stats data (only in debug mode)"""
-                if not require_admin():
-                    return jsonify({'error': 'Admin required'}), 403
+    # ===== CONTEXT PROCESSORS =====
 
-                try:
-                    stats = app.web_manager._get_comprehensive_stats()
-                    return jsonify({
-                        'stats': stats,
-                        'web_manager_stats': {
-                            'startup_time': app.web_manager.startup_time.isoformat(),
-                            'request_count': app.web_manager.request_count,
-                            'error_count': app.web_manager.error_count
-                        },
-                        'timestamp': datetime.now().isoformat()
-                    })
-                except Exception as e:
-                    return jsonify({
-                        'error': str(e),
-                        'timestamp': datetime.now().isoformat()
-                    }), 500
+    @app.context_processor
+    def inject_global_vars():
+        """Inject global variables into all templates"""
+        return {
+            'current_year': datetime.now().year,
+            'bot_name': 'Ladbot',
+            'version': '2.0',
+            'is_admin': require_admin() if require_auth() else False,
+            'current_user': session.get('user') if require_auth() else None,
+            'nav_guilds': get_user_guilds()[:5] if require_auth() else [],  # Limit to 5 for nav
+            'total_guilds': len(get_user_guilds()) if require_auth() else 0
+        }
 
-        logger.info("✅ All routes registered successfully")
+    logger.info("✅ All routes registered successfully")
