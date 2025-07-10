@@ -740,24 +740,44 @@ def register_routes(app):
             if not require_guild_admin(guild_id):
                 return jsonify({'error': 'Access denied'}), 403
 
-            # Use async function properly
-            async def save_all_settings():
-                success_count = 0
-                total_count = len(settings)
+            # ✅ FIXED: Use the bot's event loop instead of creating a new one
+            def save_settings_sync():
+                """Synchronous wrapper that schedules async operations"""
+                if not app.bot or not hasattr(app.bot, 'loop'):
+                    raise Exception("Bot not available or no event loop")
 
-                for setting_name, value in settings.items():
-                    success = await db_manager.set_guild_setting(guild_id, setting_name, value)
-                    if success:
-                        success_count += 1
-                        logger.info(f"✅ WEB: Set {setting_name}={value} for guild {guild_id}")
-                    else:
-                        logger.error(f"❌ WEB: Failed to set {setting_name} for guild {guild_id}")
+                loop = app.bot.loop
+                if loop.is_running():
+                    # Schedule the coroutine in the bot's event loop
+                    import concurrent.futures
+                    import threading
 
-                return success_count, total_count
+                    future = concurrent.futures.Future()
 
-            # Run the async function
-            import asyncio
-            success_count, total_count = asyncio.run(save_all_settings())
+                    async def save_all():
+                        try:
+                            success_count = 0
+                            total_count = len(settings)
+
+                            for setting_name, value in settings.items():
+                                success = await db_manager.set_guild_setting(guild_id, setting_name, value)
+                                if success:
+                                    success_count += 1
+                                    logger.info(f"✅ WEB: Set {setting_name}={value} for guild {guild_id}")
+                                else:
+                                    logger.error(f"❌ WEB: Failed to set {setting_name} for guild {guild_id}")
+
+                            future.set_result((success_count, total_count))
+                        except Exception as e:
+                            future.set_exception(e)
+
+                    # Schedule in bot's event loop
+                    asyncio.run_coroutine_threadsafe(save_all(), loop)
+                    return future.result(timeout=10)  # 10 second timeout
+                else:
+                    raise Exception("Bot event loop not running")
+
+            success_count, total_count = save_settings_sync()
 
             if success_count == total_count:
                 logger.info(f"🌐 WEB DASHBOARD: Updated {success_count}/{total_count} settings for guild {guild_id}")
@@ -775,6 +795,10 @@ def register_routes(app):
                     'settings_applied': success_count,
                     'total_settings': total_count
                 }), 500
+
+        except Exception as e:
+            logger.error(f"Settings update error: {e}")
+            return jsonify({'error': str(e)}), 500
 
         except Exception as e:
             logger.error(f"Settings update error: {e}")
@@ -916,38 +940,69 @@ def register_routes(app):
 
         @app.route('/api/test-database')
         def test_database():
-            """Test database connection and settings"""
+            """Test database connection and operations - FIXED VERSION"""
             if not require_auth():
                 return jsonify({'error': 'Authentication required'}), 401
 
             try:
-                async def test_db():
-                    # Test connection
-                    test_guild_id = 123456789  # Test guild ID
+                def test_db_sync():
+                    """Synchronous wrapper for database test"""
+                    if not app.bot or not hasattr(app.bot, 'loop'):
+                        return {'error': 'Bot not available'}
 
-                    # Test write
-                    write_success = await db_manager.set_guild_setting(test_guild_id, 'test_setting', True)
+                    loop = app.bot.loop
+                    if not loop.is_running():
+                        return {'error': 'Bot event loop not running'}
 
-                    # Test read
-                    read_value = await db_manager.get_guild_setting(test_guild_id, 'test_setting', False)
+                    import concurrent.futures
 
-                    return write_success, read_value
+                    future = concurrent.futures.Future()
 
-                import asyncio
-                write_success, read_value = asyncio.run(test_db())
+                    async def test_operations():
+                        try:
+                            # Test connection and basic operations
+                            health = await db_manager.health_check()
+
+                            # Test write/read cycle
+                            test_guild_id = 999999999  # Test guild ID
+                            write_success = await db_manager.set_guild_setting(test_guild_id, 'test_setting', True)
+                            read_value = await db_manager.get_guild_setting(test_guild_id, 'test_setting', False)
+
+                            # Cleanup
+                            await db_manager.delete_guild_settings(test_guild_id)
+
+                            future.set_result({
+                                'health': health,
+                                'write_success': write_success,
+                                'read_value': read_value,
+                                'connection_info': db_manager.get_connection_info()
+                            })
+                        except Exception as e:
+                            future.set_exception(e)
+
+                    # Schedule in bot's event loop
+                    asyncio.run_coroutine_threadsafe(test_operations(), loop)
+                    return future.result(timeout=10)
+
+                result = test_db_sync()
+
+                if 'error' in result:
+                    return jsonify({
+                        'success': False,
+                        'error': result['error']
+                    }), 500
 
                 return jsonify({
                     'success': True,
-                    'database_url': db_manager.database_url[:50] + '...' if db_manager.database_url else 'None',
-                    'write_test': write_success,
-                    'read_test': read_value,
-                    'connection_ready': db_manager.pool is not None
+                    **result
                 })
 
             except Exception as e:
+                logger.error(f"Database test error: {e}")
                 return jsonify({
                     'success': False,
-                    'error': str(e)
+                    'error': str(e),
+                    'connection_info': db_manager.get_connection_info() if 'db_manager' in globals() else None
                 }), 500
 
         @app.route('/api/settings/generate-sample', methods=['GET'])
