@@ -7,6 +7,7 @@ import os
 import logging
 import asyncio
 import json
+import traceback
 import aiosqlite
 from pathlib import Path
 from typing import Any, Dict, Optional, List
@@ -328,36 +329,45 @@ class DatabaseManager:
             return False
 
     async def _set_setting_postgresql(self, guild_id: int, setting_name: str, value: Any) -> bool:
-        """Set setting in PostgreSQL"""
+        """Set setting in PostgreSQL - FIXED VERSION"""
         async with self.pool.acquire() as conn:
-            # Get existing settings
-            row = await conn.fetchrow(
-                "SELECT settings FROM guild_settings WHERE guild_id = $1",
-                guild_id
-            )
+            try:
+                # Get existing settings
+                row = await conn.fetchrow(
+                    "SELECT settings FROM guild_settings WHERE guild_id = $1",
+                    guild_id
+                )
 
-            if row and row['settings']:
-                settings = dict(row['settings'])
-            else:
-                settings = {}
+                if row and row['settings']:
+                    # Convert JSONB to dict properly
+                    settings = dict(row['settings']) if isinstance(row['settings'], dict) else {}
+                else:
+                    settings = {}
 
-            # Update the specific setting
-            settings[setting_name] = value
-            settings['last_updated'] = datetime.now().isoformat()
-            settings['last_updated_by'] = 'database_manager'
+                # Update the specific setting
+                settings[setting_name] = value
+                settings['last_updated'] = datetime.now().isoformat()
+                settings['last_updated_by'] = 'web_dashboard'
 
-            # Upsert the settings
-            await conn.execute("""
-                               INSERT INTO guild_settings (guild_id, settings, updated_at)
-                               VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (guild_id) 
-                DO
-                               UPDATE SET
-                                   settings = $2,
-                                   updated_at = CURRENT_TIMESTAMP
-                               """, guild_id, json.dumps(settings))
+                # Convert to JSON string for PostgreSQL
+                settings_json = json.dumps(settings)
 
-            logger.info(f"✅ PostgreSQL: Set guild {guild_id} setting {setting_name} = {value}")
-            return True
+                # Upsert the settings with proper JSON handling
+                await conn.execute("""
+                                   INSERT INTO guild_settings (guild_id, settings, updated_at)
+                                   VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP) ON CONFLICT (guild_id) 
+                    DO
+                                   UPDATE SET
+                                       settings = $2::jsonb,
+                                       updated_at = CURRENT_TIMESTAMP
+                                   """, guild_id, settings_json)
+
+                logger.info(f"✅ PostgreSQL: Set guild {guild_id} setting {setting_name} = {value}")
+                return True
+
+            except Exception as e:
+                logger.error(f"PostgreSQL setting error for {setting_name}: {e}")
+                return False
 
     async def _set_setting_sqlite(self, guild_id: int, setting_name: str, value: Any) -> bool:
         """Set setting in SQLite"""
