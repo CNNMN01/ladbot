@@ -1,9 +1,17 @@
-# Environment variables and secrets
+# ===== ENVIRONMENT & SECRETS =====
+# CRITICAL: Never commit these files!
 .env
 *.env
 !.env.example
 
-# Python
+# Bot tokens and API keys
+*token*
+*secret*
+*key*.txt
+*credentials*
+config/secrets.json
+
+# ===== PYTHON =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -11,9 +19,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
 
 # Distribution / packaging
-.Python
 build/
 develop-eggs/
 dist/
@@ -32,7 +40,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# ===== VIRTUAL ENVIRONMENTS =====
 venv/
 env/
 ENV/
@@ -40,8 +48,9 @@ env.bak/
 venv.bak/
 .venv/
 .ENV/
+.virtualenv
 
-# IDE files
+# ===== IDE & EDITOR FILES =====
 .vscode/
 .idea/
 *.swp
@@ -49,8 +58,11 @@ venv.bak/
 *~
 .project
 .pydevproject
+*.sublime-project
+*.sublime-workspace
+.atom/
 
-# OS generated files
+# ===== OS GENERATED FILES =====
 .DS_Store
 .DS_Store?
 ._*
@@ -59,28 +71,58 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 desktop.ini
+$RECYCLE.BIN/
 
-# Logs and databases
+# ===== LOGS & DATABASES =====
 logs/
 *.log
 *.log.*
+log_*.txt
+debug.log
+error.log
+
+# Database files
 *.db
 *.sqlite*
 *.sqlite3
+database/
+db/
 
-# Bot-specific data
+# ===== BOT-SPECIFIC DATA =====
+# Guild and user data that shouldn't be public
 data/guild_settings/
 data/user_data/
 data/cache/
+data/backups/
+data/analytics.json
+command_stats.json
+error_reports/
+
+# Backup files
 backup_*/
+backups/
+*.backup
+*.bak
+
+# Temporary files
 temp/
 tmp/
+*.tmp
+*.temp
+session_data/
 
-# Web dashboard uploads
+# ===== WEB DASHBOARD =====
+# Uploaded files and user content
 uploads/
 src/web/static/uploads/
+src/web/static/user_content/
 
-# Test files
+# Session and cache files
+flask_session/
+cache/
+.cache/
+
+# ===== TESTING =====
 .pytest_cache/
 .coverage
 htmlcov/
@@ -90,72 +132,106 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+test_results/
 
-# Documentation builds
+# ===== DOCUMENTATION =====
 docs/_build/
 .readthedocs.yml
+site/
 
-# Jupyter Notebook
+# ===== JUPYTER NOTEBOOK =====
 .ipynb_checkpoints
 
-# pyenv
+# ===== PYTHON VERSION MANAGERS =====
 .python-version
+.pyenv-version
 
+# ===== PACKAGE MANAGERS =====
 # pipenv
 Pipfile.lock
 
 # Poetry
 poetry.lock
 
+# ===== TASK RUNNERS =====
 # Celery
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
-*.sage.py
-
-# mypy
+# ===== TYPE CHECKERS =====
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
 .pyre/
-
-# pytype static type analyzer
 .pytype/
 
-# Cython debug symbols
+# ===== CYTHON =====
 cython_debug/
 
-# Docker
-.dockerignore
-Dockerfile
-docker-compose.yml
-.docker/
+# ===== DOCKER =====
+# Uncomment if you don't want to track Docker files
+# .dockerignore
+# Dockerfile
+# docker-compose.yml
+# .docker/
 
-# Railway/Render deployment files (optional)
-# Uncomment if you don't want to track these
+# ===== DEPLOYMENT =====
+# Railway deployment files (uncomment if private)
 # railway.json
+# railway.toml
+
+# Render deployment files (uncomment if private)
 # render.yaml
 
-# Local development files
+# Heroku deployment files (uncomment if private)
+# Procfile
+# runtime.txt
+
+# ===== LOCAL DEVELOPMENT =====
 local_settings.py
+local_config.py
 test_config.py
 debug_data/
+development.db
 
-# Analytics and stats (if you want to keep them private)
-analytics.json
-command_stats.json
-error_reports/
+# ===== MONITORING & ANALYTICS =====
+# Private analytics data
+analytics/
+metrics/
+performance_data/
 
-# API keys and tokens (extra safety)
-*token*
-*secret*
-*key*.txt
-*credentials*
+# Error tracking
+sentry_data/
+error_logs/
 
-# Temporary bot data
-*.tmp
-*.temp
-session_data/
+# ===== SECURITY =====
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+certificates/
+
+# Security scans
+.bandit
+security_reports/
+
+# ===== MISC =====
+# Compiled translations
+*.mo
+
+# Django stuff (if you add Django later)
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Scrapy stuff
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# mkdocs documentation
+/site
+
+# End of file

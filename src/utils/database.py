@@ -4,12 +4,12 @@ Database setup for settings storage
 import os
 import logging
 import asyncpg
+import asyncio
 import json
 from typing import Any, Dict, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-
 
 class DatabaseManager:
     """Manages database connections and settings operations"""
@@ -19,57 +19,51 @@ class DatabaseManager:
         self.pool = None
 
     async def initialize(self):
-        """Initialize database connection pool"""
-        try:
-            if not self.database_url:
-                logger.error("❌ DATABASE_URL not found in environment variables")
-                return False
+        """Initialize database connection pool with retry logic"""
+        retry_count = 3
+        for attempt in range(retry_count):
+            try:
+                if not self.database_url:
+                    logger.error("❌ DATABASE_URL not found in environment variables")
+                    return False
 
-            # Create connection pool
-            self.pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=2,
-                max_size=10,
-                command_timeout=60
-            )
+                # Create connection pool with Railway-optimized settings
+                self.pool = await asyncpg.create_pool(
+                    self.database_url,
+                    min_size=1,  # Start smaller for Railway
+                    max_size=5,  # Reasonable limit
+                    command_timeout=30,
+                    server_settings={
+                        'application_name': 'ladbot',
+                        'jit': 'off'  # Disable JIT for better Railway compatibility
+                    }
+                )
 
-            # Create tables if they don't exist
-            await self.create_tables()
-            logger.info("✅ Database initialized successfully")
-            return True
+                # Create tables if they don't exist
+                await self.create_tables()
+                logger.info("✅ Database initialized successfully")
+                return True
 
-        except Exception as e:
-            logger.error(f"❌ Database initialization failed: {e}")
-            return False
+            except Exception as e:
+                logger.error(f"❌ Database init attempt {attempt+1} failed: {e}")
+                if attempt < retry_count - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+
+        return False
 
     async def create_tables(self):
         """Create settings table if it doesn't exist"""
         create_sql = """
-                     CREATE TABLE IF NOT EXISTS guild_settings \
-                     ( \
-                         guild_id \
-                         BIGINT \
-                         PRIMARY \
-                         KEY, \
-                         settings \
-                         JSONB \
-                         NOT \
-                         NULL \
-                         DEFAULT \
-                         '{}', \
-                         created_at \
-                         TIMESTAMP \
-                         DEFAULT \
-                         CURRENT_TIMESTAMP, \
-                         updated_at \
-                         TIMESTAMP \
-                         DEFAULT \
-                         CURRENT_TIMESTAMP
-                     );
-
-                     CREATE INDEX IF NOT EXISTS idx_guild_settings_updated
-                         ON guild_settings(updated_at); \
-                     """
+        CREATE TABLE IF NOT EXISTS guild_settings (
+            guild_id BIGINT PRIMARY KEY,
+            settings JSONB NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_guild_settings_updated 
+        ON guild_settings(updated_at);
+        """
 
         async with self.pool.acquire() as conn:
             await conn.execute(create_sql)
@@ -118,13 +112,13 @@ class DatabaseManager:
 
                 # Upsert the settings
                 await conn.execute("""
-                                   INSERT INTO guild_settings (guild_id, settings, updated_at)
-                                   VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (guild_id) 
-                    DO
-                                   UPDATE SET
-                                       settings = $2,
-                                       updated_at = CURRENT_TIMESTAMP
-                                   """, guild_id, json.dumps(settings))
+                    INSERT INTO guild_settings (guild_id, settings, updated_at) 
+                    VALUES ($1, $2, CURRENT_TIMESTAMP)
+                    ON CONFLICT (guild_id) 
+                    DO UPDATE SET 
+                        settings = $2,
+                        updated_at = CURRENT_TIMESTAMP
+                """, guild_id, json.dumps(settings))
 
                 logger.info(f"✅ DB SET: Guild {guild_id} setting {setting_name} = {value}")
                 return True
@@ -158,13 +152,13 @@ class DatabaseManager:
 
             async with self.pool.acquire() as conn:
                 await conn.execute("""
-                                   INSERT INTO guild_settings (guild_id, settings, updated_at)
-                                   VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (guild_id) 
-                    DO
-                                   UPDATE SET
-                                       settings = $2,
-                                       updated_at = CURRENT_TIMESTAMP
-                                   """, guild_id, json.dumps(settings))
+                    INSERT INTO guild_settings (guild_id, settings, updated_at) 
+                    VALUES ($1, $2, CURRENT_TIMESTAMP)
+                    ON CONFLICT (guild_id) 
+                    DO UPDATE SET 
+                        settings = $2,
+                        updated_at = CURRENT_TIMESTAMP
+                """, guild_id, json.dumps(settings))
 
                 logger.info(f"✅ DB SET ALL: Guild {guild_id} - {len(settings)} settings updated")
                 return True
@@ -178,7 +172,6 @@ class DatabaseManager:
         if self.pool:
             await self.pool.close()
             logger.info("📊 Database connections closed")
-
 
 # Global database manager instance
 db_manager = DatabaseManager()
