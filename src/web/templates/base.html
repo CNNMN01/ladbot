@@ -26,6 +26,8 @@
             --danger-color: #ED4245;
             --dark-color: #2C2F33;
             --light-color: #F8F9FA;
+            --text-primary: #2C2F33; /* FIXED: Dark text for light backgrounds */
+            --text-secondary: #495057; /* FIXED: Darker secondary text */
             --border-radius: 10px;
             --border-radius-lg: 15px;
             --shadow-sm: 0 2px 10px rgba(0,0,0,0.1);
@@ -38,7 +40,8 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding-top: 76px; /* Account for fixed navbar */
+            padding-top: 76px;
+            color: var(--text-primary) !important; /* FIXED: Force dark text */
         }
 
         /* ===== NAVIGATION ===== */
@@ -102,29 +105,57 @@
             font-size: 0.9rem;
         }
 
-        /* Active nav link */
         .navbar-nav .nav-link.active {
             background: rgba(255,255,255,0.2);
             color: white !important;
         }
 
-        /* ===== LAYOUT ===== */
+        /* ===== LAYOUT - FIXED FOR TEXT VISIBILITY ===== */
         .content-wrapper {
-            background: white;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px);
             border-radius: var(--border-radius-lg);
             box-shadow: var(--shadow-lg);
             margin: 20px;
             min-height: calc(100vh - 140px);
             overflow: hidden;
+            padding: 2rem;
+            color: var(--text-primary) !important;
         }
 
-        /* ===== CARDS ===== */
+        /* ===== HERO SECTION - FIXED ===== */
+        .hero-section {
+            text-align: center;
+            padding: 3rem 0;
+            color: var(--text-primary) !important;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary) !important;
+            text-shadow: none !important;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary) !important;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ===== CARDS - FIXED ===== */
         .card {
             border: none;
             border-radius: var(--border-radius-lg);
             box-shadow: var(--shadow-sm);
             transition: var(--transition);
             overflow: hidden;
+            background: rgba(255, 255, 255, 0.95) !important;
+            color: var(--text-primary) !important;
         }
 
         .card:hover {
@@ -137,6 +168,7 @@
             border-bottom: 1px solid rgba(88, 101, 242, 0.1);
             font-weight: 600;
             position: relative;
+            color: var(--text-primary) !important;
         }
 
         .card-header::before {
@@ -149,6 +181,51 @@
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
         }
 
+        .card-body {
+            color: var(--text-primary) !important;
+        }
+
+        .card-title {
+            color: var(--text-primary) !important;
+        }
+
+        .card-text {
+            color: var(--text-secondary) !important;
+        }
+
+        /* ===== STATS CARDS - FIXED FOR VISIBILITY ===== */
+        .stats-card, .stat-card {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-card:hover, .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stats-number, .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color) !important;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .stats-label, .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary) !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         /* ===== BUTTONS ===== */
         .btn {
             border-radius: var(--border-radius);
@@ -159,24 +236,25 @@
 
         .btn-primary {
             background: var(--primary-color);
-            color: white;
+            color: white !important;
         }
 
         .btn-primary:hover {
             background: var(--primary-hover);
             transform: translateY(-2px);
             box-shadow: var(--shadow-sm);
+            color: white !important;
         }
 
         .btn-outline-primary {
             border: 2px solid var(--primary-color);
-            color: var(--primary-color);
+            color: var(--primary-color) !important;
             background: transparent;
         }
 
         .btn-outline-primary:hover {
             background: var(--primary-color);
-            color: white;
+            color: white !important;
             transform: translateY(-1px);
         }
 
@@ -202,31 +280,52 @@
 
         .alert-success {
             background: linear-gradient(135deg, rgba(87, 242, 135, 0.1) 0%, rgba(87, 242, 135, 0.05) 100%);
-            color: #2d5016;
+            color: #155724 !important;
             border-left: 4px solid var(--success-color);
         }
 
         .alert-danger {
             background: linear-gradient(135deg, rgba(237, 66, 69, 0.1) 0%, rgba(237, 66, 69, 0.05) 100%);
-            color: #721c24;
+            color: #721c24 !important;
             border-left: 4px solid var(--danger-color);
         }
 
         .alert-warning {
             background: linear-gradient(135deg, rgba(254, 231, 92, 0.1) 0%, rgba(254, 231, 92, 0.05) 100%);
-            color: #856404;
+            color: #856404 !important;
             border-left: 4px solid var(--warning-color);
         }
 
         .alert-info {
             background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, rgba(88, 101, 242, 0.05) 100%);
-            color: #055160;
+            color: #055160 !important;
             border-left: 4px solid var(--primary-color);
+        }
+
+        /* ===== STATUS INDICATORS ===== */
+        .status-online {
+            color: var(--success-color) !important;
+        }
+
+        .status-offline {
+            color: var(--danger-color) !important;
         }
 
         /* ===== UTILITIES ===== */
         .text-primary {
             color: var(--primary-color) !important;
+        }
+
+        .text-secondary {
+            color: var(--text-secondary) !important;
+        }
+
+        .text-muted {
+            color: var(--text-secondary) !important;
+        }
+
+        .text-dark {
+            color: var(--text-primary) !important;
         }
 
         .bg-primary {
@@ -237,6 +336,14 @@
             border-color: var(--primary-color) !important;
         }
 
+        /* ===== FORCE DARK TEXT EVERYWHERE ===== */
+        h1, h2, h3, h4, h5, h6,
+        p, div, span, li, td, th,
+        .container, .container-fluid,
+        .row, .col {
+            color: var(--text-primary) !important;
+        }
+
         /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             body {
@@ -245,6 +352,7 @@
 
             .content-wrapper {
                 margin: 10px;
+                padding: 1rem;
                 border-radius: var(--border-radius);
                 min-height: calc(100vh - 86px);
             }
@@ -257,12 +365,28 @@
                 margin: 2px 0;
                 text-align: center;
             }
+
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.1rem;
+            }
+
+            .stats-number, .stat-number {
+                font-size: 2rem;
+            }
         }
 
         @media (max-width: 576px) {
             .content-wrapper {
                 margin: 5px;
                 min-height: calc(100vh - 76px);
+            }
+
+            .hero-title {
+                font-size: 2rem;
             }
         }
 
@@ -353,16 +477,26 @@
                             <i class="fas fa-cog"></i>Settings
                         </a>
                         <a class="nav-link {{ 'active' if request.endpoint == 'analytics' }}" href="{{ url_for('analytics') }}">
-                            <i class="fas fa-chart-line"></i>Analytics
+                            <i class="fas fa-chart-bar"></i>Analytics
                         </a>
-                        <a class="nav-link" href="{{ url_for('logout') }}">
-                            <i class="fas fa-sign-out-alt"></i>Logout
-                        </a>
+                        <div class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user"></i>{{ session.user.username if session.user else 'User' }}
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> About</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                            </ul>
+                        </div>
                     </div>
                 {% else %}
                     <div class="navbar-nav ms-auto">
-                        <a class="nav-link" href="{{ url_for('index') }}">
-                            <i class="fas fa-home"></i>Home
+                        <a class="nav-link" href="{{ url_for('about') }}">
+                            <i class="fas fa-info-circle"></i>About
+                        </a>
+                        <a class="nav-link" href="{{ url_for('login') }}">
+                            <i class="fas fa-sign-in-alt"></i>Login
                         </a>
                     </div>
                 {% endif %}
@@ -370,153 +504,41 @@
         </div>
     </nav>
 
-    <!-- Flash Messages -->
-    <div class="container-fluid mt-2">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show fade-in" role="alert">
-                        <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' if category == 'info' else 'check-circle' if category == 'success' else 'exclamation-circle' }} me-2"></i>
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
-
     <!-- Main Content -->
     <div class="content-wrapper fade-in">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="container-fluid mb-4">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <strong>
+                                {% if category == 'success' %}
+                                    <i class="fas fa-check-circle"></i>
+                                {% elif category == 'error' or category == 'danger' %}
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="fas fa-exclamation-circle"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle"></i>
+                                {% endif %}
+                            </strong>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Page Content -->
         {% block content %}{% endblock %}
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Custom JavaScript -->
-    <script>
-        // Global utility functions
-        window.ladbotUtils = {
-            // Auto-hide alerts
-            initAlerts: function() {
-                // Auto-hide alerts after 5 seconds
-                setTimeout(function() {
-                    var alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
-                    alerts.forEach(function(alert) {
-                        try {
-                            var bsAlert = new bootstrap.Alert(alert);
-                            bsAlert.close();
-                        } catch (e) {
-                            // Silent fail if alert already closed
-                        }
-                    });
-                }, 5000);
-            },
-
-            // Show loading state on button
-            setButtonLoading: function(button, loading = true) {
-                if (loading) {
-                    button.classList.add('btn-loading');
-                    button.disabled = true;
-                    button.setAttribute('data-original-text', button.textContent);
-                } else {
-                    button.classList.remove('btn-loading');
-                    button.disabled = false;
-                    const originalText = button.getAttribute('data-original-text');
-                    if (originalText) {
-                        button.textContent = originalText;
-                        button.removeAttribute('data-original-text');
-                    }
-                }
-            },
-
-            // Show toast notification
-            showToast: function(message, type = 'success', duration = 3000) {
-                // Create toast container if it doesn't exist
-                let toastContainer = document.querySelector('.toast-container');
-                if (!toastContainer) {
-                    toastContainer = document.createElement('div');
-                    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-                    toastContainer.style.zIndex = '1055';
-                    document.body.appendChild(toastContainer);
-                }
-
-                // Create toast element
-                const toastId = 'toast-' + Date.now();
-                const toastHtml = `
-                    <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                        <div class="toast-header">
-                            <i class="fas fa-${type === 'error' ? 'exclamation-triangle text-danger' : 'check-circle text-success'} me-2"></i>
-                            <strong class="me-auto">${type === 'error' ? 'Error' : 'Success'}</strong>
-                            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                        </div>
-                        <div class="toast-body">${message}</div>
-                    </div>
-                `;
-
-                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-                const toastElement = document.getElementById(toastId);
-                const toast = new bootstrap.Toast(toastElement, { delay: duration });
-
-                toast.show();
-
-                // Remove toast element after it's hidden
-                toastElement.addEventListener('hidden.bs.toast', function() {
-                    toastElement.remove();
-                });
-            },
-
-            // Format numbers with commas
-            formatNumber: function(num) {
-                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-            },
-
-            // Set active navigation item
-            setActiveNav: function() {
-                const currentPath = window.location.pathname;
-                const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
-
-                navLinks.forEach(link => {
-                    const href = link.getAttribute('href');
-                    if (href && currentPath === href) {
-                        link.classList.add('active');
-                    } else {
-                        link.classList.remove('active');
-                    }
-                });
-            }
-        };
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            ladbotUtils.initAlerts();
-            ladbotUtils.setActiveNav();
-
-            // Add smooth scrolling to all links
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
-                    if (target) {
-                        target.scrollIntoView({
-                            behavior: 'smooth'
-                        });
-                    }
-                });
-            });
-
-            console.log('🤖 Ladbot Dashboard loaded successfully');
-        });
-
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible') {
-                // Page became visible - could trigger data refresh
-                console.log('Page became visible');
-            }
-        });
-    </script>
-
+    <!-- Custom JS -->
     {% block scripts %}{% endblock %}
 </body>
 </html>
