@@ -1,17 +1,26 @@
-# ===== ENVIRONMENT & SECRETS =====
-# CRITICAL: Never commit these files!
+# ===== CRITICAL SECURITY - NEVER COMMIT THESE =====
 .env
-*.env
+.env.*
 !.env.example
+*.env
+.env.old
+.env.backup
 
-# Bot tokens and API keys
+# Specific token patterns from your bot (extra safety)
+*MTM8*
+*Vlu2*
+*KENmzB*
+
+# General credential patterns
 *token*
 *secret*
-*key*.txt
+*password*
 *credentials*
-config/secrets.json
+*api_key*
+config/secrets.*
+auth_config.*
 
-# ===== PYTHON =====
+# ===== PYTHON PROJECT FILES =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,8 +29,6 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-
-# Distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -48,9 +55,48 @@ env.bak/
 venv.bak/
 .venv/
 .ENV/
-.virtualenv
+.virtualenv/
 
-# ===== IDE & EDITOR FILES =====
+# ===== BOT DATA & LOGS =====
+logs/
+*.log
+*.log.*
+log_*.txt
+debug.log
+error.log
+data/guild_settings/
+data/user_data/
+data/cache/
+data/backups/
+data/analytics.json
+command_stats.json
+error_reports/
+backup_*/
+backups/
+*.backup
+*.bak
+temp/
+tmp/
+*.tmp
+*.temp
+session_data/
+
+# ===== DATABASE FILES =====
+*.db
+*.sqlite*
+*.sqlite3
+database/
+db/
+
+# ===== WEB DASHBOARD UPLOADS =====
+uploads/
+src/web/static/uploads/
+src/web/static/user_content/
+flask_session/
+cache/
+.cache/
+
+# ===== IDE & OS FILES =====
 .vscode/
 .idea/
 *.swp
@@ -61,8 +107,6 @@ venv.bak/
 *.sublime-project
 *.sublime-workspace
 .atom/
-
-# ===== OS GENERATED FILES =====
 .DS_Store
 .DS_Store?
 ._*
@@ -73,56 +117,7 @@ Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
 
-# ===== LOGS & DATABASES =====
-logs/
-*.log
-*.log.*
-log_*.txt
-debug.log
-error.log
-
-# Database files
-*.db
-*.sqlite*
-*.sqlite3
-database/
-db/
-
-# ===== BOT-SPECIFIC DATA =====
-# Guild and user data that shouldn't be public
-data/guild_settings/
-data/user_data/
-data/cache/
-data/backups/
-data/analytics.json
-command_stats.json
-error_reports/
-
-# Backup files
-backup_*/
-backups/
-*.backup
-*.bak
-
-# Temporary files
-temp/
-tmp/
-*.tmp
-*.temp
-session_data/
-
-# ===== WEB DASHBOARD =====
-# Uploaded files and user content
-uploads/
-src/web/static/uploads/
-src/web/static/user_content/
-
-# Session and cache files
-flask_session/
-cache/
-.cache/
-
-# ===== TESTING =====
+# ===== TESTING & COVERAGE =====
 .pytest_cache/
 .coverage
 htmlcov/
@@ -139,25 +134,6 @@ docs/_build/
 .readthedocs.yml
 site/
 
-# ===== JUPYTER NOTEBOOK =====
-.ipynb_checkpoints
-
-# ===== PYTHON VERSION MANAGERS =====
-.python-version
-.pyenv-version
-
-# ===== PACKAGE MANAGERS =====
-# pipenv
-Pipfile.lock
-
-# Poetry
-poetry.lock
-
-# ===== TASK RUNNERS =====
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
 # ===== TYPE CHECKERS =====
 .mypy_cache/
 .dmypy.json
@@ -165,27 +141,14 @@ dmypy.json
 .pyre/
 .pytype/
 
-# ===== CYTHON =====
-cython_debug/
-
-# ===== DOCKER =====
-# Uncomment if you don't want to track Docker files
-# .dockerignore
-# Dockerfile
-# docker-compose.yml
-# .docker/
-
-# ===== DEPLOYMENT =====
-# Railway deployment files (uncomment if private)
-# railway.json
-# railway.toml
-
-# Render deployment files (uncomment if private)
-# render.yaml
-
-# Heroku deployment files (uncomment if private)
-# Procfile
-# runtime.txt
+# ===== SECURITY FILES =====
+*.pem
+*.key
+*.crt
+*.cert
+certificates/
+.bandit
+security_reports/
 
 # ===== LOCAL DEVELOPMENT =====
 local_settings.py
@@ -194,44 +157,27 @@ test_config.py
 debug_data/
 development.db
 
-# ===== MONITORING & ANALYTICS =====
-# Private analytics data
-analytics/
-metrics/
-performance_data/
+# ===== DEPLOYMENT FILES (optional) =====
+# Uncomment if you want to keep these private
+# railway.json
+# render.yaml
+# Procfile
+# runtime.txt
 
-# Error tracking
-sentry_data/
-error_logs/
+# ===== JUPYTER NOTEBOOK =====
+.ipynb_checkpoints
 
-# ===== SECURITY =====
-# SSL certificates and keys
-*.pem
-*.key
-*.crt
-*.cert
-certificates/
+# ===== PYTHON VERSION MANAGERS =====
+.python-version
+.pyenv-version
 
-# Security scans
-.bandit
-security_reports/
+# ===== PACKAGE MANAGERS =====
+Pipfile.lock
+poetry.lock
 
-# ===== MISC =====
-# Compiled translations
-*.mo
+# ===== TASK RUNNERS =====
+celerybeat-schedule
+celerybeat.pid
 
-# Django stuff (if you add Django later)
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Scrapy stuff
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# mkdocs documentation
-/site
-
-# End of file
+# ===== CYTHON =====
+cython_debug/
