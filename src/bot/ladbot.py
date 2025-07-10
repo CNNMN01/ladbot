@@ -10,13 +10,13 @@ import threading
 import json
 import psutil
 import os
+import discord
 from pathlib import Path
 from utils.database import db_manager
 from datetime import datetime, date, timedelta
 from collections import defaultdict, deque
 from typing import Dict, Any, Optional, List, Union
 
-import discord
 from discord.ext import commands, tasks
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class LadBot(commands.Bot):
             self.db_manager = db_manager
 
             logger.info("🗄️ Initializing database connection...")
-            db_success = await self.db_manager.initialize()  # This line should work the same
+            db_success = await self.db_manager.initialize()
             if not db_success:
                 logger.error("❌ Database initialization failed - bot may not function properly")
             else:
@@ -130,6 +130,145 @@ class LadBot(commands.Bot):
             logger.info("🎮 Bot setup completed successfully")
         except Exception as e:
             logger.error(f"❌ Error in setup_hook: {e}")
+
+    # ===== GLOBAL COMMAND CHECKING =====
+
+    async def on_command(self, ctx):
+        """Global command interceptor - checks database settings for ALL commands"""
+        if not ctx.guild:
+            return  # Allow DM commands
+
+        if not self.database_ready:
+            return  # Allow commands if database not ready
+
+        try:
+            # Get the command name
+            command_name = ctx.command.name
+
+            # Special commands that should always work (admin/core commands)
+            always_allowed = {'help', 'ping', 'settings', 'reload', 'logs', 'console', 'feedback'}
+
+            if command_name in always_allowed:
+                return  # Allow these commands always
+
+            # Check if command is enabled in database
+            setting_enabled = await self.get_setting(ctx.guild.id, command_name, True)
+
+            if not setting_enabled:
+                # Command is disabled - stop it and show message
+                embed = discord.Embed(
+                    title="🚫 Command Disabled",
+                    description=f"The `{command_name}` command has been disabled for this server.",
+                    color=0xff9900
+                )
+                embed.add_field(
+                    name="Re-enable Command",
+                    value="Use the web dashboard to enable this command",
+                    inline=False
+                )
+                await ctx.send(embed=embed)
+
+                # Prevent the command from running
+                ctx.command.enabled = False
+                logger.info(f"🚫 Blocked disabled command: {command_name} in guild {ctx.guild.id}")
+                return
+
+            logger.debug(f"✅ Allowed command: {command_name} in guild {ctx.guild.id}")
+
+        except Exception as e:
+            logger.error(f"Error in global command check: {e}")
+            # On error, allow command (fail-safe)
+
+    # ===== SETTINGS METHODS - DATABASE INTEGRATION =====
+
+    async def get_setting(self, guild_id: int, setting_name: str, default=True):
+        """Get a guild setting from database - FIXED VERSION"""
+        if not self.database_ready or not self.db_manager:
+            logger.warning(f"Database not ready, returning default for {setting_name}")
+            return default
+
+        try:
+            # Force database lookup every time for web dashboard changes
+            value = await self.db_manager.get_guild_setting(guild_id, setting_name, default)
+            logger.debug(f"🔍 BOT: Got {setting_name}={value} for guild {guild_id} from database")
+            return value
+        except Exception as e:
+            logger.error(f"❌ BOT: Error getting setting {setting_name}: {e}")
+            return default
+
+    async def set_setting(self, guild_id: int, setting_name: str, value):
+        """Set a guild setting in database - FIXED VERSION"""
+        if not self.database_ready or not self.db_manager:
+            logger.warning(f"Database not ready, cannot set {setting_name}")
+            return False
+
+        try:
+            success = await self.db_manager.set_guild_setting(guild_id, setting_name, value)
+            if success:
+                # Clear any local cache
+                cache_key = f"{guild_id}_{setting_name}"
+                self.settings_cache.pop(cache_key, None)
+                logger.info(f"✅ BOT: Set {setting_name}={value} for guild {guild_id} in database")
+            return success
+        except Exception as e:
+            logger.error(f"❌ BOT: Error setting {setting_name}: {e}")
+            return False
+
+    async def get_all_guild_settings(self, guild_id: int):
+        """Get all settings for a guild from database"""
+        if not self.database_ready or not self.db_manager:
+            return {}
+
+        try:
+            return await self.db_manager.get_all_guild_settings(guild_id)
+        except Exception as e:
+            logger.error(f"Error getting all settings for guild {guild_id}: {e}")
+            return {}
+
+    def reload_guild_settings(self, guild_id: int):
+        """Clear settings cache for a guild (database is always current)"""
+        try:
+            # Clear cache for this guild
+            keys_to_remove = [k for k in self.settings_cache.keys() if k.startswith(f"{guild_id}_")]
+            for key in keys_to_remove:
+                del self.settings_cache[key]
+
+            logger.info(f"🔄 Cleared settings cache for guild {guild_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing cache for guild {guild_id}: {e}")
+            return False
+
+    # ===== COMPATIBILITY METHODS =====
+
+    def get_guild_setting(self, guild_id: int, setting_name: str, default=True):
+        """Sync wrapper for get_setting (for compatibility with sync code)"""
+        if not self.database_ready:
+            return default
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.get_setting(guild_id, setting_name, default))
+        except Exception as e:
+            logger.error(f"Error in sync get_guild_setting: {e}")
+            return default
+
+    def set_guild_setting(self, guild_id: int, setting_name: str, value):
+        """Sync wrapper for set_setting (for compatibility with sync code)"""
+        if not self.database_ready:
+            return False
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.set_setting(guild_id, setting_name, value))
+        except Exception as e:
+            logger.error(f"Error in sync set_guild_setting: {e}")
+            return False
+
+    @property
+    def prefix(self):
+        """Bot prefix for compatibility"""
+        return self.command_prefix
+
+    # ===== DATA MANAGEMENT =====
 
     def _create_data_manager(self):
         """Create a data manager for analytics and backups (non-settings data)"""
@@ -272,95 +411,6 @@ class LadBot(commands.Bot):
                 }
 
         return CogLoader(self)
-
-    # ===== SETTINGS METHODS - DATABASE INTEGRATION =====
-
-    async def get_setting(self, guild_id: int, setting_name: str, default=True):
-        """Get a guild setting from database - FIXED VERSION"""
-        if not self.database_ready or not self.db_manager:
-            logger.warning(f"Database not ready, returning default for {setting_name}")
-            return default
-
-        try:
-            # Force database lookup every time for web dashboard changes
-            value = await self.db_manager.get_guild_setting(guild_id, setting_name, default)
-            logger.info(f"🔍 BOT: Got {setting_name}={value} for guild {guild_id} from database")
-            return value
-        except Exception as e:
-            logger.error(f"❌ BOT: Error getting setting {setting_name}: {e}")
-            return default
-
-    async def set_setting(self, guild_id: int, setting_name: str, value):
-        """Set a guild setting in database - FIXED VERSION"""
-        if not self.database_ready or not self.db_manager:
-            logger.warning(f"Database not ready, cannot set {setting_name}")
-            return False
-
-        try:
-            success = await self.db_manager.set_guild_setting(guild_id, setting_name, value)
-            if success:
-                # Clear any local cache
-                cache_key = f"{guild_id}_{setting_name}"
-                self.settings_cache.pop(cache_key, None)
-                logger.info(f"✅ BOT: Set {setting_name}={value} for guild {guild_id} in database")
-            return success
-        except Exception as e:
-            logger.error(f"❌ BOT: Error setting {setting_name}: {e}")
-            return False
-
-    async def get_all_guild_settings(self, guild_id: int):
-        """Get all settings for a guild from database"""
-        if not self.database_ready or not self.db_manager:
-            return {}
-
-        try:
-            return await self.db_manager.get_all_guild_settings(guild_id)
-        except Exception as e:
-            logger.error(f"Error getting all settings for guild {guild_id}: {e}")
-            return {}
-
-    def reload_guild_settings(self, guild_id: int):
-        """Clear settings cache for a guild (database is always current)"""
-        try:
-            # Clear cache for this guild
-            keys_to_remove = [k for k in self.settings_cache.keys() if k.startswith(f"{guild_id}_")]
-            for key in keys_to_remove:
-                del self.settings_cache[key]
-
-            logger.info(f"🔄 Cleared settings cache for guild {guild_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Error clearing cache for guild {guild_id}: {e}")
-            return False
-
-    # ===== COMPATIBILITY METHODS =====
-
-    def get_guild_setting(self, guild_id: int, setting_name: str, default=True):
-        """Sync wrapper for get_setting (for compatibility with sync code)"""
-        if not self.database_ready:
-            return default
-        try:
-            loop = asyncio.get_event_loop()
-            return loop.run_until_complete(self.get_setting(guild_id, setting_name, default))
-        except Exception as e:
-            logger.error(f"Error in sync get_guild_setting: {e}")
-            return default
-
-    def set_guild_setting(self, guild_id: int, setting_name: str, value):
-        """Sync wrapper for set_setting (for compatibility with sync code)"""
-        if not self.database_ready:
-            return False
-        try:
-            loop = asyncio.get_event_loop()
-            return loop.run_until_complete(self.set_setting(guild_id, setting_name, value))
-        except Exception as e:
-            logger.error(f"Error in sync set_guild_setting: {e}")
-            return False
-
-    @property
-    def prefix(self):
-        """Bot prefix for compatibility"""
-        return self.command_prefix
 
     # ===== COG LOADING - ENHANCED =====
 
@@ -590,6 +640,12 @@ class LadBot(commands.Bot):
 
     async def on_command_error(self, ctx, error):
         """Enhanced error handling with tracking"""
+        # Don't show error for disabled commands (we already showed a message)
+        if hasattr(ctx.command, 'enabled') and not ctx.command.enabled:
+            # Re-enable for next time
+            ctx.command.enabled = True
+            return
+
         self.error_count += 1
 
         # Log the error
@@ -750,37 +806,54 @@ class LadBot(commands.Bot):
         except Exception as e:
             logger.error(f"Error during bot shutdown: {e}")
 
+
+
         finally:
+
             await super().close()
 
+        # ===== HELPER FUNCTIONS =====
 
-# ===== HELPER FUNCTIONS =====
+        def setup_bot() -> LadBot:
 
-def setup_bot() -> LadBot:
-    """Create and setup the bot instance"""
-    try:
-        bot = LadBot()
-        logger.info("✅ Bot instance created successfully")
-        return bot
-    except Exception as e:
-        logger.error(f"❌ Failed to create bot instance: {e}")
-        raise
+            """Create and setup the bot instance"""
 
+            try:
 
-if __name__ == "__main__":
-    # For testing purposes
-    import asyncio
-    from config.settings import settings
+                bot = LadBot()
 
+                logger.info("✅ Bot instance created successfully")
 
-    async def main():
-        bot = setup_bot()
-        try:
-            await bot.start(settings.BOT_TOKEN)
-        except KeyboardInterrupt:
-            logger.info("Bot stopped by user")
-        finally:
-            await bot.close()
+                return bot
 
+            except Exception as e:
 
-    asyncio.run(main())
+                logger.error(f"❌ Failed to create bot instance: {e}")
+
+                raise
+
+        if __name__ == "__main__":
+
+            # For testing purposes
+
+            import asyncio
+
+            from config.settings import settings
+
+            async def main():
+
+                bot = setup_bot()
+
+                try:
+
+                    await bot.start(settings.BOT_TOKEN)
+
+                except KeyboardInterrupt:
+
+                    logger.info("Bot stopped by user")
+
+                finally:
+
+                    await bot.close()
+
+            asyncio.run(main())
